@@ -1,0 +1,11 @@
+*.layout
+*.depend
+bin
+obj
+*.d
+*.o
+voxels-0.5
+voxels
+voxels-dbg
+*.save
+*~
