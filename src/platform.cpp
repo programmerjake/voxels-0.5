@@ -39,6 +39,11 @@ double Display::realtimeTimer()
 static string ResourcePrefix;
 static string getExecutablePath();
 
+string getResourceFileName(string resource)
+{
+    return ResourcePrefix + resource;
+}
+
 #ifdef _WIN64
 #error implement getExecutablePath for Win64
 #elif _WIN32

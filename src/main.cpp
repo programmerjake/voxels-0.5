@@ -16,13 +16,14 @@
  *
  */
 #include <iostream>
+#include "platform.h"
+#include "image.h"
 
 using namespace std;
 
-#include "platform.h"
-
 int main()
 {
+    Image textures("textures.png");
     while(true)
     {
         Display::initFrame();

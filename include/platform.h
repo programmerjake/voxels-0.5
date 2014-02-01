@@ -14,6 +14,8 @@ void glLoadMatrix(Matrix mat);
 
 const float defaultFPS = 60;
 
+string getResourceFileName(string resource);
+
 enum KeyboardKey
 {
     KeyboardKey_Unknown,
