@@ -49,6 +49,9 @@
 		<Unit filename="include/matrix.h" />
 		<Unit filename="include/platform.h" />
 		<Unit filename="include/png_decoder.h" />
+		<Unit filename="include/stream.h" />
+		<Unit filename="include/texture_atlas.h" />
+		<Unit filename="include/texture_descriptor.h" />
 		<Unit filename="include/util.h" />
 		<Unit filename="include/vector.h" />
 		<Unit filename="src/image.cpp" />
@@ -58,6 +61,8 @@
 			<Option compiler="gcc" use="1" buildCommand="$compiler $options $includes `sdl-config --cflags` -c $file -o $object" />
 		</Unit>
 		<Unit filename="src/png_decoder.cpp" />
+		<Unit filename="src/stream.cpp" />
+		<Unit filename="src/texture_atlas.cpp" />
 		<Unit filename="src/util.cpp" />
 		<Unit filename="src/vector.cpp" />
 		<Extensions>

@@ -23,7 +23,6 @@ using namespace std;
 
 int main()
 {
-    Image textures("textures.png");
     while(true)
     {
         Display::initFrame();

@@ -15,6 +15,4 @@
  * MA 02110-1301, USA.
  *
  */
-#include "util.h"
-
-default_random_engine defaultRandom;
+#include "stream.h"

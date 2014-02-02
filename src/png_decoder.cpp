@@ -1,8 +1,26 @@
+/*
+ * Voxels is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * Voxels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Voxels; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ *
+ */
 #include "png_decoder.h"
 #include <png.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cerrno>
+#include "util.h"
 
 using namespace std;
 
@@ -25,7 +43,7 @@ inline bool LoadPNG(const char *filename, uint8_t *&pixels, unsigned &width, uns
     FILE *f = fopen(filename, "rb");
     if(!f)
     {
-        errorMsg = string("can't open file : ") + strerror(errno);
+        errorMsg = string("can't open file : ") + strerror(errno) + " : \"" + filename + "\"";
         return false;
     }
     png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, (void *)&errorMsg, pngloaderror, pngloadwarning);
@@ -114,10 +132,10 @@ inline bool LoadPNG(const char *filename, uint8_t *&pixels, unsigned &width, uns
 
 }
 
-PngDecoder::PngDecoder(string fileName)
+PngDecoder::PngDecoder(wstring fileName)
 {
-    string errorMsg;
-    if(!LoadPNG(fileName.c_str(), data, w, h, errorMsg))
+    string errorMsg, str = wcsrtombs(fileName);
+    if(!LoadPNG(str.c_str(), data, w, h, errorMsg))
     {
         throw new PngLoadError(errorMsg);
     }

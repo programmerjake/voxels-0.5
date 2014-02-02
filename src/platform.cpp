@@ -21,6 +21,7 @@
 #include <GL/gl.h>
 #include "matrix.h"
 #include "vector.h"
+#include <cwchar>
 #include <string>
 #include <iostream>
 #include <cstdlib>
@@ -36,10 +37,10 @@ double Display::realtimeTimer()
     return static_cast<double>(chrono::duration_cast<chrono::nanoseconds>(chrono::system_clock::now().time_since_epoch()).count()) * 1e-9;
 }
 
-static string ResourcePrefix;
-static string getExecutablePath();
+static wstring ResourcePrefix;
+static wstring getExecutablePath();
 
-string getResourceFileName(string resource)
+wstring getResourceFileName(wstring resource)
 {
     return ResourcePrefix + resource;
 }
@@ -61,10 +62,11 @@ string getResourceFileName(string resource)
 #endif
 #elif __linux
 #include <unistd.h>
-#include <limits.h>
-#include <errno.h>
-#include <string.h>
-static string getExecutablePath()
+#include <climits>
+#include <cerrno>
+#include <cstring>
+#include <cwchar>
+static wstring getExecutablePath()
 {
     char buf[PATH_MAX + 1];
     ssize_t rv = readlink("/proc/self/exe", &buf[0], PATH_MAX);
@@ -73,7 +75,7 @@ static string getExecutablePath()
         throw new runtime_error(string("can't get executable path : ") + strerror(errno));
     }
     buf[rv] = '\0';
-    return string(&buf[0]);
+    return mbsrtowcs(&buf[0]);
 }
 #elif __unix
 #error implement getExecutablePath for other unix
@@ -85,13 +87,13 @@ static string getExecutablePath()
 
 initializer initializer1([]()
 {
-    string p = getExecutablePath();
-    size_t pos = p.find_last_of("/\\");
-    if(pos == string::npos)
-        p = "";
+    wstring p = getExecutablePath();
+    size_t pos = p.find_last_of(L"/\\");
+    if(pos == wstring::npos)
+        p = L"";
     else
         p = p.substr(0, pos + 1);
-    ResourcePrefix = p + "res/";
+    ResourcePrefix = p + L"res/";
 });
 
 static const auto ImageDecoderFlags = IMG_INIT_PNG;
@@ -753,16 +755,17 @@ void glLoadMatrix(Matrix mat)
     glLoadMatrixf(static_cast<const float *>(matArray));
 }
 
-string Display::title()
+wstring Display::title()
 {
     char *title_, *icon;
     SDL_WM_GetCaption(&title_, &icon);
-    return string(title_);
+    return mbsrtowcs(title_);
 }
 
-void Display::title(string newTitle)
+void Display::title(wstring newTitle)
 {
-    SDL_WM_SetCaption(newTitle.c_str(), nullptr);
+    string s = wcsrtombs(newTitle);
+    SDL_WM_SetCaption(s.c_str(), nullptr);
 }
 
 void Display::handleEvents(EventHandler *eventHandler)
