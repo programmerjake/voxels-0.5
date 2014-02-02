@@ -25,7 +25,7 @@ using namespace std;
 
 struct Color final
 {
-    float b, g, r, a; /// a is opacity -- 0 is transparent and 1 is opaque
+    float r, g, b, a; /// a is opacity -- 0 is transparent and 1 is opaque
     Color(float v, float a = 1)
     {
         r = g = b = v;
@@ -73,6 +73,10 @@ struct Color final
     void ai(uint8_t v)
     {
         a = (unsigned)v * (1.0f / 255.0f);
+    }
+    friend Color scale(Color l, Color r)
+    {
+        return Color(l.r * r.r, l.g * r.g, l.b * r.b, l.a * r.a);
     }
 };
 

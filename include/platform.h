@@ -20,6 +20,7 @@
 
 #include <GL/gl.h>
 #include <string>
+#include <memory>
 #include "matrix.h"
 #include "vector.h"
 
@@ -220,7 +221,7 @@ namespace Display
 {
     wstring title();
     void title(wstring newTitle);
-    void handleEvents(EventHandler * eventHandler);
+    void handleEvents(shared_ptr<EventHandler> eventHandler);
     void flip(float fps = defaultFPS);
     double instantaneousFPS();
     double frameDeltaTime();

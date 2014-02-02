@@ -22,6 +22,7 @@
 #include <cwchar>
 #include <string>
 #include <stdexcept>
+#include <mutex>
 #include "color.h"
 
 using namespace std;
@@ -42,7 +43,7 @@ public:
     explicit Image(unsigned w, unsigned h);
     explicit Image(Color c);
     Image(const Image &rt);
-    Image(Image &&rt);
+    const Image &operator =(const Image &);
     ~Image();
 
     void setPixel(int x, int y, Color c);
@@ -51,31 +52,45 @@ public:
     static void unbind();
     unsigned width() const
     {
-        return w;
+        return data->w;
     }
     unsigned height() const
     {
-        return h;
-    }
-    Image *dup() const
-    {
-        return new Image(*this);
+        return data->h;
     }
 private:
-    const Image &operator =(const Image &) = delete;
-    uint8_t *data;
-    unsigned w, h;
-    enum {BytesPerPixel = 4};
     enum RowOrder
     {
         TopToBottom,
         BottomToTop
     };
-    RowOrder rowOrder;
-    uint32_t texture;
-    bool textureValid;
+    struct data_t
+    {
+        uint8_t * const data;
+        unsigned refcount;
+        const unsigned w, h;
+        RowOrder rowOrder;
+        uint32_t texture;
+        bool textureValid;
+        mutex lock;
+        data_t(uint8_t * data, unsigned w, unsigned h, RowOrder rowOrder)
+            : data(data), refcount(0), w(w), h(h), rowOrder(rowOrder), texture(0), textureValid(false), lock()
+        {
+        }
+        data_t(uint8_t * data, data_t * rt)
+            : data(data), refcount(0), w(rt->w), h(rt->h), rowOrder(rt->rowOrder), texture(0), textureValid(false), lock()
+        {
+        }
+        ~data_t()
+        {
+            delete []data;
+        }
+    };
+    data_t *data;
+    static constexpr size_t BytesPerPixel = 4;
     void setRowOrder(RowOrder newRowOrder);
-    void swapRows(int y1, int y2);
+    void swapRows(unsigned y1, unsigned y2);
+    void copyOnWrite();
 };
 
 #endif // IMAGE_H

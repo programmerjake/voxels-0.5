@@ -25,12 +25,7 @@ Image::Image(wstring resourceName)
     try
     {
         PngDecoder decoder(getResourceFileName(resourceName));
-        w = decoder.width();
-        h = decoder.height();
-        rowOrder = TopToBottom;
-        texture = 0;
-        textureValid = false;
-        data = decoder.removeData();
+        data = new data_t(decoder.removeData(), decoder.width(), decoder.height(), TopToBottom);
     }
     catch(PngLoadError *e)
     {
@@ -42,112 +37,102 @@ Image::Image(wstring resourceName)
 
 Image::Image(unsigned w, unsigned h)
 {
-    this->w = w;
-    this->h = h;
-    rowOrder = TopToBottom;
-    texture = 0;
-    textureValid = false;
-    data = new uint8_t[BytesPerPixel * w * h];
-    memset((void *)data, 0, BytesPerPixel * w * h);
+    data = new data_t(new uint8_t[BytesPerPixel * w * h], w, h, TopToBottom);
+    memset((void *)data->data, 0, BytesPerPixel * w * h);
 }
 
 Image::Image(Color c)
 {
-    w = h = 1;
-    rowOrder = TopToBottom;
-    texture = 0;
-    textureValid = false;
-    data = new uint8_t[BytesPerPixel * w * h];
+    data = new data_t(new uint8_t[BytesPerPixel], 1, 1, TopToBottom);
     setPixel(0, 0, c);
 }
 
 Image::Image(const Image &rt)
 {
-    w = rt.w;
-    h = rt.h;
-    rowOrder = rt.rowOrder;
-    texture = 0;
-    textureValid = false;
-    data = new uint8_t[BytesPerPixel * w * h];
-    memcpy((void *)data, (const void *)rt.data, BytesPerPixel * w * h);
-}
-
-Image::Image(Image &&rt)
-{
-    w = rt.w;
-    h = rt.h;
-    rowOrder = rt.rowOrder;
-    texture = rt.texture;
-    textureValid = rt.textureValid;
     data = rt.data;
-    rt.w = 1;
-    rt.h = 1;
-    rt.texture = 0;
-    rt.textureValid = false;
-    rt.data = new uint8_t[BytesPerPixel];
-    memset((void *)rt.data, 0, BytesPerPixel);
+    data->lock.lock();
+    data->refcount++;
+    data->lock.unlock();
 }
 
 Image::~Image()
 {
     static_assert(sizeof(uint32_t) == sizeof(GLuint), "GLuint is not the same size as uint32_t");
-    if(texture != 0)
+    data->lock.lock();
+    if(data->refcount > 0)
     {
-        glDeleteTextures(1, (const GLuint *)&texture);
+        data->refcount--;
+        data->lock.unlock();
+        return;
     }
-    delete []data;
+    data->lock.unlock(); // so we don't destroy a locked mutex
+    if(data->texture != 0)
+    {
+        glDeleteTextures(1, (const GLuint *)&data->texture);
+    }
+    delete data;
 }
 
 void Image::setPixel(int x, int y, Color c)
 {
-    if(rowOrder == BottomToTop)
+    data->lock.lock();
+    if(data->rowOrder == BottomToTop)
     {
-        y = h - y - 1;
+        y = data->h - y - 1;
     }
-    if(y < 0 || (unsigned)y >= h || x < 0 || (unsigned)x >= w)
+    if(y < 0 || (unsigned)y >= data->h || x < 0 || (unsigned)x >= data->w)
     {
+        data->lock.unlock();
         return;
     }
-    uint8_t *pixel = &data[BytesPerPixel * (x + y * w)];
+    copyOnWrite();
+    data->textureValid = false;
+    uint8_t *pixel = &data->data[BytesPerPixel * (x + y * data->w)];
     pixel[0] = c.ri();
     pixel[1] = c.gi();
     pixel[2] = c.bi();
     pixel[3] = c.ai();
+    data->lock.unlock();
 }
 
 Color Image::getPixel(int x, int y) const
 {
     Color retval;
-    if(rowOrder == BottomToTop)
+    data->lock.lock();
+    if(data->rowOrder == BottomToTop)
     {
-        y = h - y - 1;
+        y = data->h - y - 1;
     }
-    if(y < 0 || (unsigned)y >= h || x < 0 || (unsigned)x >= w)
+    if(y < 0 || (unsigned)y >= data->h || x < 0 || (unsigned)x >= data->w)
     {
+        data->lock.unlock();
         return Color();
     }
-    uint8_t *pixel = &data[BytesPerPixel * (x + y * w)];
+    uint8_t *pixel = &data->data[BytesPerPixel * (x + y * data->w)];
     retval.ri(pixel[0]);
-    retval.gi(pixel[0]);
-    retval.bi(pixel[0]);
-    retval.ai(pixel[0]);
+    retval.gi(pixel[1]);
+    retval.bi(pixel[2]);
+    retval.ai(pixel[3]);
+    data->lock.unlock();
     return retval;
 }
 
 void Image::bind()
 {
     static_assert(sizeof(uint32_t) == sizeof(GLuint), "GLuint is not the same size as uint32_t");
+    data->lock.lock();
     setRowOrder(BottomToTop);
-    if(textureValid)
+    if(data->textureValid)
     {
-        glBindTexture(GL_TEXTURE_2D, texture);
+        glBindTexture(GL_TEXTURE_2D, data->texture);
+        data->lock.unlock();
         return;
     }
-    if(texture == 0)
+    if(data->texture == 0)
     {
-        glGenTextures(1, (GLuint *)&texture);
+        glGenTextures(1, (GLuint *)&data->texture);
     }
-    glBindTexture(GL_TEXTURE_2D, texture);
+    glBindTexture(GL_TEXTURE_2D, data->texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -155,8 +140,9 @@ void Image::bind()
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glPixelTransferf(GL_ALPHA_SCALE, 1.0);
     glPixelTransferf(GL_ALPHA_BIAS, 0.0);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid *)data);
-    textureValid = true;
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, data->w, data->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid *)data->data);
+    data->textureValid = true;
+    data->lock.unlock();
 }
 
 void Image::unbind()
@@ -166,25 +152,37 @@ void Image::unbind()
 
 void Image::setRowOrder(RowOrder newRowOrder)
 {
-    if(rowOrder == newRowOrder)
+    if(data->rowOrder == newRowOrder)
     {
         return;
     }
-    rowOrder = newRowOrder;
-    for(int y1 = 0, y2 = h - 1; y1 < y2; y1++, y2--)
+    data->rowOrder = newRowOrder;
+    for(unsigned y1 = 0, y2 = data->h - 1; y1 < y2; y1++, y2--)
     {
         swapRows(y1, y2);
     }
 }
 
-void Image::swapRows(int y1, int y2)
+void Image::swapRows(unsigned y1, unsigned y2)
 {
-    int index1 = y1 * w * BytesPerPixel, index2 = y2 * w * BytesPerPixel;
-    for(unsigned i = 0; i < w * BytesPerPixel; i++)
+    size_t index1 = y1 * BytesPerPixel * data->w, index2 = y2 * BytesPerPixel * data->w;
+    for(size_t i = 0; i < data->w * BytesPerPixel; i++)
     {
-        uint8_t t = data[index1];
-        data[index1++] = data[index2];
-        data[index2++] = t;
+        uint8_t t = data->data[index1];
+        data->data[index1++] = data->data[index2];
+        data->data[index2++] = t;
     }
 }
 
+void Image::copyOnWrite()
+{
+    if(data->refcount == 0)
+        return;
+    data_t * newData = new data_t(new uint8_t[BytesPerPixel * data->w * data->h], data);
+    for(size_t i = 0; i < BytesPerPixel * data->w * data->h; i++)
+        newData->data[i] = data->data[i];
+    data->refcount--;
+    data->lock.unlock();
+    data = newData;
+    data->lock.lock();
+}

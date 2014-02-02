@@ -369,4 +369,9 @@ public:
     }
 };
 
+inline Vector transform(const Matrix & m, Vector v)
+{
+    return m.apply(v);
+}
+
 #endif // MATRIX_H

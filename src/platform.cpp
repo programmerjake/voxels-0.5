@@ -714,16 +714,16 @@ struct DefaultEventHandler : public EventHandler
         return true;
     }
 };
-DefaultEventHandler DefaultEventHandler_handler;
+shared_ptr<EventHandler> DefaultEventHandler_handler(new DefaultEventHandler);
 }
 
-static void handleEvents(EventHandler *eventHandler)
+static void handleEvents(shared_ptr<EventHandler> eventHandler)
 {
     for(Event *e = makeEvent(); e != nullptr; e = makeEvent())
     {
         if(eventHandler == nullptr || !e->dispatch(eventHandler))
         {
-            e->dispatch(&DefaultEventHandler_handler);
+            e->dispatch(DefaultEventHandler_handler);
         }
     }
 }
@@ -768,7 +768,7 @@ void Display::title(wstring newTitle)
     SDL_WM_SetCaption(s.c_str(), nullptr);
 }
 
-void Display::handleEvents(EventHandler *eventHandler)
+void Display::handleEvents(shared_ptr<EventHandler> eventHandler)
 {
     ::handleEvents(eventHandler);
 }

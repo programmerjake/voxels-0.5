@@ -19,6 +19,7 @@
 #define EVENT_H_INCLUDED
 
 #include "platform.h"
+#include <memory>
 
 class KeyDownEvent;
 class MouseUpEvent;
@@ -62,7 +63,7 @@ protected:
     {
     }
 public:
-    virtual bool dispatch(EventHandler *eventHandler) = 0;
+    virtual bool dispatch(shared_ptr<EventHandler> eventHandler) = 0;
 };
 
 class MouseEvent : public Event
@@ -95,7 +96,7 @@ public:
     KeyDownEvent(KeyboardKey key, KeyboardModifiers mods, bool isRepetition = false) : KeyEvent(Type_KeyDown, key, mods), isRepetition(isRepetition)
     {
     }
-    virtual bool dispatch(EventHandler *eventHandler) override
+    virtual bool dispatch(shared_ptr<EventHandler> eventHandler) override
     {
         return eventHandler->handleKeyDown(*this);
     }
@@ -108,7 +109,7 @@ public:
         : KeyEvent(Type_KeyUp, key, mods)
     {
     }
-    virtual bool dispatch(EventHandler *eventHandler) override
+    virtual bool dispatch(shared_ptr<EventHandler> eventHandler) override
     {
         return eventHandler->handleKeyUp(*this);
     }
@@ -121,7 +122,7 @@ struct KeyPressEvent : public Event
         : Event(Type_KeyPress), character(character)
     {
     }
-    virtual bool dispatch(EventHandler *eventHandler) override
+    virtual bool dispatch(shared_ptr<EventHandler> eventHandler) override
     {
         return eventHandler->handleKeyPress(*this);
     }
@@ -143,7 +144,7 @@ struct MouseUpEvent : public MouseButtonEvent
     {
     }
 
-    virtual bool dispatch(EventHandler *eventHandler) override
+    virtual bool dispatch(shared_ptr<EventHandler> eventHandler) override
     {
         return eventHandler->handleMouseUp(*this);
     }
@@ -156,7 +157,7 @@ struct MouseDownEvent : public MouseButtonEvent
     {
     }
 
-    virtual bool dispatch(EventHandler *eventHandler) override
+    virtual bool dispatch(shared_ptr<EventHandler> eventHandler) override
     {
         return eventHandler->handleMouseDown(*this);
     }
@@ -169,7 +170,7 @@ struct MouseMoveEvent : public MouseEvent
     {
     }
 
-    virtual bool dispatch(EventHandler *eventHandler) override
+    virtual bool dispatch(shared_ptr<EventHandler> eventHandler) override
     {
         return eventHandler->handleMouseMove(*this);
     }
@@ -183,7 +184,7 @@ struct MouseScrollEvent : public MouseEvent
     {
     }
 
-    virtual bool dispatch(EventHandler *eventHandler) override
+    virtual bool dispatch(shared_ptr<EventHandler> eventHandler) override
     {
         return eventHandler->handleMouseScroll(*this);
     }
@@ -195,83 +196,91 @@ struct QuitEvent : public Event
         : Event(Type_Quit)
     {
     }
-    virtual bool dispatch(EventHandler *eventHandler) override
+    virtual bool dispatch(shared_ptr<EventHandler> eventHandler) override
     {
         return eventHandler->handleQuit(*this);
     }
 };
 
-class CombinedEventHandler : public EventHandler
+class CombinedEventHandler final : public EventHandler
 {
 private:
-    EventHandler *first, *second;
+    shared_ptr<EventHandler> first, second;
 public:
-    CombinedEventHandler(EventHandler *first, EventHandler *second)
+    CombinedEventHandler(shared_ptr<EventHandler> first, shared_ptr<EventHandler> second)
         : first(first), second(second)
     {
     }
-    virtual bool handleMouseUp(MouseUpEvent &event)
+    virtual bool handleMouseUp(MouseUpEvent &event) override
     {
         if(first->handleMouseUp(event))
         {
             return true;
         }
+
         return second->handleMouseUp(event);
     }
-    virtual bool handleMouseDown(MouseDownEvent &event)
+    virtual bool handleMouseDown(MouseDownEvent &event) override
     {
         if(first->handleMouseDown(event))
         {
             return true;
         }
+
         return second->handleMouseDown(event);
     }
-    virtual bool handleMouseMove(MouseMoveEvent &event)
+    virtual bool handleMouseMove(MouseMoveEvent &event) override
     {
         if(first->handleMouseMove(event))
         {
             return true;
         }
+
         return second->handleMouseMove(event);
     }
-    virtual bool handleMouseScroll(MouseScrollEvent &event)
+    virtual bool handleMouseScroll(MouseScrollEvent &event)override
     {
         if(first->handleMouseScroll(event))
         {
             return true;
         }
+
         return second->handleMouseScroll(event);
     }
-    virtual bool handleKeyUp(KeyUpEvent &event)
+    virtual bool handleKeyUp(KeyUpEvent &event)override
     {
         if(first->handleKeyUp(event))
         {
             return true;
         }
+
         return second->handleKeyUp(event);
     }
-    virtual bool handleKeyDown(KeyDownEvent &event)
+    virtual bool handleKeyDown(KeyDownEvent &event)override
     {
         if(first->handleKeyDown(event))
         {
             return true;
         }
+
         return second->handleKeyDown(event);
     }
-    virtual bool handleKeyPress(KeyPressEvent &event)
+    virtual bool handleKeyPress(KeyPressEvent &event)override
     {
         if(first->handleKeyPress(event))
         {
             return true;
         }
+
         return second->handleKeyPress(event);
     }
-    virtual bool handleQuit(QuitEvent &event)
+    virtual bool handleQuit(QuitEvent &event)override
     {
         if(first->handleQuit(event))
         {
             return true;
         }
+
         return second->handleQuit(event);
     }
 };
