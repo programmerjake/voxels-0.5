@@ -835,7 +835,7 @@ float Display::scaleY()
 
 void Display::initFrame()
 {
-    if(width > height)
+    if(width < height)
     {
         scaleXInternal = static_cast<float>(width()) / height();
         scaleYInternal = 1.0;
@@ -847,9 +847,9 @@ void Display::initFrame()
     }
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_TEXTURE_2D);
-    glEnable(GL_ALPHA_TEST);
-    glEnable(GL_CULL_FACE);
-    glEnable(GL_BLEND);
+    //glEnable(GL_ALPHA_TEST);
+    //glEnable(GL_CULL_FACE);
+    //glEnable(GL_BLEND);
     glDepthFunc(GL_LEQUAL);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);

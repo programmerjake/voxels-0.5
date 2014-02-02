@@ -19,6 +19,7 @@
 #define COLOR_H_INCLUDED
 
 #include <cstdint>
+#include <ostream>
 #include "util.h"
 
 using namespace std;
@@ -77,6 +78,10 @@ struct Color final
     friend Color scale(Color l, Color r)
     {
         return Color(l.r * r.r, l.g * r.g, l.b * r.b, l.a * r.a);
+    }
+    friend ostream & operator <<(ostream & os, const Color & c)
+    {
+        return os << "RGBA(" << c.r << ", " << c.g << ", " << c.b << ", " << c.a << ")";
     }
 };
 

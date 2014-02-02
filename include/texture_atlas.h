@@ -23,7 +23,7 @@
 class TextureAtlas final
 {
 public:
-	static Image * const texture;
+	static const Image texture;
 	const int left, top, width, height;
     const float minU, maxU, minV, maxV;
 	enum {textureXRes = 512, textureYRes = 256};
@@ -31,7 +31,7 @@ public:
 	explicit TextureAtlas(int left, int top, int width, int height)
         : left(left), top(top), width(width), height(height),
         minU((left + pixelOffset) / textureXRes),
-        maxU((left + width + pixelOffset) / textureXRes),
+        maxU((left + width - pixelOffset) / textureXRes),
         minV(1 - (top + height - pixelOffset) / textureYRes),
         maxV(1 - (top + pixelOffset) / textureYRes)
 	{

@@ -42,13 +42,18 @@ public:
     explicit Image(wstring resourceName);
     explicit Image(unsigned w, unsigned h);
     explicit Image(Color c);
+    Image();
+    Image(nullptr_t)
+        : Image()
+    {
+    }
     Image(const Image &rt);
     const Image &operator =(const Image &);
     ~Image();
 
     void setPixel(int x, int y, Color c);
     Color getPixel(int x, int y) const;
-    void bind();
+    void bind() const;
     static void unbind();
     unsigned width() const
     {
@@ -57,6 +62,22 @@ public:
     unsigned height() const
     {
         return data->h;
+    }
+    operator bool() const
+    {
+        return data != nullptr;
+    }
+    bool operator !() const
+    {
+        return data == nullptr;
+    }
+    friend bool operator ==(Image l, Image r)
+    {
+        return l.data == r.data;
+    }
+    friend bool operator !=(Image l, Image r)
+    {
+        return l.data != r.data;
     }
 private:
     enum RowOrder
@@ -88,8 +109,8 @@ private:
     };
     data_t *data;
     static constexpr size_t BytesPerPixel = 4;
-    void setRowOrder(RowOrder newRowOrder);
-    void swapRows(unsigned y1, unsigned y2);
+    void setRowOrder(RowOrder newRowOrder) const;
+    void swapRows(unsigned y1, unsigned y2) const;
     void copyOnWrite();
 };
 

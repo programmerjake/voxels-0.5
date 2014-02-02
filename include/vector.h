@@ -22,6 +22,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <random>
+#include <ostream>
 
 using namespace std;
 
@@ -223,6 +224,11 @@ public:
         }
         while(absSquared(retval) > 1 || absSquared(retval) < eps);
         return retval;
+    }
+
+    friend ostream & operator <<(ostream & os, const Vector & v)
+    {
+        return os << "<" << v.x << ", " << v.y << ", " << v.z << ">";
     }
 private:
 };

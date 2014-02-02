@@ -50,41 +50,87 @@ Image::Image(Color c)
 Image::Image(const Image &rt)
 {
     data = rt.data;
+
+    if(!data)
+    {
+        return;
+    }
+
     data->lock.lock();
     data->refcount++;
     data->lock.unlock();
 }
 
+Image::Image()
+    : data(nullptr)
+{
+}
+
 Image::~Image()
 {
     static_assert(sizeof(uint32_t) == sizeof(GLuint), "GLuint is not the same size as uint32_t");
+
+    if(!data)
+    {
+        return;
+    }
+
     data->lock.lock();
+
     if(data->refcount > 0)
     {
         data->refcount--;
         data->lock.unlock();
         return;
     }
+
     data->lock.unlock(); // so we don't destroy a locked mutex
+
     if(data->texture != 0)
     {
         glDeleteTextures(1, (const GLuint *)&data->texture);
     }
+
     delete data;
+}
+
+const Image & Image::operator =(const Image & rt)
+{
+    static_assert(sizeof(uint32_t) == sizeof(GLuint), "GLuint is not the same size as uint32_t");
+    this->~Image();
+    data = rt.data;
+
+    if(!data)
+    {
+        return *this;
+    }
+
+    data->lock.lock();
+    data->refcount++;
+    data->lock.unlock();
+    return *this;
 }
 
 void Image::setPixel(int x, int y, Color c)
 {
+    if(!data)
+    {
+        return;
+    }
+
     data->lock.lock();
+
     if(data->rowOrder == BottomToTop)
     {
         y = data->h - y - 1;
     }
+
     if(y < 0 || (unsigned)y >= data->h || x < 0 || (unsigned)x >= data->w)
     {
         data->lock.unlock();
         return;
     }
+
     copyOnWrite();
     data->textureValid = false;
     uint8_t *pixel = &data->data[BytesPerPixel * (x + y * data->w)];
@@ -97,17 +143,25 @@ void Image::setPixel(int x, int y, Color c)
 
 Color Image::getPixel(int x, int y) const
 {
+    if(!data)
+    {
+        return Color();
+    }
+
     Color retval;
     data->lock.lock();
+
     if(data->rowOrder == BottomToTop)
     {
         y = data->h - y - 1;
     }
+
     if(y < 0 || (unsigned)y >= data->h || x < 0 || (unsigned)x >= data->w)
     {
         data->lock.unlock();
         return Color();
     }
+
     uint8_t *pixel = &data->data[BytesPerPixel * (x + y * data->w)];
     retval.ri(pixel[0]);
     retval.gi(pixel[1]);
@@ -117,21 +171,31 @@ Color Image::getPixel(int x, int y) const
     return retval;
 }
 
-void Image::bind()
+void Image::bind() const
 {
     static_assert(sizeof(uint32_t) == sizeof(GLuint), "GLuint is not the same size as uint32_t");
+
+    if(!data)
+    {
+        unbind();
+        return;
+    }
+
     data->lock.lock();
     setRowOrder(BottomToTop);
+
     if(data->textureValid)
     {
         glBindTexture(GL_TEXTURE_2D, data->texture);
         data->lock.unlock();
         return;
     }
+
     if(data->texture == 0)
     {
         glGenTextures(1, (GLuint *)&data->texture);
     }
+
     glBindTexture(GL_TEXTURE_2D, data->texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -150,22 +214,25 @@ void Image::unbind()
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void Image::setRowOrder(RowOrder newRowOrder)
+void Image::setRowOrder(RowOrder newRowOrder) const
 {
     if(data->rowOrder == newRowOrder)
     {
         return;
     }
+
     data->rowOrder = newRowOrder;
+
     for(unsigned y1 = 0, y2 = data->h - 1; y1 < y2; y1++, y2--)
     {
         swapRows(y1, y2);
     }
 }
 
-void Image::swapRows(unsigned y1, unsigned y2)
+void Image::swapRows(unsigned y1, unsigned y2) const
 {
     size_t index1 = y1 * BytesPerPixel * data->w, index2 = y2 * BytesPerPixel * data->w;
+
     for(size_t i = 0; i < data->w * BytesPerPixel; i++)
     {
         uint8_t t = data->data[index1];
@@ -177,10 +244,17 @@ void Image::swapRows(unsigned y1, unsigned y2)
 void Image::copyOnWrite()
 {
     if(data->refcount == 0)
+    {
         return;
-    data_t * newData = new data_t(new uint8_t[BytesPerPixel * data->w * data->h], data);
+    }
+
+    data_t *newData = new data_t(new uint8_t[BytesPerPixel * data->w * data->h], data);
+
     for(size_t i = 0; i < BytesPerPixel * data->w * data->h; i++)
+    {
         newData->data[i] = data->data[i];
+    }
+
     data->refcount--;
     data->lock.unlock();
     data = newData;

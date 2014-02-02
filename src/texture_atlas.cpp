@@ -6,11 +6,11 @@ using namespace std;
 
 namespace
 {
-Image *loadImage()
+Image loadImage()
 {
     try
     {
-        return new Image(L"textures.png");
+        return Image(L"textures.png");
     }
     catch(exception *e)
     {
@@ -21,7 +21,7 @@ Image *loadImage()
 }
 }
 
-Image *const TextureAtlas::texture = loadImage();
+const Image TextureAtlas::texture = loadImage();
 
 const TextureAtlas
 TextureAtlas::ActivatorRailOff(0, 0, 16, 16),

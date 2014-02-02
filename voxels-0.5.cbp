@@ -45,6 +45,7 @@
 		</Linker>
 		<Unit filename="include/color.h" />
 		<Unit filename="include/event.h" />
+		<Unit filename="include/generate.h" />
 		<Unit filename="include/image.h" />
 		<Unit filename="include/matrix.h" />
 		<Unit filename="include/mesh.h" />

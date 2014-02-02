@@ -115,7 +115,7 @@ inline bool LoadPNG(const char *filename, uint8_t *&pixels, unsigned &width, uns
     }
     for(unsigned y = 0; y < YRes; y++)
     {
-        rows[y] = (png_bytep)&retval[y * XRes];
+        rows[y] = (png_bytep)&retval[y * XRes * 4];
     }
 
     png_read_image(png_ptr, rows);
