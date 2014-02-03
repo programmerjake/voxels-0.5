@@ -835,7 +835,7 @@ float Display::scaleY()
 
 void Display::initFrame()
 {
-    if(width < height)
+    if(width > height)
     {
         scaleXInternal = static_cast<float>(width()) / height();
         scaleYInternal = 1.0;
@@ -847,13 +847,13 @@ void Display::initFrame()
     }
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_TEXTURE_2D);
-    //glEnable(GL_ALPHA_TEST);
-    //glEnable(GL_CULL_FACE);
-    //glEnable(GL_BLEND);
+    glEnable(GL_ALPHA_TEST);
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
     glDepthFunc(GL_LEQUAL);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
-    glAlphaFunc(GL_GREATER, 0.05f);
+    glAlphaFunc(GL_GREATER, 0.0f);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
@@ -861,8 +861,7 @@ void Display::initFrame()
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     const float minDistance = 5e-2f, maxDistance = 100.0f;
-    glFrustum(-minDistance * scaleX(), minDistance * scaleX(), -minDistance
-              * scaleY(), minDistance * scaleY(), minDistance, maxDistance);
+    glFrustum(-minDistance / scaleY(), minDistance / scaleY(), -minDistance / scaleX(), minDistance / scaleX(), minDistance, maxDistance);
     glEnableClientState(GL_COLOR_ARRAY);
     glEnableClientState(GL_TEXTURE_COORD_ARRAY);
     glEnableClientState(GL_VERTEX_ARRAY);

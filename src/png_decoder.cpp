@@ -92,8 +92,6 @@ inline bool LoadPNG(const char *filename, uint8_t *&pixels, unsigned &width, uns
         png_set_palette_to_rgb(png_ptr);
     }
 
-    png_set_invert_alpha(png_ptr);
-
     if((color_type & PNG_COLOR_MASK_ALPHA) == 0)
     {
         png_set_filler(png_ptr, 0, PNG_FILLER_AFTER);
