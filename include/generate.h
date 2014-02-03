@@ -4,7 +4,7 @@
 #include "mesh.h"
 #include <utility>
 
-Mesh invert(Mesh mesh)
+inline Mesh invert(Mesh mesh)
 {
     vector<Triangle> triangles;
     triangles.reserve(mesh->size());
@@ -18,7 +18,7 @@ Mesh invert(Mesh mesh)
     return Mesh(new Mesh_t(mesh->texture(), triangles));
 }
 
-TransformedMesh invert(TransformedMesh mesh)
+inline TransformedMesh invert(TransformedMesh mesh)
 {
     mesh.mesh = invert(mesh.mesh);
     return mesh;
