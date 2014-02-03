@@ -27,7 +27,7 @@ public:
 	const int left, top, width, height;
     const float minU, maxU, minV, maxV;
 	enum {textureXRes = 512, textureYRes = 256};
-    static constexpr float pixelOffset = 0.1f;
+    static constexpr float pixelOffset = 0.05f;
 	explicit TextureAtlas(int left, int top, int width, int height)
         : left(left), top(top), width(width), height(height),
         minU((left + pixelOffset) / textureXRes),

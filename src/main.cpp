@@ -24,35 +24,31 @@ using namespace std;
 
 int main()
 {
-    Triangle t1;
-    t1.p[0] = Vector(-1, -1, 0);
-    t1.p[1] = Vector(1, -1, 0);
-    t1.p[2] = Vector(-1, 1, 0);
-    t1.c[0] = Color(1);
-    t1.c[1] = Color(1);
-    t1.c[2] = Color(1);
-    t1.t[0] = TextureCoord(0, 0);
-    t1.t[1] = TextureCoord(1, 0);
-    t1.t[2] = TextureCoord(0, 1);
-    Triangle t2;
-    t2.p[0] = Vector(1, 1, 0);
-    t2.p[1] = Vector(-1, 1, 0);
-    t2.p[2] = Vector(1, -1, 0);
-    t2.c[0] = Color(1);
-    t2.c[1] = Color(1);
-    t2.c[2] = Color(1);
-    t2.t[0] = TextureCoord(1, 1);
-    t2.t[1] = TextureCoord(0, 1);
-    t2.t[2] = TextureCoord(1, 0);
-    Mesh mesh = Mesh(new Mesh_t(TextureAtlas::OakWood.td(), vector<Triangle>{t1, t2}));
-    mesh->add(invert(mesh));
+    Mesh mesh = Mesh(new Mesh_t());
+    int size = 5;
+    for(int dx = -size; dx <= size; dx++)
+    {
+        for(int dy = -size; dy <= size; dy++)
+        {
+            for(int dz = -size; dz <= size; dz++)
+            {
+                mesh->add(transform(Matrix::translate(dx - 0.5, dy - 0.5, dz - 0.5),
+                                    Generate::unitBox(dx == -size ? TextureAtlas::OakWood.td() : TextureDescriptor(),
+                                                      dx == size ? TextureAtlas::OakWood.td() : TextureDescriptor(),
+                                                      dy == -size ? TextureAtlas::WoodEnd.td() : TextureDescriptor(),
+                                                      dy == size ? TextureAtlas::WoodEnd.td() : TextureDescriptor(),
+                                                      dz == -size ? TextureAtlas::OakWood.td() : TextureDescriptor(),
+                                                      dz == size ? TextureAtlas::OakWood.td() : TextureDescriptor())));
+            }
+        }
+    }
     Renderer r;
     while(true)
     {
         Display::initFrame();
         glClearColor(0, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        r << transform(Matrix::rotateY(Display::timer() * M_PI / 2 * 0).concat(Matrix::translate(0, 0, -1)), mesh);
+        r << transform(Matrix::rotateY(M_PI / 40 * Display::timer()).concat(Matrix::rotateX(Display::timer() / 10)).concat(Matrix::translate(0, 0, -10)), mesh);
         Display::flip();
         Display::handleEvents(nullptr);
     }
