@@ -861,7 +861,7 @@ void Display::initFrame()
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     const float minDistance = 5e-2f, maxDistance = 100.0f;
-    glFrustum(-minDistance / scaleY(), minDistance / scaleY(), -minDistance / scaleX(), minDistance / scaleX(), minDistance, maxDistance);
+    glFrustum(-minDistance * scaleX(), minDistance * scaleX(), -minDistance * scaleY(), minDistance * scaleY(), minDistance, maxDistance);
     glEnableClientState(GL_COLOR_ARRAY);
     glEnableClientState(GL_TEXTURE_COORD_ARRAY);
     glEnableClientState(GL_VERTEX_ARRAY);

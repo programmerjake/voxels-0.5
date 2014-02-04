@@ -13,6 +13,7 @@
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-g" />
+					<Add option="-DDEBUG_VERSION" />
 					<Add directory="include" />
 				</Compiler>
 			</Target>
@@ -28,6 +29,11 @@
 				<Linker>
 					<Add option="-s" />
 				</Linker>
+				<ExtraCommands>
+					<Add before="if [ ! -x update-version.sh ]; then chmod 775 update-version.sh; fi" />
+					<Add before="./update-version.sh" />
+					<Mode after="always" />
+				</ExtraCommands>
 			</Target>
 		</Build>
 		<Compiler>
@@ -45,6 +51,8 @@
 		</Linker>
 		<Unit filename="include/color.h" />
 		<Unit filename="include/event.h" />
+		<Unit filename="include/game_load_stream.h" />
+		<Unit filename="include/game_version.h" />
 		<Unit filename="include/generate.h" />
 		<Unit filename="include/image.h" />
 		<Unit filename="include/matrix.h" />
@@ -57,6 +65,7 @@
 		<Unit filename="include/texture_descriptor.h" />
 		<Unit filename="include/util.h" />
 		<Unit filename="include/vector.h" />
+		<Unit filename="src/game_version.cpp" />
 		<Unit filename="src/image.cpp" />
 		<Unit filename="src/main.cpp" />
 		<Unit filename="src/matrix.cpp" />

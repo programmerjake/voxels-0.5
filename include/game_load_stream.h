@@ -1,0 +1,8 @@
+#ifndef GAME_LOAD_STREAM_H_INCLUDED
+#define GAME_LOAD_STREAM_H_INCLUDED
+
+#include "stream.h"
+
+
+
+#endif // GAME_LOAD_STREAM_H_INCLUDED

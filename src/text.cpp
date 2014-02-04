@@ -9,7 +9,7 @@ const Text::TextProperties Text::defaultTextProperties = Text::TextProperties();
 namespace
 {
 const float charWidth = 1, charHeight = 1;
-auto Font = TextureAtlas::Font8x8;
+const TextureAtlas & Font = TextureAtlas::Font8x8;
 const int fontWidth = 8, fontHeight = 8;
 const int textureXRes = 128, textureYRes = 128;
 const float pixelOffset = TextureAtlas::pixelOffset;
@@ -333,14 +333,9 @@ void init()
         float maxU = (left + width - pixelOffset) / textureXRes;
         float minV = 1 - (top + height - pixelOffset) / textureYRes;
         float maxV = 1 - (top + pixelOffset) / textureYRes;
-        cout << "minU:" << minU << " maxU:" << maxU << " minV:" << minV << " maxV:" << maxV << endl;
-        TextureDescriptor texture = Font.tdNoOffset().subTexture(minU, maxU, minV, maxV);
-        cout << "minU:" << texture.minU << " maxU:" << texture.maxU << " minV:" << texture.minV << " maxV:" << texture.maxV << endl;
+        TextureDescriptor texture = Font.tdNoOffset();
+        texture = texture.subTexture(minU, maxU, minV, maxV);
         charMesh[i] = Generate::quadrilateral(texture, Vector(0, 0, 0), Color(1), Vector(1, 0, 0), Color(1), Vector(1, 1, 0), Color(1), Vector(0, 1, 0), Color(1));
-        for(Triangle tri : *charMesh[i])
-        {
-            cout << "triangle : " << tri.p[0] << tri.t[0] << tri.p[1] << tri.t[1] << tri.p[2] << tri.t[2] << endl;
-        }
     }
 }
 
@@ -351,7 +346,7 @@ void renderChar(Mesh dest, Matrix m, Color color, wchar_t ch)
     dest->add(scaleColors(color, transform(m, charMesh[translateToCodePage437(ch)])));
 }
 
-void updateFromChar(float &x, float &y, float &w, float &h, wchar_t ch, const Text::TextProperties &properties)
+bool updateFromChar(float &x, float &y, float &w, float &h, wchar_t ch, const Text::TextProperties &properties)
 {
     if(ch == L'\n')
     {
@@ -383,7 +378,9 @@ void updateFromChar(float &x, float &y, float &w, float &h, wchar_t ch, const Te
         {
             h = y + charHeight;
         }
+        return true;
     }
+    return false;
 }
 }
 
@@ -443,8 +440,11 @@ Mesh Text::mesh(wstring str, Color color, const TextProperties &properties)
 
     for(wchar_t ch : str)
     {
-        renderChar(retval, Matrix::translate(x, totalHeight - y - 1, 0), color, ch);
-        updateFromChar(x, y, w, h, ch, properties);
+        Matrix mat = Matrix::translate(x, totalHeight - y - 1, 0);
+        if(updateFromChar(x, y, w, h, ch, properties))
+        {
+            renderChar(retval, mat, color, ch);
+        }
     }
 
     return retval;

@@ -16,10 +16,12 @@
  *
  */
 #include <iostream>
+#include <sstream>
 #include "platform.h"
 #include "generate.h"
 #include "texture_atlas.h"
 #include "text.h"
+#include "game_version.h"
 
 using namespace std;
 
@@ -49,9 +51,14 @@ int main()
         Display::initFrame();
         glClearColor(0, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        //r << transform(Matrix::rotateY(M_PI / 40 * Display::timer()).concat(Matrix::rotateX(Display::timer() / 10)).concat(Matrix::translate(0, 0, -10)), mesh);
-        //Display::initOverlay();
-        r << transform(Matrix::translate(0, 0, -30), invert(Text::mesh(L"hello", Color(1, 0, 1))));
+        r << transform(Matrix::rotateY(M_PI / 40 * Display::timer()).concat(Matrix::rotateX(Display::timer() / 10)).concat(Matrix::translate(0, 0, -20)), mesh);
+        Display::initOverlay();
+        wstringstream s;
+        s << L"Voxels " << GameVersion::VERSION;
+        if(GameVersion::DEBUG)
+            s << L" Debug";
+        s << "\nFPS : " << Display::averageFPS() << endl;
+        r << transform(Matrix::translate(-40 * Display::scaleX(), 40 * Display::scaleY() - Text::height(s.str()), -40 * Display::scaleX()), Text::mesh(s.str(), Color(1, 0, 1)));
         Display::flip();
         Display::handleEvents(nullptr);
     }
