@@ -1,3 +1,4 @@
+#include "block.h"
 #ifndef WORLD_H_INCLUDED
 #define WORLD_H_INCLUDED
 
@@ -21,7 +22,7 @@ public:
     {
         return world() != nullptr;
     }
-    operator !() const
+    bool operator !() const
     {
         return world() == nullptr;
     }

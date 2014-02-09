@@ -77,6 +77,13 @@ public:
     {
     }
     virtual uint8_t readByte() = 0;
+    void readBytes(uint8_t * array, size_t count)
+    {
+        for(size_t i = 0; i < count; i++)
+        {
+            array[i] = readByte();
+        }
+    }
     uint8_t readU8()
     {
         return readByte();
@@ -211,6 +218,11 @@ public:
     {
     }
     virtual void writeByte(uint8_t) = 0;
+    void writeBytes(const uint8_t * array, size_t count)
+    {
+        for(size_t i = 0; i < count; i++)
+            writeByte(array[i]);
+    }
     void writeU8(uint8_t v)
     {
         writeByte(v);

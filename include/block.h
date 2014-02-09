@@ -8,6 +8,8 @@
 #include <map>
 #include <cstdlib>
 #include <iostream>
+#include <vector>
+#include "game_load_stream.h"
 
 using namespace std;
 
@@ -26,32 +28,34 @@ struct BlockData
     weak_ptr<BlockDescriptor> desc;
     int32_t idata;
     shared_ptr<ExtraBlockData> extraData;
-    explicit BlockData(weak_ptr<BlockDescriptor> desc = nullptr, int32_t idata = 0, shared_ptr<ExtraBlockData> extraData = nullptr)
+    explicit BlockData(weak_ptr<BlockDescriptor> desc = weak_ptr<BlockDescriptor>(), int32_t idata = 0, shared_ptr<ExtraBlockData> extraData = nullptr)
         : desc(desc), idata(idata), extraData(extraData)
     {
     }
 };
 
-#ifndef WORLD_H_INCLUDED
-class World;
-#endif // WORLD_H_INCLUDED
+struct BlockDescriptor;
 
-struct BlockDescriptor
+typedef shared_ptr<const BlockDescriptor> BlockDescriptorPtr;
+
+#include "world.h"
+
+struct BlockDescriptor : public enable_shared_from_this<BlockDescriptor>
 {
 private:
-    static map<wstring, shared_ptr<BlockDescriptor>> *blocks;
-    static vector<shared_ptr<BlockDescriptor>> *blocksList;
-    static addToBlocksList(shared_ptr<BlockDescriptor> bd) /// call with all constructed BlockDescriptor daughter classes
+    static map<wstring, BlockDescriptorPtr> *blocks;
+    static vector<BlockDescriptorPtr> *blocksList;
+    static void addToBlocksList(BlockDescriptorPtr bd) /// call with all constructed BlockDescriptor daughter classes
     {
         if(blocks == nullptr) // so that we don't have problems with static initialization order
         {
-            blocks = new map<wstring, shared_ptr<BlockDescriptor>>;
-            blocksList = new vector<shared_ptr<BlockDescriptor>>;
+            blocks = new map<wstring, BlockDescriptorPtr>;
+            blocksList = new vector<BlockDescriptorPtr>;
         }
-        shared_ptr<BlockDescriptor> & b = (*blocks)[bd.name];
+        shared_ptr<const BlockDescriptor> & b = (*blocks)[bd->name];
         if(b)
         {
-            cerr << "Error : duplicate block name : \"" << bd.name << "\"\n";
+            cerr << "Error : duplicate block name : \"" << bd->name << "\"\n";
             exit(1);
         }
         b = bd;
@@ -59,7 +63,7 @@ private:
     }
 public:
     const wstring name;
-    static weak_ptr<BlockDescriptor> getBlock(wstring name)
+    static BlockDescriptorPtr getBlock(wstring name)
     {
         return blocks->at(name);
     }
@@ -72,9 +76,7 @@ protected:
     {
     }
 public:
-#error finish
+    virtual void onMove(BlockIterator bi) const = 0;
 };
-
-#include "world.h"
 
 #endif // BLOCK_H_INCLUDED

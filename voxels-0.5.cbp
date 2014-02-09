@@ -40,6 +40,7 @@
 			<Add option="-Wextra" />
 			<Add option="-Wall" />
 			<Add option="-std=c++11 -fexceptions `sdl-config --cflags`" />
+			<Add option="-D__cplusplus=201103L" />
 			<Add directory="/usr/include/SDL" />
 			<Add directory="/home/lifsja/boost_1_55_0" />
 		</Compiler>

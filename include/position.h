@@ -40,19 +40,19 @@ struct PositionF : public VectorF
     {
     }
     explicit PositionF(PositionI p)
-        : x(p.x), y(p.y), z(p.z), d(p.d)
+        : VectorF(p.x, p.y, p.z), d(p.d)
     {
     }
     PositionF(float x, float y, float z, Dimension d)
-        : x(x), y(y), z(z), d(d)
+        : VectorF(x, y, z), d(d)
     {
     }
     PositionF(VectorF p, Dimension d)
-        : x(p.x), y(p.y), z(p.z), d(d)
+        : VectorF(p.x, p.y, p.z), d(d)
     {
     }
     PositionF(VectorI p, Dimension d)
-        : x(p.x), y(p.y), z(p.z), d(d)
+        : VectorF(p.x, p.y, p.z), d(d)
     {
     }
     explicit operator VectorF() const
@@ -61,7 +61,7 @@ struct PositionF : public VectorF
     }
     explicit operator PositionI() const
     {
-        return PositionI(VectorF(x, y, z), d);
+        return PositionI(VectorI(x, y, z), d);
     }
     friend bool operator ==(const PositionF & a, const PositionI & b)
     {
