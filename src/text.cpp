@@ -335,14 +335,14 @@ void init()
         float maxV = 1 - (top + pixelOffset) / textureYRes;
         TextureDescriptor texture = Font.tdNoOffset();
         texture = texture.subTexture(minU, maxU, minV, maxV);
-        charMesh[i] = Generate::quadrilateral(texture, Vector(0, 0, 0), Color(1), Vector(1, 0, 0), Color(1), Vector(1, 1, 0), Color(1), Vector(0, 1, 0), Color(1));
+        charMesh[i] = Generate::quadrilateral(texture, VectorF(0, 0, 0), Color(1), VectorF(1, 0, 0), Color(1), VectorF(1, 1, 0), Color(1), VectorF(0, 1, 0), Color(1));
     }
 }
 
 void renderChar(Mesh dest, Matrix m, Color color, wchar_t ch)
 {
     init();
-    //cout << "char:" << (char)ch << " pt:" << transform(m, Vector(0, 0, 0)) << endl;
+    //cout << "char:" << (char)ch << " pt:" << transform(m, VectorF(0, 0, 0)) << endl;
     dest->add(scaleColors(color, transform(m, charMesh[translateToCodePage437(ch)])));
 }
 

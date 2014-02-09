@@ -26,7 +26,7 @@ inline TransformedMesh invert(TransformedMesh mesh)
 
 namespace Generate
 {
-	inline Mesh quadrilateral(TextureDescriptor texture, Vector p1, Color c1, Vector p2, Color c2, Vector p3, Color c3, Vector p4, Color c4)
+	inline Mesh quadrilateral(TextureDescriptor texture, VectorF p1, Color c1, VectorF p2, Color c2, VectorF p3, Color c3, VectorF p4, Color c4)
 	{
 		const TextureCoord t1 = TextureCoord(texture.minU, texture.minV);
 		const TextureCoord t2 = TextureCoord(texture.maxU, texture.minV);
@@ -38,14 +38,14 @@ namespace Generate
 	/// make a box from <0, 0, 0> to <1, 1, 1>
 	inline Mesh unitBox(TextureDescriptor nx, TextureDescriptor px, TextureDescriptor ny, TextureDescriptor py, TextureDescriptor nz, TextureDescriptor pz)
 	{
-		const Vector p0 = Vector(0, 0, 0);
-		const Vector p1 = Vector(1, 0, 0);
-		const Vector p2 = Vector(0, 1, 0);
-		const Vector p3 = Vector(1, 1, 0);
-		const Vector p4 = Vector(0, 0, 1);
-		const Vector p5 = Vector(1, 0, 1);
-		const Vector p6 = Vector(0, 1, 1);
-		const Vector p7 = Vector(1, 1, 1);
+		const VectorF p0 = VectorF(0, 0, 0);
+		const VectorF p1 = VectorF(1, 0, 0);
+		const VectorF p2 = VectorF(0, 1, 0);
+		const VectorF p3 = VectorF(1, 1, 0);
+		const VectorF p4 = VectorF(0, 0, 1);
+		const VectorF p5 = VectorF(1, 0, 1);
+		const VectorF p6 = VectorF(0, 1, 1);
+		const VectorF p7 = VectorF(1, 1, 1);
 		Mesh retval = Mesh(new Mesh_t());
 		const Color c = Color(1);
 		if(nx)

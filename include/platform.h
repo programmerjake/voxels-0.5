@@ -236,7 +236,7 @@ namespace Display
     void initOverlay();
     bool grabMouse();
     void grabMouse(bool g);
-    Vector transformMouseTo3D(float x, float y, float depth = 1.0f);
+    VectorF transformMouseTo3D(float x, float y, float depth = 1.0f);
 }
 
 #endif // PLATFORM_H_INCLUDED

@@ -146,9 +146,9 @@ public:
      * @see #rotateX(double angle)
      * @see #rotateY(double angle)
      * @see #rotateZ(double angle) */
-    static Matrix rotate(const Vector axis, const double angle)
+    static Matrix rotate(const VectorF axis, const double angle)
     {
-        Vector axisv = normalize(axis);
+        VectorF axisv = normalize(axis);
         float c, s, v;
         c = cos(angle);
         s = sin(angle);
@@ -168,45 +168,45 @@ public:
 
 
     /** creates a rotation matrix<br/>
-     * the same as <code>Matrix::rotate(Vector(1, 0, 0), angle)</code>
+     * the same as <code>Matrix::rotate(VectorF(1, 0, 0), angle)</code>
      *
      * @param angle
      *            angle to rotate around the x axis in radians
      * @return the new rotation matrix
-     * @see #rotate(Vector axis, double angle)
+     * @see #rotate(VectorF axis, double angle)
      * @see #rotateY(double angle)
      * @see #rotateZ(double angle) */
     static Matrix rotateX(double angle)
     {
-        return rotate(Vector(1, 0, 0), angle);
+        return rotate(VectorF(1, 0, 0), angle);
     }
 
     /** creates a rotation matrix<br/>
-     * the same as <code>Matrix::rotate(Vector(0, 1, 0), angle)</code>
+     * the same as <code>Matrix::rotate(VectorF(0, 1, 0), angle)</code>
      *
      * @param angle
      *            angle to rotate around the y axis in radians
      * @return the new rotation matrix
-     * @see #rotate(Vector axis, double angle)
+     * @see #rotate(VectorF axis, double angle)
      * @see #rotateX(double angle)
      * @see #rotateZ(double angle) */
     static Matrix rotateY(double angle)
     {
-        return rotate(Vector(0, 1, 0), angle);
+        return rotate(VectorF(0, 1, 0), angle);
     }
 
     /** creates a rotation matrix<br/>
-     * the same as <code>Matrix::rotate(Vector(0, 0, 1), angle)</code>
+     * the same as <code>Matrix::rotate(VectorF(0, 0, 1), angle)</code>
      *
      * @param angle
      *            angle to rotate around the z axis in radians
      * @return the new rotation matrix
-     * @see #rotate(Vector axis, double angle)
+     * @see #rotate(VectorF axis, double angle)
      * @see #rotateX(double angle)
      * @see #rotateY(double angle) */
     static Matrix rotateZ(double angle)
     {
-        return rotate(Vector(0, 0, 1), angle);
+        return rotate(VectorF(0, 0, 1), angle);
     }
 
     /** creates a translation matrix
@@ -214,7 +214,7 @@ public:
      * @param position
      *            the position to translate (0, 0, 0) to
      * @return the new translation matrix */
-    static Matrix translate(Vector position)
+    static Matrix translate(VectorF position)
     {
         return Matrix(1,
                           0,
@@ -265,7 +265,7 @@ public:
      *            <code>s.y</code> is the amount to scale the y coordinate by.<br/>
      *            <code>s.z</code> is the amount to scale the z coordinate by.
      * @return the new scaling matrix */
-    static Matrix scale(Vector s)
+    static Matrix scale(VectorF s)
     {
         return Matrix(s.x, 0, 0, 0, 0, s.y, 0, 0, 0, 0, s.z, 0);
     }
@@ -347,17 +347,17 @@ public:
                 * rt.x12 + this->x32 * rt.x22 + rt.x32);
 	}
 
-    Vector apply(Vector v) const
+    VectorF apply(VectorF v) const
     {
-        return Vector(v.x * this->x00 + v.y * this->x10 + v.z * this->x20
+        return VectorF(v.x * this->x00 + v.y * this->x10 + v.z * this->x20
                 + this->x30, v.x * this->x01 + v.y * this->x11 + v.z * this->x21
                 + this->x31, v.x * this->x02 + v.y * this->x12 + v.z * this->x22
                 + this->x32);
     }
 
-    Vector applyToNormal(Vector v) const
+    VectorF applyToNormal(VectorF v) const
     {
-        return normalize(Vector(v.x * this->x00 + v.y * this->x10 + v.z * this->x20, v.x
+        return normalize(VectorF(v.x * this->x00 + v.y * this->x10 + v.z * this->x20, v.x
                 * this->x01 + v.y * this->x11 + v.z * this->x21, v.x * this->x02
                 + v.y * this->x12 + v.z * this->x22));
     }
@@ -369,7 +369,7 @@ public:
     }
 };
 
-inline Vector transform(const Matrix & m, Vector v)
+inline VectorF transform(const Matrix & m, VectorF v)
 {
     return m.apply(v);
 }

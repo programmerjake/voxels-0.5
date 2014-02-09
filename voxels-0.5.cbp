@@ -49,7 +49,11 @@
 			<Add library="SDL_image" />
 			<Add library="png" />
 		</Linker>
+		<Unit filename="include/block.h" />
+		<Unit filename="include/block_face.h" />
+		<Unit filename="include/chunk.h" />
 		<Unit filename="include/color.h" />
+		<Unit filename="include/dimension.h" />
 		<Unit filename="include/event.h" />
 		<Unit filename="include/game_load_stream.h" />
 		<Unit filename="include/game_version.h" />
@@ -59,12 +63,16 @@
 		<Unit filename="include/mesh.h" />
 		<Unit filename="include/platform.h" />
 		<Unit filename="include/png_decoder.h" />
+		<Unit filename="include/position.h" />
+		<Unit filename="include/render_layer.h" />
 		<Unit filename="include/stream.h" />
 		<Unit filename="include/text.h" />
 		<Unit filename="include/texture_atlas.h" />
 		<Unit filename="include/texture_descriptor.h" />
 		<Unit filename="include/util.h" />
 		<Unit filename="include/vector.h" />
+		<Unit filename="include/world.h" />
+		<Unit filename="src/block.cpp" />
 		<Unit filename="src/game_version.cpp" />
 		<Unit filename="src/image.cpp" />
 		<Unit filename="src/main.cpp" />
@@ -79,6 +87,7 @@
 		<Unit filename="src/texture_atlas.cpp" />
 		<Unit filename="src/util.cpp" />
 		<Unit filename="src/vector.cpp" />
+		<Unit filename="src/world.cpp" />
 		<Extensions>
 			<code_completion />
 			<debugger />

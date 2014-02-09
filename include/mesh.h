@@ -33,13 +33,13 @@ struct TextureCoord
 
 struct Triangle
 {
-    Vector p[3];
+    VectorF p[3];
     Color c[3];
     TextureCoord t[3];
     Triangle()
     {
     }
-    Triangle(Vector p1, Color c1, TextureCoord t1, Vector p2, Color c2, TextureCoord t2, Vector p3, Color c3, TextureCoord t3)
+    Triangle(VectorF p1, Color c1, TextureCoord t1, VectorF p2, Color c2, TextureCoord t2, VectorF p3, Color c3, TextureCoord t3)
     {
         p[0] = p1;
         c[0] = c1;
@@ -51,7 +51,7 @@ struct Triangle
         c[2] = c3;
         t[2] = t3;
     }
-    Vector normal() const
+    VectorF normal() const
     {
         return normalize(cross(p[1] - p[0], p[2] - p[0]));
     }
@@ -59,7 +59,7 @@ struct Triangle
 
 inline Triangle transform(const Matrix &m, Triangle t)
 {
-    for(Vector &p : t.p)
+    for(VectorF &p : t.p)
     {
         p = transform(m, p);
     }
@@ -224,7 +224,7 @@ public:
 
         for(auto i = points.begin(); i != points.end(); i += floatsPerPoint)
         {
-            Vector v;
+            VectorF v;
             v.x = i[0];
             v.y = i[1];
             v.z = i[2];
@@ -281,9 +281,9 @@ public:
         const Triangle &operator *() const
         {
             subIterator p = pointIterator, c = colorIterator, t = textureCoordIterator;
-            tri.p[0] = Vector(p[0], p[1], p[2]);
-            tri.p[1] = Vector(p[3], p[4], p[5]);
-            tri.p[2] = Vector(p[6], p[7], p[8]);
+            tri.p[0] = VectorF(p[0], p[1], p[2]);
+            tri.p[1] = VectorF(p[3], p[4], p[5]);
+            tri.p[2] = VectorF(p[6], p[7], p[8]);
             tri.c[0] = Color(c[0], c[1], c[2], c[3]);
             tri.c[1] = Color(c[4], c[5], c[6], c[7]);
             tri.c[2] = Color(c[8], c[9], c[10], c[11]);

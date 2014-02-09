@@ -887,8 +887,8 @@ void Display::grabMouse(bool g)
     SDL_WM_GrabInput(g ? SDL_GRAB_ON : SDL_GRAB_OFF);
 }
 
-Vector Display::transformMouseTo3D(float x, float y, float depth)
+VectorF Display::transformMouseTo3D(float x, float y, float depth)
 {
-    return Vector(depth * scaleX() * (2 * x / width() - 1), depth * scaleY() * (1 - 2 * y / height()), -depth);
+    return VectorF(depth * scaleX() * (2 * x / width() - 1), depth * scaleY() * (1 - 2 * y / height()), -depth);
 }
 
