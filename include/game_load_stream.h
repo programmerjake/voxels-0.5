@@ -13,7 +13,7 @@ public:
     {
     }
     explicit InvalidFileFormatException(IOException * e)
-        : IOException("IO Error : " + e->what())
+        : IOException(string("IO Error : ") + e->what())
     {
         delete e;
     }
@@ -43,6 +43,7 @@ private:
     shared_ptr<Reader> reader;
     uint32_t fileVersionInternal;
 public:
+    static_assert(sizeof(uint8_t) == 1, "uint8_t is not a byte");
     static constexpr uint8_t MAGIC_STRING[8] = {'V', 'o', 'x', 'e', 'l', 's', ' ', ' '};
     const uint32_t fileVersion() const
     {
@@ -55,7 +56,13 @@ public:
         try
         {
             uint8_t testMagicString[8];
-            reader->readBytes(testMagicString, sizeof(testMagicString))
+            reader->readBytes(testMagicString, sizeof(testMagicString));
+            for(int i = 0; i < sizeof(MAGIC_STRING); i++)
+                if(testMagicString[i] != MAGIC_STRING[i])
+                    throw new InvalidFileFormatException("Invalid Magic String");
+            fileVersionInternal = reader->readU32();
+            if(fileVersionInternal > GameVersion::FILE_VERSION)
+                throw new VersionTooNewException;
         }
         catch(InvalidFileFormatException * e)
         {
@@ -65,6 +72,14 @@ public:
         {
             throw InvalidFileFormatException(e);
         }
+    }
+    virtual uint8_t readByte() override
+    {
+        return reader->readByte();
+    }
+    BlockDescriptorPtr readBlockDescriptor()
+    {
+    #error finish
     }
 };
 

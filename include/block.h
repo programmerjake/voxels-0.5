@@ -9,7 +9,6 @@
 #include <cstdlib>
 #include <iostream>
 #include <vector>
-#include "game_load_stream.h"
 
 using namespace std;
 
@@ -39,6 +38,7 @@ struct BlockDescriptor;
 typedef shared_ptr<const BlockDescriptor> BlockDescriptorPtr;
 
 #include "world.h"
+#include "game_load_stream.h"
 
 struct BlockDescriptor : public enable_shared_from_this<BlockDescriptor>
 {
@@ -67,7 +67,6 @@ public:
     {
         return blocks->at(name);
     }
-protected:
     BlockDescriptor(wstring name)
         : name(name)
     {
@@ -75,8 +74,14 @@ protected:
     virtual ~BlockDescriptor()
     {
     }
+protected:
+    virtual BlockDescriptorPtr load(GameLoadStream & gls) const = 0;
 public:
     virtual void onMove(BlockIterator bi) const = 0;
+    static BlockDescriptorPtr load(GameLoadStream & gls)
+    {
+    #error finish
+    }
 };
 
 #endif // BLOCK_H_INCLUDED
