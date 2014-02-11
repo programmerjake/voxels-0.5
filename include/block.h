@@ -38,7 +38,7 @@ struct BlockDescriptor;
 typedef shared_ptr<const BlockDescriptor> BlockDescriptorPtr;
 
 #include "world.h"
-#include "game_load_stream.h"
+#include "game_stream.h"
 
 struct BlockDescriptor : public enable_shared_from_this<BlockDescriptor>
 {
@@ -65,6 +65,8 @@ public:
     const wstring name;
     static BlockDescriptorPtr getBlock(wstring name)
     {
+        if(blocks->find(name) == blocks->end())
+            return nullptr;
         return blocks->at(name);
     }
     BlockDescriptor(wstring name)
@@ -75,12 +77,19 @@ public:
     {
     }
 protected:
-    virtual BlockDescriptorPtr load(GameLoadStream & gls) const = 0;
+    virtual BlockData loadInternal(GameLoadStream & gls) const = 0;
+    virtual void storeInternal(BlockData data, GameStoreStream & gss) const = 0;
 public:
     virtual void onMove(BlockIterator bi) const = 0;
-    static BlockDescriptorPtr load(GameLoadStream & gls)
+    static BlockData load(GameLoadStream & gls)
     {
-    #error finish
+        return gls.readBlockDescriptor()->loadInternal(gls);
+    }
+
+    static void store(BlockData data, GameStoreStream & gss)
+    {
+        gss.writeBlockDescriptor(data.desc);
+        data.desc->storeInternal(data, gss);
     }
 };
 

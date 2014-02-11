@@ -56,7 +56,7 @@
 		<Unit filename="include/color.h" />
 		<Unit filename="include/dimension.h" />
 		<Unit filename="include/event.h" />
-		<Unit filename="include/game_load_stream.h" />
+		<Unit filename="include/game_stream.h" />
 		<Unit filename="include/game_version.h" />
 		<Unit filename="include/generate.h" />
 		<Unit filename="include/image.h" />
@@ -74,6 +74,7 @@
 		<Unit filename="include/vector.h" />
 		<Unit filename="include/world.h" />
 		<Unit filename="src/block.cpp" />
+		<Unit filename="src/game_stream.cpp" />
 		<Unit filename="src/game_version.cpp" />
 		<Unit filename="src/image.cpp" />
 		<Unit filename="src/main.cpp" />
