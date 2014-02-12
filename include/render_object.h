@@ -3,6 +3,7 @@
 
 #include "mesh.h"
 #include "position.h"
+#include "render_layer.h"
 #include <stream.h>
 #include <atomic>
 
@@ -55,10 +56,14 @@ class RenderObjectBlockMesh final
 private:
     uint32_t id;
     Mesh center, nx, px, ny, py, nz, pz;
+    RenderLayer rl;
+
+
 public:
     const bool nxBlocked, pxBlocked, nyBlocked, pyBlocked, nzBlocked, pzBlocked;
-    void render(Mesh dest, VectorI pos)
+    void render(Mesh dest, RenderLayer rl, VectorI pos)
     {
+#error finish
     }
 };
 

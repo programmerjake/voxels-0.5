@@ -3,6 +3,9 @@
 #define WORLD_H_INCLUDED
 
 #include "chunk.h"
+#include <unordered_map>
+
+using namespace std;
 
 class World;
 
@@ -44,7 +47,33 @@ private:
 
 class World final
 {
-#error finish
+    friend class Chunk;
+    friend class BlockIterator;
+    World(const World &) = delete;
+    const World & operator =(const World &) = delete;
+private:
+    list<shared_ptr<Chunk>> chunksList;
+    unordered_map<ChunkPosition, shared_ptr<Chunk>> chunksMap;
+    shared_ptr<Chunk> getChunk(ChunkPosition pos)
+    {
+        shared_ptr<Chunk> & c = chunksMap[pos];
+        if(c != nullptr)
+            return c;
+        c = shared_ptr<Chunk>(new Chunk(pos));
+        c->nx == chunksMap[pos.nx()];
+        c->px == chunksMap[pos.px()];
+        c->nz == chunksMap[pos.nz()];
+        c->pz == chunksMap[pos.pz()];
+        chunksList.push_back(c);
+        return c;
+    }
+public:
+    World()
+    {
+    }
+    ~World()
+    {
+    }
 };
 
 #endif // WORLD_H_INCLUDED

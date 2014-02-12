@@ -1,3 +1,4 @@
+#include "block.h"
 #ifndef GAME_LOAD_STREAM_H_INCLUDED
 #define GAME_LOAD_STREAM_H_INCLUDED
 
@@ -7,6 +8,7 @@
 #include <map>
 #include <cmath>
 #include <vector>
+#include <memory>
 
 using namespace std;
 
@@ -60,7 +62,7 @@ private:
 public:
     static_assert(sizeof(uint8_t) == 1, "uint8_t is not a byte");
     static constexpr uint8_t MAGIC_STRING[8] = {'V', 'o', 'x', 'e', 'l', 's', ' ', ' '};
-    const uint32_t fileVersion() const
+    uint32_t fileVersion() const
     {
         return fileVersionInternal;
     }
@@ -72,11 +74,13 @@ public:
         {
             uint8_t testMagicString[8];
             reader->readBytes(testMagicString, sizeof(testMagicString));
-            for(int i = 0; i < sizeof(MAGIC_STRING); i++)
+            for(size_t i = 0; i < sizeof(MAGIC_STRING); i++)
+            {
                 if(testMagicString[i] != MAGIC_STRING[i])
                 {
                     throw new InvalidFileFormatException("Invalid Magic String");
                 }
+            }
             fileVersionInternal = reader->readU32();
             if(fileVersionInternal > GameVersion::FILE_VERSION)
             {
@@ -162,7 +166,7 @@ class GameStoreStream final : public Writer
 private:
     shared_ptr<Writer> writer;
     uint32_t nextBlockIndex;
-    map<wstring, uint32_t> blocks;
+    map<const wstring, uint32_t> blocks;
 public:
     GameStoreStream(shared_ptr<Writer> writer)
         : writer(writer), nextBlockIndex(0)

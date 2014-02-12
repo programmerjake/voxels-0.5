@@ -22,23 +22,27 @@ public:
     }
 };
 
-struct BlockData
-{
-    weak_ptr<BlockDescriptor> desc;
-    int32_t idata;
-    shared_ptr<ExtraBlockData> extraData;
-    explicit BlockData(weak_ptr<BlockDescriptor> desc = weak_ptr<BlockDescriptor>(), int32_t idata = 0, shared_ptr<ExtraBlockData> extraData = nullptr)
-        : desc(desc), idata(idata), extraData(extraData)
-    {
-    }
-};
-
 struct BlockDescriptor;
 
 typedef shared_ptr<const BlockDescriptor> BlockDescriptorPtr;
 
+#include "light.h"
+
+struct BlockData
+{
+    shared_ptr<BlockDescriptor> desc;
+    int32_t idata;
+    Lighting light;
+    shared_ptr<ExtraBlockData> extraData;
+    explicit BlockData(weak_ptr<BlockDescriptor> desc = weak_ptr<BlockDescriptor>(), int32_t idata = 0, shared_ptr<ExtraBlockData> extraData = nullptr)
+        : desc(desc), idata(idata), light(), extraData(extraData)
+    {
+    }
+};
+
 #include "world.h"
 #include "game_stream.h"
+#include "util.h"
 
 struct BlockDescriptor : public enable_shared_from_this<BlockDescriptor>
 {
@@ -55,7 +59,7 @@ private:
         shared_ptr<const BlockDescriptor> & b = (*blocks)[bd->name];
         if(b)
         {
-            cerr << "Error : duplicate block name : \"" << bd->name << "\"\n";
+            cerr << "Error : duplicate block name : \"" << wcsrtombs(bd->name) << "\"\n";
             exit(1);
         }
         b = bd;

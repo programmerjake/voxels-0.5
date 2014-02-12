@@ -19,12 +19,12 @@ BlockDescriptorPtr GameLoadStream::readBlockDescriptor()
 void GameStoreStream::writeBlockDescriptor(BlockDescriptorPtr bd)
 {
     assert(bd);
-    auto iter = blocks.find(bd->name());
+    auto iter = blocks.find(bd->name);
     if(iter == blocks.end())
     {
         writeU32(nextBlockIndex);
-        blocks[bd->name()] = nextBlockIndex++;
-        writeString(bd->name());
+        blocks[bd->name] = nextBlockIndex++;
+        writeString(bd->name);
     }
     else
         writeU32(get<1>(*iter));

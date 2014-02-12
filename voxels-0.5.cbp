@@ -60,6 +60,7 @@
 		<Unit filename="include/game_version.h" />
 		<Unit filename="include/generate.h" />
 		<Unit filename="include/image.h" />
+		<Unit filename="include/light.h" />
 		<Unit filename="include/matrix.h" />
 		<Unit filename="include/mesh.h" />
 		<Unit filename="include/platform.h" />

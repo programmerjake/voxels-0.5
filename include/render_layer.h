@@ -5,7 +5,7 @@
 
 using namespace std;
 
-enum class RenderLayer : uint_fast32_t
+enum class RenderLayer : uint_fast8_t
 {
     Opaque,
     Translucent,
