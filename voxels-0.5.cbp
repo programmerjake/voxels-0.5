@@ -66,6 +66,7 @@
 		<Unit filename="include/png_decoder.h" />
 		<Unit filename="include/position.h" />
 		<Unit filename="include/render_layer.h" />
+		<Unit filename="include/render_object.h" />
 		<Unit filename="include/stream.h" />
 		<Unit filename="include/text.h" />
 		<Unit filename="include/texture_atlas.h" />

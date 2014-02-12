@@ -1,4 +1,4 @@
-#include "game_load_stream.h"
+#include "game_stream.h"
 #include "block.h"
 
 BlockDescriptorPtr GameLoadStream::readBlockDescriptor()
