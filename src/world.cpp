@@ -29,9 +29,7 @@ void renderLayerSetup(RenderLayer rl)
 BlockIterator::BlockIterator(shared_ptr<World> w, PositionI pos)
     : worldInternal(w), pos(pos)
 {
-    int ChunkX = ChunkFloorSizeMask & pos.x;
-    int ChunkZ = ChunkFloorSizeMask & pos.z;
     chunk = w->getChunk(ChunkPosition(pos));
-    chunkIndex = (pos.x & ChunkModSizeMask) + ChunkSize * (pos.y) + ChunkSize * ChunkHeight * (pos.z & ChunkModSizeMask);
+    chunkIndex = (ssize_t)(pos.x & ChunkModSizeMask) + ChunkSize * (ssize_t)(pos.y) + ChunkSize * ChunkHeight * (ssize_t)(pos.z & ChunkModSizeMask);
 }
 

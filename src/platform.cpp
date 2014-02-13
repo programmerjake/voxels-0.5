@@ -599,6 +599,13 @@ static MouseButton buttonState = MouseButton_None;
 
 static Event *makeEvent()
 {
+    static bool needCharEvent = false;
+    static wchar_t character;
+    if(needCharEvent)
+    {
+        needCharEvent = false;
+        return new KeyPressEvent(character);
+    }
     while(true)
     {
         SDL_Event SDLEvent;
@@ -616,6 +623,8 @@ static Event *makeEvent()
             KeyboardKey key = translateKey(SDLEvent.key.keysym.sym);
             Event *retval = new KeyDownEvent(key, translateModifiers(SDLEvent.key.keysym.mod), keyState(key));
             keyState(key) = true;
+            character = SDLEvent.key.keysym.unicode;
+            needCharEvent = (SDLEvent.key.keysym.unicode != 0);
             return retval;
         }
         case SDL_KEYUP:
@@ -629,12 +638,22 @@ static Event *makeEvent()
             return new MouseMoveEvent(SDLEvent.motion.x, SDLEvent.motion.y, SDLEvent.motion.xrel, SDLEvent.motion.yrel);
         case SDL_MOUSEBUTTONDOWN:
         {
+            if(SDLEvent.button.button == SDL_BUTTON_WHEELDOWN)
+            {
+                return new MouseScrollEvent(SDLEvent.button.x, SDLEvent.button.y, 0, 0, 0, -1);
+            }
+            if(SDLEvent.button.button == SDL_BUTTON_WHEELUP)
+            {
+                return new MouseScrollEvent(SDLEvent.button.x, SDLEvent.button.y, 0, 0, 0, 1);
+            }
             MouseButton button = translateButton(SDLEvent.button.button);
             buttonState = static_cast<MouseButton>(buttonState | button); // set bit
             return new MouseDownEvent(SDLEvent.button.x, SDLEvent.button.y, 0, 0, button);
         }
         case SDL_MOUSEBUTTONUP:
         {
+            if(SDLEvent.button.button == SDL_BUTTON_WHEELDOWN || SDLEvent.button.button == SDL_BUTTON_WHEELUP)
+                break;
             MouseButton button = translateButton(SDLEvent.button.button);
             buttonState = static_cast<MouseButton>(buttonState & ~button); // clear bit
             return new MouseUpEvent(SDLEvent.button.x, SDLEvent.button.y, 0, 0, button);

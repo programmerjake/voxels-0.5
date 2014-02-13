@@ -7,11 +7,6 @@
 #include <stream.h>
 #include <atomic>
 
-class RenderObjectList
-{
-public:
-};
-
 class RenderObject
 {
 private:

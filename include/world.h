@@ -60,10 +60,10 @@ private:
         if(c != nullptr)
             return c;
         c = shared_ptr<Chunk>(new Chunk(pos));
-        c->nx == chunksMap[pos.nx()];
-        c->px == chunksMap[pos.px()];
-        c->nz == chunksMap[pos.nz()];
-        c->pz == chunksMap[pos.pz()];
+        c->nx = chunksMap[pos.nx()];
+        c->px = chunksMap[pos.px()];
+        c->nz = chunksMap[pos.nz()];
+        c->pz = chunksMap[pos.pz()];
         chunksList.push_back(c);
         return c;
     }
