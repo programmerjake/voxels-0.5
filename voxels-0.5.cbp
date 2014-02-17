@@ -77,6 +77,7 @@
 		<Unit filename="include/vector.h" />
 		<Unit filename="include/world.h" />
 		<Unit filename="src/block.cpp" />
+		<Unit filename="src/client.cpp" />
 		<Unit filename="src/game_stream.cpp" />
 		<Unit filename="src/game_version.cpp" />
 		<Unit filename="src/image.cpp" />

@@ -12,7 +12,7 @@
 
 using namespace std;
 
-class RenderObject
+class RenderObject : public enable_shared_from_this<RenderObject>
 {
 private:
     RenderObject(const RenderObject &) = delete;
@@ -49,17 +49,39 @@ public:
     }
     static shared_ptr<RenderObject> read(Reader &reader, Client &client);
     virtual bool operator ==(const RenderObject &rt) const = 0;
-    virtual void render(Mesh dest, RenderLayer rl, Dimension d) = 0;
+    virtual void render(Mesh dest, RenderLayer rl, Dimension d, Client &client) = 0;
+};
+
+struct RenderObjectWorld final
+{
+    map<PositionI, shared_ptr<RenderObjectBlock>> blocks;
+    static shared_ptr<RenderObjectWorld> getWorld(Client &client)
+    {
+        static Client::IdType worldId = Client::NullId;
+        if(worldId == Client::NullId)
+        {
+            shared_ptr<RenderObjectWorld> retval = shared_ptr<RenderObjectWorld>(new RenderObjectWorld);
+            worldId = client.makeId(retval, Client::DataType::RenderObjectWorld);
+            return retval;
+        }
+        shared_ptr<RenderObjectWorld> retval = client.getPtr(worldId, Client::DataType::RenderObjectWorld);
+        if(retval != nullptr)
+            return retval;
+        retval = shared_ptr<RenderObjectWorld>(new RenderObjectWorld);
+        client.setPtr(retval, worldId, Client::DataType::RenderObjectWorld);
+        return retval;
+    }
 };
 
 class RenderObjectBlockMesh final : public enable_shared_from_this<RenderObjectBlockMesh>
 {
 private:
     Mesh center, nx, px, ny, py, nz, pz;
+    shared_ptr<RenderObjectWorld> world;
 public:
     const RenderLayer rl;
     const bool nxBlocked, pxBlocked, nyBlocked, pyBlocked, nzBlocked, pzBlocked;
-    void render(Mesh dest, RenderLayer rl, VectorI pos);
+    void render(Mesh dest, RenderLayer rl, VectorI pos, Client &client);
     RenderObjectBlockMesh(Mesh center, Mesh nx, Mesh px, Mesh ny, Mesh py, Mesh nz, Mesh pz, bool nxBlocked, bool pxBlocked, bool nyBlocked, bool pyBlocked, bool nzBlocked, bool pzBlocked, RenderLayer rl)
         : center(center), nx(nx), px(px), ny(ny), py(py), nz(nz), pz(pz), nxBlocked(nxBlocked), pxBlocked(pxBlocked), nyBlocked(nyBlocked), pyBlocked(pyBlocked), nzBlocked(nzBlocked), pzBlocked(pzBlocked), rl(rl)
     {
@@ -156,22 +178,28 @@ public:
         pos.y = reader.readS32();
         pos.z = reader.readS32();
         pos.d = reader.readDimension();
-        return shared_ptr<RenderObjectBlock>(new RenderObjectBlock(block, pos));
+        auto retval = shared_ptr<RenderObjectBlock>(new RenderObjectBlock(block, pos));
+        shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
+        world->blocks[pos] = retval;
+        return retval;
     }
-    void render(Mesh dest, RenderLayer rl, Dimension d) override
+    void render(Mesh dest, RenderLayer rl, Dimension d, Client &client) override
     {
         if(d == pos.d)
-            block->render(dest, rl, (VectorI)pos);
+            block->render(dest, rl, (VectorI)pos, client);
     }
     virtual bool operator ==(const RenderObject &rt) const override
     {
-        if(rt)
-#error finish
+        if(rt.type() != type())
+            return false;
+        const RenderObjectBlock & b = (const RenderObjectBlock &)rt;
+        if(block == b.block && pos == b.pos)
+            return true;
+        return false;
     }
-#error finish
 };
 
-inline void RenderObjectBlockMesh::render(Mesh dest, RenderLayer rl, VectorI pos)
+inline void RenderObjectBlockMesh::render(Mesh dest, RenderLayer rl, VectorI pos, CLient &client)
 {
     if(rl != this->rl)
     {

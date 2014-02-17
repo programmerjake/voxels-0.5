@@ -16,29 +16,29 @@ public:
     {
         Image,
         RenderObjectBlockMesh,
+        RenderObjectWorld,
         Last
     };
-    typedef uint_fast32_t IdType;
+    typedef uint_fast64_t IdType;
     static constexpr IdType NullId = 0;
     static void writeId(Writer &writer, IdType id)
     {
-        writer->writeU32(id);
+        writer->writeU64(id);
     }
     static IdType readId(Reader &reader)
     {
-        return reader->readU32();
+        return reader->readU64();
     }
     static IdType readIdNonNull(Reader &reader)
     {
-        return reader->readlimitedU32(1, ~(uint32_t)0);
+        return reader->readlimitedU64(1, ~(uint64_t)0);
     }
 private:
-    atomic_uint_fast32_t nextId;
+    static atomic_uint_fast64_t nextId;
     map<shared_ptr<void>, IdType> idMap[DataType::Last];
     map<IdType, shared_ptr<void> ptrMap[DataType::Last];
 public:
     Client()
-        : nextId(1)
     {
     }
     template <typename T>
