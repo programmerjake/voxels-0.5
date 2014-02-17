@@ -35,30 +35,12 @@ public:
     }
 };
 
-class InvalidDataValueException final : public InvalidFileFormatException
-{
-public:
-    explicit InvalidDataValueException(string msg)
-        : InvalidFileFormatException(msg)
-    {
-    }
-};
-
 class GameLoadStream final : public Reader
 {
 private:
     shared_ptr<Reader> reader;
     uint32_t fileVersionInternal;
     vector<BlockDescriptorPtr> blocks;
-    template <typename T>
-    static T limitAfterRead(T v, T min, T max)
-    {
-        if(v < min || v > max)
-        {
-            throw new InvalidDataValueException("read value out of range");
-        }
-        return v;
-    }
 public:
     static_assert(sizeof(uint8_t) == 1, "uint8_t is not a byte");
     static constexpr uint8_t MAGIC_STRING[8] = {'V', 'o', 'x', 'e', 'l', 's', ' ', ' '};
@@ -99,64 +81,6 @@ public:
     virtual uint8_t readByte() override
     {
         return reader->readByte();
-    }
-    uint8_t readLimitedU8(uint8_t min, uint8_t max)
-    {
-        return limitAfterRead(readU8(), min, max);
-    }
-    int8_t readLimitedS8(int8_t min, int8_t max)
-    {
-        return limitAfterRead(readS8(), min, max);
-    }
-    uint16_t readLimitedU16(uint16_t min, uint16_t max)
-    {
-        return limitAfterRead(readU16(), min, max);
-    }
-    int16_t readLimitedS16(int16_t min, int16_t max)
-    {
-        return limitAfterRead(readS16(), min, max);
-    }
-    uint32_t readLimitedU32(uint32_t min, uint32_t max)
-    {
-        return limitAfterRead(readU32(), min, max);
-    }
-    int32_t readLimitedS32(int32_t min, int32_t max)
-    {
-        return limitAfterRead(readS32(), min, max);
-    }
-    uint64_t readLimitedU64(uint64_t min, uint64_t max)
-    {
-        return limitAfterRead(readU64(), min, max);
-    }
-    int64_t readLimitedS64(int64_t min, int64_t max)
-    {
-        return limitAfterRead(readS64(), min, max);
-    }
-    float readFiniteF32()
-    {
-        float retval = readF32();
-        if(!isfinite(retval))
-        {
-            throw new InvalidDataValueException("read value is not finite");
-        }
-        return retval;
-    }
-    double readFiniteF64()
-    {
-        double retval = readF64();
-        if(!isfinite(retval))
-        {
-            throw new InvalidDataValueException("read value is not finite");
-        }
-        return retval;
-    }
-    float readLimitedF32(float min, float max)
-    {
-        return limitAfterRead(readFiniteF32(), min, max);
-    }
-    double readLimitedF64(double min, double max)
-    {
-        return limitAfterRead(readFiniteF64(), min, max);
     }
     BlockDescriptorPtr readBlockDescriptor();
 };

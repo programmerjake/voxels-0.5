@@ -23,7 +23,10 @@
 #include <string>
 #include <stdexcept>
 #include <mutex>
+#include <memory>
 #include "color.h"
+#include "stream.h"
+#include "client.h"
 
 using namespace std;
 
@@ -47,9 +50,6 @@ public:
         : Image()
     {
     }
-    Image(const Image &rt);
-    const Image &operator =(const Image &);
-    ~Image();
 
     void setPixel(int x, int y, Color c);
     Color getPixel(int x, int y) const;
@@ -79,6 +79,8 @@ public:
     {
         return l.data != r.data;
     }
+    void write(Writer &writer, Client &client) const;
+    static Image read(Reader &reader, Client &client);
 private:
     enum RowOrder
     {
@@ -88,26 +90,22 @@ private:
     struct data_t
     {
         uint8_t * const data;
-        unsigned refcount;
         const unsigned w, h;
         RowOrder rowOrder;
         uint32_t texture;
         bool textureValid;
         mutex lock;
         data_t(uint8_t * data, unsigned w, unsigned h, RowOrder rowOrder)
-            : data(data), refcount(0), w(w), h(h), rowOrder(rowOrder), texture(0), textureValid(false), lock()
+            : data(data), w(w), h(h), rowOrder(rowOrder), texture(0), textureValid(false)
         {
         }
         data_t(uint8_t * data, data_t * rt)
-            : data(data), refcount(0), w(rt->w), h(rt->h), rowOrder(rt->rowOrder), texture(0), textureValid(false), lock()
+            : data(data), w(rt->w), h(rt->h), rowOrder(rt->rowOrder), texture(0), textureValid(false)
         {
         }
-        ~data_t()
-        {
-            delete []data;
-        }
+        ~data_t();
     };
-    data_t *data;
+    shared_ptr<data_t> data;
     static constexpr size_t BytesPerPixel = 4;
     void setRowOrder(RowOrder newRowOrder) const;
     void swapRows(unsigned y1, unsigned y2) const;

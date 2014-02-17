@@ -53,6 +53,7 @@
 		<Unit filename="include/block.h" />
 		<Unit filename="include/block_face.h" />
 		<Unit filename="include/chunk.h" />
+		<Unit filename="include/client.h" />
 		<Unit filename="include/color.h" />
 		<Unit filename="include/dimension.h" />
 		<Unit filename="include/event.h" />
@@ -86,6 +87,7 @@
 			<Option compiler="gcc" use="1" buildCommand="$compiler $options $includes `sdl-config --cflags` -c $file -o $object" />
 		</Unit>
 		<Unit filename="src/png_decoder.cpp" />
+		<Unit filename="src/render_object.cpp" />
 		<Unit filename="src/stream.cpp" />
 		<Unit filename="src/text.cpp" />
 		<Unit filename="src/texture_atlas.cpp" />

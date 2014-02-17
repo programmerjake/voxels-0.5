@@ -25,7 +25,7 @@ Image::Image(wstring resourceName)
     try
     {
         PngDecoder decoder(getResourceFileName(resourceName));
-        data = new data_t(decoder.removeData(), decoder.width(), decoder.height(), TopToBottom);
+        data = shared_ptr<data_t>(new data_t(decoder.removeData(), decoder.width(), decoder.height(), TopToBottom));
     }
     catch(PngLoadError *e)
     {
@@ -37,28 +37,14 @@ Image::Image(wstring resourceName)
 
 Image::Image(unsigned w, unsigned h)
 {
-    data = new data_t(new uint8_t[BytesPerPixel * w * h], w, h, TopToBottom);
+    data = shared_ptr<data_t>(new data_t(new uint8_t[BytesPerPixel * w * h], w, h, TopToBottom));
     memset((void *)data->data, 0, BytesPerPixel * w * h);
 }
 
 Image::Image(Color c)
 {
-    data = new data_t(new uint8_t[BytesPerPixel], 1, 1, TopToBottom);
+    data = shared_ptr<data_t>(new data_t(new uint8_t[BytesPerPixel], 1, 1, TopToBottom));
     setPixel(0, 0, c);
-}
-
-Image::Image(const Image &rt)
-{
-    data = rt.data;
-
-    if(!data)
-    {
-        return;
-    }
-
-    data->lock.lock();
-    data->refcount++;
-    data->lock.unlock();
 }
 
 Image::Image()
@@ -66,49 +52,14 @@ Image::Image()
 {
 }
 
-Image::~Image()
+Image::data_t::~data_t()
 {
     static_assert(sizeof(uint32_t) == sizeof(GLuint), "GLuint is not the same size as uint32_t");
-
-    if(!data)
+    if(texture != 0)
     {
-        return;
+        glDeleteTextures(1, (const GLuint *)&texture);
     }
-
-    data->lock.lock();
-
-    if(data->refcount > 0)
-    {
-        data->refcount--;
-        data->lock.unlock();
-        return;
-    }
-
-    data->lock.unlock(); // so we don't destroy a locked mutex
-
-    if(data->texture != 0)
-    {
-        glDeleteTextures(1, (const GLuint *)&data->texture);
-    }
-
-    delete data;
-}
-
-const Image & Image::operator =(const Image & rt)
-{
-    static_assert(sizeof(uint32_t) == sizeof(GLuint), "GLuint is not the same size as uint32_t");
-    this->~Image();
-    data = rt.data;
-
-    if(!data)
-    {
-        return *this;
-    }
-
-    data->lock.lock();
-    data->refcount++;
-    data->lock.unlock();
-    return *this;
+    delete []data;
 }
 
 void Image::setPixel(int x, int y, Color c)
@@ -243,20 +194,69 @@ void Image::swapRows(unsigned y1, unsigned y2) const
 
 void Image::copyOnWrite()
 {
-    if(data->refcount == 0)
+    if(data.unique())
     {
         return;
     }
 
-    data_t *newData = new data_t(new uint8_t[BytesPerPixel * data->w * data->h], data);
+    shared_ptr<data_t> newData = shared_ptr<data_t>(new data_t(new uint8_t[BytesPerPixel * data->w * data->h], data));
 
     for(size_t i = 0; i < BytesPerPixel * data->w * data->h; i++)
     {
         newData->data[i] = data->data[i];
     }
 
-    data->refcount--;
     data->lock.unlock();
     data = newData;
     data->lock.lock();
 }
+
+void Image::write(Writer &writer, Client &client) const
+{
+    if(!*this)
+    {
+        Client::writeId(writer, Client::NullId);
+        return;
+    }
+    Client::IdType id = client->getId(data, Client::DataType::Image);
+    if(id != Client::NullId)
+    {
+        Client::writeId(writer, id);
+        return;
+    }
+    id = client->makeId(data, Client::DataType::Image);
+    Client::writeId(writer, id);
+    writer->writeU32(width());
+    writer->writeU32(height());
+    for(size_t i = 0; i < BytesPerPixel * data->w * data->h, i++)
+    {
+        data->lock.lock();
+        uint8_t b = data->data[i];
+        data->lock.unlock();
+        writer->writeU8(b);
+    }
+}
+
+Image Image::read(Reader &reader, Client &client)
+{
+    Client::IdType id = Client::readId(reader);
+    if(id == Client::NullId)
+        return Image(nullptr);
+    Image retval;
+    retval.data = client.getPtr(id, Client::DataType::Image);
+    if(retval.data != nullptr)
+    {
+        return retval;
+    }
+    uint32_t w, h;
+    w = reader->readU32();
+    h = reader->readU32();
+    retval = Image(w, h);
+    for(size_t i = 0; i < BytesPerPixel * w * h, i++)
+    {
+        retval.data->data[i] = reader->readU8();
+    }
+    client.setPtr(retval.data, id, Client::DataType::Image);
+    return retval;
+}
+

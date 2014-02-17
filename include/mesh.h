@@ -9,6 +9,8 @@
 #include <ostream>
 #include "image.h"
 #include "texture_descriptor.h"
+#include "stream.h"
+#include "client.h"
 
 class Mesh_t;
 
@@ -122,6 +124,26 @@ private:
                             floatsPerColor = 4, colorsPerTriangle = 3,
                             floatsPerTextureCoord = 2, textureCoordsPerTriangle = 3;
     friend class Renderer;
+    Mesh_t(Reader &reader, Client &client)
+    {
+        length = reader.readU32();
+        points.resize(floatsPerPoint * pointsPerTriangle * length);
+        colors.resize(floatsPerColor * colorsPerTriangle * length);
+        textureCoords.resize(floatsPerTextureCoord * textureCoordsPerTriangle * length);
+        textureInternal = Image::read(reader, client);
+        for(float & v : points)
+        {
+            v = reader.readFiniteF32();
+        }
+        for(float & v : textureCoords)
+        {
+            v = reader.readFiniteF32();
+        }
+        for(float & v : colors)
+        {
+            v = reader.readFiniteF32();
+        }
+    }
 public:
     Mesh_t()
     {
@@ -441,7 +463,35 @@ public:
         Mesh_t m2(m);
         add(m2);
     }
+
+    friend void writeMesh(Mesh mesh, Writer &writer, Client &client);
+
+    friend Mesh readMesh(Reader &reader, Client &client);
 };
+
+inline void writeMesh(Mesh mesh, Writer &writer, Client &client)
+{
+    assert(mesh && (uint32_t)mesh->size() == mesh->size());
+    writer.writeU32(mesh->size());
+    mesh->texture().write(writer, client);
+    for(float v : mesh->points)
+    {
+        writer.writeF32(v);
+    }
+    for(float v : mesh->textureCoords)
+    {
+        writer.writeF32(v);
+    }
+    for(float v : mesh->colors)
+    {
+        writer.writeF32(v);
+    }
+}
+
+inline Mesh readMesh(Reader &reader, Client &client)
+{
+    return Mesh(new Mesh_t(reader, client));
+}
 
 inline TransformedMesh::operator Mesh() const
 {
