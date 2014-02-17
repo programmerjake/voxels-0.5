@@ -25,6 +25,7 @@
 #include <cstdio>
 #include <cstring>
 #include "util.h"
+#include "dimension.h"
 
 using namespace std;
 
@@ -281,6 +282,10 @@ public:
     {
         return limitAfterRead(readFiniteF64(), min, max);
     }
+    Dimension readDimension()
+    {
+        return readLimitedU8(0, (uint8_t)Dimension::Last - 1);
+    }
 };
 
 class Writer
@@ -390,6 +395,10 @@ public:
             }
         }
         writeU8(0);
+    }
+    void writeDimension(Dimension v)
+    {
+        writeU8((uint8_t)v);
     }
 };
 

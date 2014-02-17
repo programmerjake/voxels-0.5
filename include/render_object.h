@@ -25,7 +25,7 @@ private:
 protected:
     virtual void writeInternal(Writer &writer, Client &client) = 0;
 public:
-    enum class Type : uint8_t
+    enum class Type : uint_fast8_t
     {
         Entity,
         Block,
@@ -49,6 +49,7 @@ public:
     }
     static shared_ptr<RenderObject> read(Reader &reader, Client &client);
     virtual bool operator ==(const RenderObject &rt) const = 0;
+    virtual void render(Mesh dest, RenderLayer rl, Dimension d) = 0;
 };
 
 class RenderObjectBlockMesh final : public enable_shared_from_this<RenderObjectBlockMesh>
@@ -129,6 +130,44 @@ private:
     shared_ptr<RenderObjectBlockMesh> block;
 public:
     const PositionI pos;
+    RenderObjectBlock(shared_ptr<RenderObjectBlockMesh> block, PositionI pos)
+        : block(block), pos(pos)
+    {
+    }
+    virtual Type type() const override
+    {
+        return Type::Block;
+    }
+protected:
+    virtual void writeInternal(Writer &writer, Client &client) override
+    {
+        block->write(writer, client);
+        writer.writeS32(pos.x);
+        writer.writeS32(pos.y);
+        writer.writeS32(pos.z);
+        writer.writeDimension(pos.d);
+    }
+public:
+    static shared_ptr<RenderObjectBlock> read(Reader &reader, Client &client)
+    {
+        shared_ptr<RenderObjectBlockMesh> block = RenderObjectBlockMesh::read(reader, client);
+        PositionI pos;
+        pos.x = reader.readS32();
+        pos.y = reader.readS32();
+        pos.z = reader.readS32();
+        pos.d = reader.readDimension();
+        return shared_ptr<RenderObjectBlock>(new RenderObjectBlock(block, pos));
+    }
+    void render(Mesh dest, RenderLayer rl, Dimension d) override
+    {
+        if(d == pos.d)
+            block->render(dest, rl, (VectorI)pos);
+    }
+    virtual bool operator ==(const RenderObject &rt) const override
+    {
+        if(rt)
+#error finish
+    }
 #error finish
 };
 
@@ -139,6 +178,19 @@ inline void RenderObjectBlockMesh::render(Mesh dest, RenderLayer rl, VectorI pos
         return;
     }
     #error finish
+}
+
+inline shared_ptr<RenderObject> RenderObject::read(Reader &reader, Client &client)
+{
+    Type type = reader.readLimitedU8(0, (uint8_t)Type::Last);
+    switch(type)
+    {
+    case Block:
+
+        break;
+    default:
+        throw new InvalidDataValueException("read RenderObject type not implemented")
+    }
 }
 
 #endif // RENDER_OBJECT_H_INCLUDED

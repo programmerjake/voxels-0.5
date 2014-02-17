@@ -3,7 +3,7 @@
 
 #include <cstdint>
 
-enum class Dimension : uint_fast32_t
+enum class Dimension : uint_fast8_t
 {
     Overworld,
     Last
