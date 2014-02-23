@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include "stream.h"
 
 using namespace std;
@@ -23,51 +24,91 @@ public:
     static constexpr IdType NullId = 0;
     static void writeId(Writer &writer, IdType id)
     {
-        writer->writeU64(id);
+        writer.writeU64(id);
     }
     static IdType readId(Reader &reader)
     {
-        return reader->readU64();
+        return reader.readU64();
     }
     static IdType readIdNonNull(Reader &reader)
     {
-        return reader->readlimitedU64(1, ~(uint64_t)0);
+        return reader.readLimitedU64(1, ~(uint64_t)0);
     }
 private:
     static atomic_uint_fast64_t nextId;
-    map<shared_ptr<void>, IdType> idMap[DataType::Last];
-    map<IdType, shared_ptr<void> ptrMap[DataType::Last];
+    map<shared_ptr<void>, IdType> idMap[(int)DataType::Last];
+    map<IdType, shared_ptr<void>> ptrMap[(int)DataType::Last];
+    recursive_mutex theLock;
 public:
     Client()
     {
+    }
+    #error add locking and unlocking to all uses of Client
+    void lock()
+    {
+        theLock.lock();
+    }
+    void unlock()
+    {
+        theLock.unlock();
     }
     template <typename T>
     IdType getId(shared_ptr<T> ptr, DataType dataType)
     {
         assert(ptr != nullptr);
-        return idMap[dataType][ptr];
+        lock();
+        IdType retval = idMap[(int)dataType][ptr];
+        unlock();
+        return retval;
     }
     template <typename T>
     IdType makeId(shared_ptr<T> ptr, DataType dataType)
     {
         assert(ptr != nullptr);
-        IdType retval = idMap[dataType][ptr] = nextId++;
-        ptrMap[dataType][retval] = ptr;
+        lock();
+        IdType retval = idMap[(int)dataType][ptr] = nextId++;
+        ptrMap[(int)dataType][retval] = ptr;
+        unlock();
         return retval;
     }
     template <typename T>
     shared_ptr<T> getPtr(IdType id, DataType dataType)
     {
         assert(id != NullId);
-        return ptrMap[dataType][id];
+        lock();
+        shared_ptr<T> retval = static_pointer_cast<T>(ptrMap[(int)dataType][id]);
+        unlock();
+        return retval;
     }
     template <typename T>
     void setPtr(shared_ptr<T> ptr, IdType id, DataType dataType)
     {
         assert(ptr != nullptr && id != NullId);
-        idMap[dataType][ptr] = id;
-        ptrMap[dataType][id] = ptr;
+        lock();
+        idMap[(int)dataType][ptr] = id;
+        ptrMap[(int)dataType][id] = ptr;
+        unlock();
     }
 };
+
+class LockedClient
+{
+    LockedClient(const LockedClient &) = delete;
+    const LockedClient & operator =(const LockedClient &) = delete;
+private:
+    Client & client;
+public:
+    explicit LockedClient(Client & client)
+        : client(client)
+    {
+        client.lock();
+    }
+    ~LockedClient()
+    {
+        client.unlock();
+    }
+};
+
+void clientProcess(Reader & reader, Writer & writer);
 
 #endif // CLIENT_H_INCLUDED

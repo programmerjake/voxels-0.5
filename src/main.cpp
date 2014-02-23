@@ -24,42 +24,43 @@
 #include "game_version.h"
 #include "event.h"
 #include "util.h"
+#include "render_object.h"
 
 using namespace std;
 
 class ExampleEventHandler final : public EventHandler
 {
-    virtual bool handleMouseUp(MouseUpEvent & event) override
+    virtual bool handleMouseUp(MouseUpEvent &event) override
     {
         cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Up    : " << event.button << endl;
         return true;
     }
-    virtual bool handleMouseDown(MouseDownEvent & event) override
+    virtual bool handleMouseDown(MouseDownEvent &event) override
     {
         cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Down  : " << event.button << endl;
         return true;
     }
-    virtual bool handleMouseMove(MouseMoveEvent & event) override
+    virtual bool handleMouseMove(MouseMoveEvent &event) override
     {
         cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Move\n";
         return true;
     }
-    virtual bool handleMouseScroll(MouseScrollEvent & event) override
+    virtual bool handleMouseScroll(MouseScrollEvent &event) override
     {
         cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Scroll : (" << event.scrollX << ", " << event.scrollY << ")\n";
         return true;
     }
-    virtual bool handleKeyUp(KeyUpEvent & event) override
+    virtual bool handleKeyUp(KeyUpEvent &event) override
     {
         cout << "Key Up  : " << event.key << " : " << event.mods << endl;
         return true;
     }
-    virtual bool handleKeyDown(KeyDownEvent & event) override
+    virtual bool handleKeyDown(KeyDownEvent &event) override
     {
         cout << "Key Down : " << event.key << " : " << event.mods << (event.isRepetition ? " : Repeated\n" : " : First\n");
         return true;
     }
-    virtual bool handleKeyPress(KeyPressEvent & event) override
+    virtual bool handleKeyPress(KeyPressEvent &event) override
     {
         cout << "Key : \'" << wcsrtombs(wstring(L"") + event.character) << "\'\n";
         return true;
@@ -71,10 +72,47 @@ class ExampleEventHandler final : public EventHandler
     }
 };
 
+const int size = 5;
+
+void sourceThreadFn(Reader &reader, Writer &writer)
+{
+    Client client;
+    shared_ptr<RenderObjectBlockMesh> air, wood;
+    air = make_shared<RenderObjectBlockMesh>(Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), false, false, false, false, false, false, RenderLayer::Opaque);
+    wood = make_shared<RenderObjectBlockMesh>(Mesh(new Mesh_t),
+            Generate::unitBox(TextureDescriptor::OakWood.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
+            Generate::unitBox(TextureDescriptor(), TextureDescriptor::OakWood.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
+            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor::WoodEnd.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
+            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor::WoodEnd.td(), TextureDescriptor(), TextureDescriptor()),
+            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor::OakWood.td(), TextureDescriptor()),
+            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor::OakWood.td()),
+            true, true, true, true, true, true, RenderLayer::Opaque
+                                             );
+    vector<shared_ptr<RenderObjectBlock>> objects;
+    for(int dx = -size; dx <= size; dx++)
+    {
+        for(int dy = -size; dy <= size; dy++)
+        {
+            for(int dz = -size; dz <= size; dz++)
+            {
+                shared_ptr<RenderObjectBlock> block = make_shared<RenderObjectBlock>((dx * dx + dy * dy + dz * dz < size * size) ? wood : air, PositionI(dx, dy, dz, Dimension::Overworld));
+                block->addToClient(client);
+                objects.push_back(block);
+            }
+        }
+    }
+    writer.writeU64(blocks.size());
+    for(shared_ptr<RenderObject> object : objects)
+    {
+        object->write(writer, client);
+    }
+    writer.flush();
+}
+
 int main()
 {
     Mesh mesh = Mesh(new Mesh_t());
-    int size = 10;
+
     for(int dx = -size; dx <= size; dx++)
     {
         for(int dy = -size; dy <= size; dy++)
@@ -85,6 +123,7 @@ int main()
                 {
                     dz = size;
                 }
+
                 mesh->add(transform(Matrix::translate(dx - 0.5, dy - 0.5, dz - 0.5),
                                     Generate::unitBox(dx == -size ? TextureAtlas::OakWood.td() : TextureDescriptor(),
                                                       dx == size ? TextureAtlas::OakWood.td() : TextureDescriptor(),
@@ -95,7 +134,9 @@ int main()
             }
         }
     }
+
     Renderer r;
+
     while(true)
     {
         Display::initFrame();
@@ -105,8 +146,12 @@ int main()
         Display::initOverlay();
         wstringstream s;
         s << L"Voxels " << GameVersion::VERSION;
+
         if(GameVersion::DEBUG)
+        {
             s << L" Debug";
+        }
+
         s << "\nFPS : " << Display::averageFPS() << endl;
         r << transform(Matrix::translate(-40 * Display::scaleX(), 40 * Display::scaleY() - Text::height(s.str()), -40 * Display::scaleX()), Text::mesh(s.str(), Color(1, 0, 1)));
         Display::flip();

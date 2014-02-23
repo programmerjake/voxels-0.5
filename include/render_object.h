@@ -8,7 +8,7 @@
 #include "client.h"
 #include "block_face.h"
 #include <atomic>
-#include <map>
+#include <unordered_map>
 
 using namespace std;
 
@@ -44,29 +44,34 @@ public:
     }
     void write(Writer &writer, Client &client)
     {
-        writer->writeU8((uint8_t)type());
-        writeInternal(writer);
+        writer.writeU8((uint8_t)type());
+        writeInternal(writer, client);
     }
     static shared_ptr<RenderObject> read(Reader &reader, Client &client);
     virtual bool operator ==(const RenderObject &rt) const = 0;
     virtual void render(Mesh dest, RenderLayer rl, Dimension d, Client &client) = 0;
 };
 
+class RenderObjectBlock;
+
 struct RenderObjectWorld final
 {
-    map<PositionI, shared_ptr<RenderObjectBlock>> blocks;
+    unordered_map<PositionI, shared_ptr<RenderObjectBlock>> blocks;
     static shared_ptr<RenderObjectWorld> getWorld(Client &client)
     {
         static Client::IdType worldId = Client::NullId;
+        LockedClient lock(client);
         if(worldId == Client::NullId)
         {
             shared_ptr<RenderObjectWorld> retval = shared_ptr<RenderObjectWorld>(new RenderObjectWorld);
             worldId = client.makeId(retval, Client::DataType::RenderObjectWorld);
             return retval;
         }
-        shared_ptr<RenderObjectWorld> retval = client.getPtr(worldId, Client::DataType::RenderObjectWorld);
+        shared_ptr<RenderObjectWorld> retval = client.getPtr<RenderObjectWorld>(worldId, Client::DataType::RenderObjectWorld);
         if(retval != nullptr)
+        {
             return retval;
+        }
         retval = shared_ptr<RenderObjectWorld>(new RenderObjectWorld);
         client.setPtr(retval, worldId, Client::DataType::RenderObjectWorld);
         return retval;
@@ -79,9 +84,9 @@ private:
     Mesh center, nx, px, ny, py, nz, pz;
     shared_ptr<RenderObjectWorld> world;
 public:
-    const RenderLayer rl;
     const bool nxBlocked, pxBlocked, nyBlocked, pyBlocked, nzBlocked, pzBlocked;
-    void render(Mesh dest, RenderLayer rl, VectorI pos, Client &client);
+    const RenderLayer rl;
+    void render(Mesh dest, RenderLayer rl, PositionI pos, Client &client);
     RenderObjectBlockMesh(Mesh center, Mesh nx, Mesh px, Mesh ny, Mesh py, Mesh nz, Mesh pz, bool nxBlocked, bool pxBlocked, bool nyBlocked, bool pyBlocked, bool nzBlocked, bool pzBlocked, RenderLayer rl)
         : center(center), nx(nx), px(px), ny(ny), py(py), nz(nz), pz(pz), nxBlocked(nxBlocked), pxBlocked(pxBlocked), nyBlocked(nyBlocked), pyBlocked(pyBlocked), nzBlocked(nzBlocked), pzBlocked(pzBlocked), rl(rl)
     {
@@ -89,9 +94,11 @@ public:
     static shared_ptr<RenderObjectBlockMesh> read(Reader &reader, Client &client)
     {
         Client::IdType id = Client::readIdNonNull(reader);
-        shared_ptr<RenderObjectBlockMesh> retval = client.getPtr(id, Client::DataType::RenderObjectBlockMesh);
+        shared_ptr<RenderObjectBlockMesh> retval = client.getPtr<RenderObjectBlockMesh>(id, Client::DataType::RenderObjectBlockMesh);
         if(retval != nullptr)
+        {
             return retval;
+        }
         Mesh center, nx, px, ny, py, nz, pz;
         center = readMesh(reader, client);
         nx = readMesh(reader, client);
@@ -186,7 +193,7 @@ public:
     void render(Mesh dest, RenderLayer rl, Dimension d, Client &client) override
     {
         if(d == pos.d)
-            block->render(dest, rl, (VectorI)pos, client);
+            block->render(dest, rl, pos, client);
     }
     virtual bool operator ==(const RenderObject &rt) const override
     {
@@ -197,27 +204,55 @@ public:
             return true;
         return false;
     }
+    shared_ptr<RenderObjectBlockMesh> getBlockMesh()
+    {
+        return block;
+    }
+    void addToClient(Client &client)
+    {
+        shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
+        world->blocks[pos] = shared_from_this();
+    }
 };
 
-inline void RenderObjectBlockMesh::render(Mesh dest, RenderLayer rl, VectorI pos, CLient &client)
+inline void RenderObjectBlockMesh::render(Mesh dest, RenderLayer rl, PositionI pos, Client &client)
 {
     if(rl != this->rl)
     {
         return;
     }
-    #error finish
+    shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
+    shared_ptr<RenderObjectBlock> nxBlock = world->blocks[pos + VectorI(-1, 0, 0)];
+    shared_ptr<RenderObjectBlock> pxBlock = world->blocks[pos + VectorI(1, 0, 0)];
+    shared_ptr<RenderObjectBlock> nyBlock = world->blocks[pos + VectorI(0, -1, 0)];
+    shared_ptr<RenderObjectBlock> pyBlock = world->blocks[pos + VectorI(0, 1, 0)];
+    shared_ptr<RenderObjectBlock> nzBlock = world->blocks[pos + VectorI(0, 0, -1)];
+    shared_ptr<RenderObjectBlock> pzBlock = world->blocks[pos + VectorI(0, 0, 1)];
+    Matrix tform = Matrix::translate(pos);
+    if(nxBlock != nullptr && !nxBlock->getBlockMesh()->pxBlocked)
+        dest->add(transform(tform, nx));
+    if(pxBlock != nullptr && !pxBlock->getBlockMesh()->nxBlocked)
+        dest->add(transform(tform, px));
+    if(nyBlock != nullptr && !nyBlock->getBlockMesh()->pyBlocked)
+        dest->add(transform(tform, ny));
+    if(pyBlock != nullptr && !pyBlock->getBlockMesh()->nyBlocked)
+        dest->add(transform(tform, py));
+    if(nzBlock != nullptr && !nzBlock->getBlockMesh()->pzBlocked)
+        dest->add(transform(tform, nz));
+    if(pzBlock != nullptr && !pzBlock->getBlockMesh()->nzBlocked)
+        dest->add(transform(tform, pz));
+    dest->add(transform(tform, center));
 }
 
 inline shared_ptr<RenderObject> RenderObject::read(Reader &reader, Client &client)
 {
-    Type type = reader.readLimitedU8(0, (uint8_t)Type::Last);
+    Type type = (Type)reader.readLimitedU8(0, (uint8_t)Type::Last);
     switch(type)
     {
-    case Block:
-
-        break;
+    case Type::Block:
+        return RenderObjectBlock::read(reader, client);
     default:
-        throw new InvalidDataValueException("read RenderObject type not implemented")
+        throw new InvalidDataValueException("read RenderObject type not implemented");
     }
 }
 

@@ -99,7 +99,7 @@ private:
             : data(data), w(w), h(h), rowOrder(rowOrder), texture(0), textureValid(false)
         {
         }
-        data_t(uint8_t * data, data_t * rt)
+        data_t(uint8_t * data, shared_ptr<data_t> rt)
             : data(data), w(rt->w), h(rt->h), rowOrder(rt->rowOrder), texture(0), textureValid(false)
         {
         }

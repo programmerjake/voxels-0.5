@@ -101,7 +101,11 @@ public:
     }
     virtual void writeByte(uint8_t v) override
     {
-        return writer->writeByte(v);
+        writer->writeByte(v);
+    }
+    virtual void flush() override
+    {
+        writer->flush();
     }
     void writeBlockDescriptor(BlockDescriptorPtr bd);
 };

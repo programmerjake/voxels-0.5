@@ -218,22 +218,22 @@ void Image::write(Writer &writer, Client &client) const
         Client::writeId(writer, Client::NullId);
         return;
     }
-    Client::IdType id = client->getId(data, Client::DataType::Image);
+    Client::IdType id = client.getId(data, Client::DataType::Image);
     if(id != Client::NullId)
     {
         Client::writeId(writer, id);
         return;
     }
-    id = client->makeId(data, Client::DataType::Image);
+    id = client.makeId(data, Client::DataType::Image);
     Client::writeId(writer, id);
-    writer->writeU32(width());
-    writer->writeU32(height());
-    for(size_t i = 0; i < BytesPerPixel * data->w * data->h, i++)
+    writer.writeU32(width());
+    writer.writeU32(height());
+    for(size_t i = 0; i < BytesPerPixel * data->w * data->h; i++)
     {
         data->lock.lock();
         uint8_t b = data->data[i];
         data->lock.unlock();
-        writer->writeU8(b);
+        writer.writeU8(b);
     }
 }
 
@@ -243,18 +243,18 @@ Image Image::read(Reader &reader, Client &client)
     if(id == Client::NullId)
         return Image(nullptr);
     Image retval;
-    retval.data = client.getPtr(id, Client::DataType::Image);
+    retval.data = client.getPtr<Image::data_t>(id, Client::DataType::Image);
     if(retval.data != nullptr)
     {
         return retval;
     }
     uint32_t w, h;
-    w = reader->readU32();
-    h = reader->readU32();
+    w = reader.readU32();
+    h = reader.readU32();
     retval = Image(w, h);
-    for(size_t i = 0; i < BytesPerPixel * w * h, i++)
+    for(size_t i = 0; i < BytesPerPixel * w * h; i++)
     {
-        retval.data->data[i] = reader->readU8();
+        retval.data->data[i] = reader.readU8();
     }
     client.setPtr(retval.data, id, Client::DataType::Image);
     return retval;

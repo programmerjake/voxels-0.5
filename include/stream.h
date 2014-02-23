@@ -24,6 +24,7 @@
 #include <string>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include "util.h"
 #include "dimension.h"
 
@@ -284,7 +285,7 @@ public:
     }
     Dimension readDimension()
     {
-        return readLimitedU8(0, (uint8_t)Dimension::Last - 1);
+        return (Dimension)readLimitedU8(0, (uint8_t)Dimension::Last - 1);
     }
 };
 
@@ -300,6 +301,9 @@ public:
     {
     }
     virtual void writeByte(uint8_t) = 0;
+    virtual void flush()
+    {
+    }
     void writeBytes(const uint8_t * array, size_t count)
     {
         for(size_t i = 0; i < count; i++)
@@ -414,6 +418,11 @@ public:
         if(f == nullptr)
             throw new IOException(string("IO Error : ") + strerror(errno));
     }
+    explicit FileReader(FILE * f)
+        : f(f)
+    {
+        assert(f != nullptr);
+    }
     virtual ~FileReader()
     {
         fclose(f);
@@ -443,6 +452,11 @@ public:
         if(f == nullptr)
             throw new IOException(string("IO Error : ") + strerror(errno));
     }
+    explicit FileWriter(FILE * f)
+        : f(f)
+    {
+        assert(f != nullptr);
+    }
     virtual ~FileWriter()
     {
         fclose(f);
@@ -451,6 +465,27 @@ public:
     {
         if(fputc(v, f) == EOF)
             throw new IOException("IO Error : can't write to file");
+    }
+    virtual void flush() override
+    {
+        fflush(f);
+    }
+};
+
+class StreamPipe final
+{
+private:
+    unique_ptr<Reader> readerInternal;
+    unique_ptr<Writer> writerInternal;
+public:
+    StreamPipe();
+    Reader & reader()
+    {
+        return *readerInternal;
+    }
+    Writer & writer()
+    {
+        return *writerInternal;
     }
 };
 

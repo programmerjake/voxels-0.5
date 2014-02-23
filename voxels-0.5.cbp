@@ -64,6 +64,7 @@
 		<Unit filename="include/light.h" />
 		<Unit filename="include/matrix.h" />
 		<Unit filename="include/mesh.h" />
+		<Unit filename="include/network.h" />
 		<Unit filename="include/platform.h" />
 		<Unit filename="include/png_decoder.h" />
 		<Unit filename="include/position.h" />
@@ -84,6 +85,7 @@
 		<Unit filename="src/main.cpp" />
 		<Unit filename="src/matrix.cpp" />
 		<Unit filename="src/mesh.cpp" />
+		<Unit filename="src/network.cpp" />
 		<Unit filename="src/platform.cpp">
 			<Option compiler="gcc" use="1" buildCommand="$compiler $options $includes `sdl-config --cflags` -c $file -o $object" />
 		</Unit>

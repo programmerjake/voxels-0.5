@@ -16,3 +16,18 @@
  *
  */
 #include "stream.h"
+#include <sys/types.h>
+#include <unistd.h>
+
+StreamPipe::StreamPipe()
+{
+    int fd[2];
+    if(0 != pipe(fd))
+    {
+        string msg = "can't create pipe: ";
+        msg += strerror(errno);
+        throw new IOException(msg);
+    }
+    readerInternal = unique_ptr<Reader>(new FileReader(fdopen(fd[0], "r")));
+    writerInternal = unique_ptr<Writer>(new FileWriter(fdopen(fd[1], "w")));
+}
