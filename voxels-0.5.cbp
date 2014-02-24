@@ -13,6 +13,7 @@
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-g" />
+					<Add option="-fno-inline" />
 					<Add option="-DDEBUG_VERSION" />
 					<Add directory="include" />
 				</Compiler>
@@ -65,6 +66,7 @@
 		<Unit filename="include/matrix.h" />
 		<Unit filename="include/mesh.h" />
 		<Unit filename="include/network.h" />
+		<Unit filename="include/network_protocol.h" />
 		<Unit filename="include/platform.h" />
 		<Unit filename="include/png_decoder.h" />
 		<Unit filename="include/position.h" />

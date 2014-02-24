@@ -25,67 +25,29 @@
 #include "event.h"
 #include "util.h"
 #include "render_object.h"
+#include "client.h"
+#include "network_protocol.h"
+#include <thread>
+#include <chrono>
 
 using namespace std;
 
-class ExampleEventHandler final : public EventHandler
-{
-    virtual bool handleMouseUp(MouseUpEvent &event) override
-    {
-        cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Up    : " << event.button << endl;
-        return true;
-    }
-    virtual bool handleMouseDown(MouseDownEvent &event) override
-    {
-        cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Down  : " << event.button << endl;
-        return true;
-    }
-    virtual bool handleMouseMove(MouseMoveEvent &event) override
-    {
-        cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Move\n";
-        return true;
-    }
-    virtual bool handleMouseScroll(MouseScrollEvent &event) override
-    {
-        cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Scroll : (" << event.scrollX << ", " << event.scrollY << ")\n";
-        return true;
-    }
-    virtual bool handleKeyUp(KeyUpEvent &event) override
-    {
-        cout << "Key Up  : " << event.key << " : " << event.mods << endl;
-        return true;
-    }
-    virtual bool handleKeyDown(KeyDownEvent &event) override
-    {
-        cout << "Key Down : " << event.key << " : " << event.mods << (event.isRepetition ? " : Repeated\n" : " : First\n");
-        return true;
-    }
-    virtual bool handleKeyPress(KeyPressEvent &event) override
-    {
-        cout << "Key : \'" << wcsrtombs(wstring(L"") + event.character) << "\'\n";
-        return true;
-    }
-    virtual bool handleQuit(QuitEvent &) override
-    {
-        cout << "Quit\n";
-        return false; // so that the program will actually quit
-    }
-};
+const int size = 4;
 
-const int size = 5;
-
-void sourceThreadFn(Reader &reader, Writer &writer)
+void sourceThreadFn(Reader *preader, Writer *pwriter)
 {
+    Reader &reader = *preader;
+    Writer &writer = *pwriter;
     Client client;
     shared_ptr<RenderObjectBlockMesh> air, wood;
-    air = make_shared<RenderObjectBlockMesh>(Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), false, false, false, false, false, false, RenderLayer::Opaque);
-    wood = make_shared<RenderObjectBlockMesh>(Mesh(new Mesh_t),
-            Generate::unitBox(TextureDescriptor::OakWood.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-            Generate::unitBox(TextureDescriptor(), TextureDescriptor::OakWood.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor::WoodEnd.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor::WoodEnd.td(), TextureDescriptor(), TextureDescriptor()),
-            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor::OakWood.td(), TextureDescriptor()),
-            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor::OakWood.td()),
+    air = make_shared<RenderObjectBlockMesh>(LightProperties(LightPropertiesType::Transparent, 15), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), false, false, false, false, false, false, RenderLayer::Opaque);
+    wood = make_shared<RenderObjectBlockMesh>(LightProperties(LightPropertiesType::Opaque, 0), Mesh(new Mesh_t),
+            Generate::unitBox(TextureAtlas::OakWood.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
+            Generate::unitBox(TextureDescriptor(), TextureAtlas::OakWood.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
+            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureAtlas::WoodEnd.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
+            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::WoodEnd.td(), TextureDescriptor(), TextureDescriptor()),
+            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::OakWood.td(), TextureDescriptor()),
+            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::OakWood.td()),
             true, true, true, true, true, true, RenderLayer::Opaque
                                              );
     vector<shared_ptr<RenderObjectBlock>> objects;
@@ -101,60 +63,33 @@ void sourceThreadFn(Reader &reader, Writer &writer)
             }
         }
     }
-    writer.writeU64(blocks.size());
+    NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdateRenderObjects);
+    writer.writeU64(objects.size());
     for(shared_ptr<RenderObject> object : objects)
     {
         object->write(writer, client);
     }
     writer.flush();
+    while(true)
+    {
+        this_thread::sleep_for(chrono::milliseconds(10));
+        int dx = rand() % (size * 2 + 1 - 2) - size + 1;
+        int dy = rand() % (size * 2 + 1 - 2) - size + 1;
+        int dz = rand() % (size * 2 + 1 - 2) - size + 1;
+        shared_ptr<RenderObjectBlock> block = make_shared<RenderObjectBlock>((rand() % 2) ? wood : air, PositionI(dx, dy, dz, Dimension::Overworld));
+        block->addToClient(client);
+        NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdateRenderObjects);
+        writer.writeU64(1);
+        block->write(writer, client);
+        writer.flush();
+    }
 }
 
 int main()
 {
-    Mesh mesh = Mesh(new Mesh_t());
-
-    for(int dx = -size; dx <= size; dx++)
-    {
-        for(int dy = -size; dy <= size; dy++)
-        {
-            for(int dz = -size; dz <= size; dz++)
-            {
-                if(dx != -size && dx != size && dy != -size && dy != size && dz != -size && dz != size)
-                {
-                    dz = size;
-                }
-
-                mesh->add(transform(Matrix::translate(dx - 0.5, dy - 0.5, dz - 0.5),
-                                    Generate::unitBox(dx == -size ? TextureAtlas::OakWood.td() : TextureDescriptor(),
-                                                      dx == size ? TextureAtlas::OakWood.td() : TextureDescriptor(),
-                                                      dy == -size ? TextureAtlas::WoodEnd.td() : TextureDescriptor(),
-                                                      dy == size ? TextureAtlas::WoodEnd.td() : TextureDescriptor(),
-                                                      dz == -size ? TextureAtlas::OakWood.td() : TextureDescriptor(),
-                                                      dz == size ? TextureAtlas::OakWood.td() : TextureDescriptor())));
-            }
-        }
-    }
-
-    Renderer r;
-
-    while(true)
-    {
-        Display::initFrame();
-        glClearColor(0, 0, 0, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        r << transform(Matrix::rotateY(M_PI / 40 * Display::timer()).concat(Matrix::rotateX(Display::timer() / 10)).concat(Matrix::translate(0, 0, -4 * size)).concat(Matrix::scale(1.0f / size)), mesh);
-        Display::initOverlay();
-        wstringstream s;
-        s << L"Voxels " << GameVersion::VERSION;
-
-        if(GameVersion::DEBUG)
-        {
-            s << L" Debug";
-        }
-
-        s << "\nFPS : " << Display::averageFPS() << endl;
-        r << transform(Matrix::translate(-40 * Display::scaleX(), 40 * Display::scaleY() - Text::height(s.str()), -40 * Display::scaleX()), Text::mesh(s.str(), Color(1, 0, 1)));
-        Display::flip();
-        Display::handleEvents(shared_ptr<EventHandler>(new ExampleEventHandler));
-    }
+    StreamPipe pipe1, pipe2;
+    //DumpingReader dumpRead(pipe2.reader());
+    thread sourceThread(sourceThreadFn, &pipe1.reader(), &pipe2.writer());
+    clientProcess(pipe2.reader(), pipe1.writer());
+    return 0;
 }

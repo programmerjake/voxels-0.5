@@ -7,8 +7,13 @@
 #include "stream.h"
 #include "client.h"
 #include "block_face.h"
+#include "light.h"
 #include <atomic>
 #include <unordered_map>
+#include <unordered_set>
+#include <array>
+#include <tuple>
+#include <utility>
 
 using namespace std;
 
@@ -42,28 +47,258 @@ public:
     virtual ~RenderObject()
     {
     }
-    void write(Writer &writer, Client &client)
-    {
-        writer.writeU8((uint8_t)type());
-        writeInternal(writer, client);
-    }
+    void write(Writer &writer, Client &client);
     static shared_ptr<RenderObject> read(Reader &reader, Client &client);
     virtual bool operator ==(const RenderObject &rt) const = 0;
     virtual void render(Mesh dest, RenderLayer rl, Dimension d, Client &client) = 0;
 };
 
 class RenderObjectBlock;
+class RenderObjectBlockMesh;
 
 struct RenderObjectWorld final
 {
-    unordered_map<PositionI, shared_ptr<RenderObjectBlock>> blocks;
+    Client & client;
+    vector<PositionI> lightingUpdatesVector;
+    unordered_set<PositionI> lightingUpdatesSet;
+    RenderObjectWorld(Client & client)
+        : client(client)
+    {
+    }
+    void addLightingUpdate(PositionI pos)
+    {
+        if(get<1>(lightingUpdatesSet.insert(pos)))
+        {
+            lightingUpdatesVector.push_back(pos);
+        }
+    }
+    struct Chunk final
+    {
+        static constexpr int log2_size = 4;
+        static constexpr int size = 1 << log2_size;
+        static constexpr int mod_size_mask = size - 1;
+        static constexpr int floor_size_mask = ~mod_size_mask;
+        PositionI pos;
+        array<array<array<shared_ptr<RenderObjectBlockMesh>, size>, size>, size> blocksMesh;
+        array<array<array<Lighting, size>, size>, size> blocksLighting;
+        weak_ptr<Chunk> nx, px, ny, py, nz, pz;
+        Mesh cachedMesh[(int)RenderLayer::Last]; /// must be cleared whenever the chunk is modified
+        bool cachedMeshValid = false;
+        void invalidateMesh()
+        {
+            if(cachedMeshValid)
+            {
+                for(Mesh & mesh : cachedMesh)
+                    mesh = nullptr;
+            }
+            cachedMeshValid = false;
+        }
+    };
+    unordered_map<PositionI, shared_ptr<Chunk>> chunks;
+    shared_ptr<Chunk> getChunk(PositionI pos) /// must have the client locked
+    {
+        shared_ptr<Chunk> & chunk = chunks[pos];
+        if(chunk != nullptr)
+            return chunk;
+        chunk = make_shared<Chunk>();
+        shared_ptr<Chunk> nx = chunks[pos - VectorI(Chunk::size, 0, 0)];
+        shared_ptr<Chunk> px = chunks[pos + VectorI(Chunk::size, 0, 0)];
+        shared_ptr<Chunk> ny = chunks[pos - VectorI(0, Chunk::size, 0)];
+        shared_ptr<Chunk> py = chunks[pos + VectorI(0, Chunk::size, 0)];
+        shared_ptr<Chunk> nz = chunks[pos - VectorI(0, 0, Chunk::size)];
+        shared_ptr<Chunk> pz = chunks[pos + VectorI(0, 0, Chunk::size)];
+        chunk->nx = nx;
+        chunk->px = px;
+        chunk->ny = ny;
+        chunk->py = py;
+        chunk->nz = nz;
+        chunk->pz = pz;
+        if(nx != nullptr) nx->px = chunk;
+        if(px != nullptr) px->nx = chunk;
+        if(ny != nullptr) ny->py = chunk;
+        if(py != nullptr) py->ny = chunk;
+        if(nz != nullptr) nz->pz = chunk;
+        if(pz != nullptr) pz->nz = chunk;
+        return chunk;
+    }
+    class BlockIterator final /// Client must be locked when any member function is called
+    {
+    private:
+        PositionI pos;
+        shared_ptr<RenderObjectWorld> world;
+        VectorI modPos;
+        shared_ptr<Chunk> chunk;
+    public:
+        PositionI getPosition() const
+        {
+            return pos;
+        }
+        shared_ptr<Chunk> getChunk() const
+        {
+            return chunk;
+        }
+        BlockIterator(shared_ptr<RenderObjectWorld> world, PositionI pos)
+            : pos(pos), world(world), modPos(pos.x & Chunk::mod_size_mask, pos.y & Chunk::mod_size_mask, pos.z & Chunk::mod_size_mask)
+        {
+            assert(world != nullptr);
+            PositionI chunkPos = PositionI(pos.x & Chunk::floor_size_mask, pos.y & Chunk::floor_size_mask, pos.z & Chunk::floor_size_mask, pos.d);
+            chunk = world->getChunk(chunkPos);
+        }
+        shared_ptr<RenderObjectBlockMesh> getMesh()
+        {
+            return chunk->blocksMesh[modPos.x][modPos.y][modPos.z];
+        }
+        Lighting getLighting()
+        {
+            return chunk->blocksLighting[modPos.x][modPos.y][modPos.z];
+        }
+        void setMesh(shared_ptr<RenderObjectBlockMesh> v)
+        {
+            chunk->blocksMesh[modPos.x][modPos.y][modPos.z] = v;
+            chunk->invalidateMesh();
+            world->addLightingUpdate(pos);
+        }
+        void setLighting(Lighting v)
+        {
+            chunk->blocksLighting[modPos.x][modPos.y][modPos.z] = v;
+            chunk->invalidateMesh();
+        }
+        void moveNX()
+        {
+            pos.x--;
+            if(modPos.x <= 0)
+            {
+                modPos.x = Chunk::size - 1;
+                chunk = chunk->nx.lock();
+                if(chunk == nullptr)
+                {
+                    PositionI chunkPos = PositionI(pos.x & Chunk::floor_size_mask, pos.y & Chunk::floor_size_mask, pos.z & Chunk::floor_size_mask, pos.d);
+                    chunk = world->getChunk(chunkPos);
+                }
+            }
+            else
+                modPos.x--;
+        }
+        void moveNY()
+        {
+            pos.y--;
+            if(modPos.y <= 0)
+            {
+                modPos.y = Chunk::size - 1;
+                chunk = chunk->ny.lock();
+                if(chunk == nullptr)
+                {
+                    PositionI chunkPos = PositionI(pos.x & Chunk::floor_size_mask, pos.y & Chunk::floor_size_mask, pos.z & Chunk::floor_size_mask, pos.d);
+                    chunk = world->getChunk(chunkPos);
+                }
+            }
+            else
+                modPos.y--;
+        }
+        void moveNZ()
+        {
+            pos.z--;
+            if(modPos.z <= 0)
+            {
+                modPos.z = Chunk::size - 1;
+                chunk = chunk->nz.lock();
+                if(chunk == nullptr)
+                {
+                    PositionI chunkPos = PositionI(pos.x & Chunk::floor_size_mask, pos.y & Chunk::floor_size_mask, pos.z & Chunk::floor_size_mask, pos.d);
+                    chunk = world->getChunk(chunkPos);
+                }
+            }
+            else
+                modPos.z--;
+        }
+        void movePX()
+        {
+            pos.x++;
+            if(++modPos.x >= Chunk::size)
+            {
+                modPos.x = 0;
+                chunk = chunk->px.lock();
+                if(chunk == nullptr)
+                {
+                    PositionI chunkPos = PositionI(pos.x & Chunk::floor_size_mask, pos.y & Chunk::floor_size_mask, pos.z & Chunk::floor_size_mask, pos.d);
+                    chunk = world->getChunk(chunkPos);
+                }
+            }
+        }
+        void movePY()
+        {
+            pos.y++;
+            if(++modPos.y >= Chunk::size)
+            {
+                modPos.y = 0;
+                chunk = chunk->py.lock();
+                if(chunk == nullptr)
+                {
+                    PositionI chunkPos = PositionI(pos.x & Chunk::floor_size_mask, pos.y & Chunk::floor_size_mask, pos.z & Chunk::floor_size_mask, pos.d);
+                    chunk = world->getChunk(chunkPos);
+                }
+            }
+        }
+        void movePZ()
+        {
+            pos.z++;
+            if(++modPos.z >= Chunk::size)
+            {
+                modPos.z = 0;
+                chunk = chunk->pz.lock();
+                if(chunk == nullptr)
+                {
+                    PositionI chunkPos = PositionI(pos.x & Chunk::floor_size_mask, pos.y & Chunk::floor_size_mask, pos.z & Chunk::floor_size_mask, pos.d);
+                    chunk = world->getChunk(chunkPos);
+                }
+            }
+        }
+        BlockIterator getNX() const
+        {
+            BlockIterator retval = *this;
+            retval.moveNX();
+            return retval;
+        }
+        BlockIterator getPX() const
+        {
+            BlockIterator retval = *this;
+            retval.movePX();
+            return retval;
+        }
+        BlockIterator getNY() const
+        {
+            BlockIterator retval = *this;
+            retval.moveNY();
+            return retval;
+        }
+        BlockIterator getPY() const
+        {
+            BlockIterator retval = *this;
+            retval.movePY();
+            return retval;
+        }
+        BlockIterator getNZ() const
+        {
+            BlockIterator retval = *this;
+            retval.moveNZ();
+            return retval;
+        }
+        BlockIterator getPZ() const
+        {
+            BlockIterator retval = *this;
+            retval.movePZ();
+            return retval;
+        }
+    };
+    //FIXME(#jacob): add entities
+    //list<shared_ptr<RenderObjectEntity>> entities;
     static shared_ptr<RenderObjectWorld> getWorld(Client &client)
     {
         static Client::IdType worldId = Client::NullId;
         LockedClient lock(client);
         if(worldId == Client::NullId)
         {
-            shared_ptr<RenderObjectWorld> retval = shared_ptr<RenderObjectWorld>(new RenderObjectWorld);
+            shared_ptr<RenderObjectWorld> retval = shared_ptr<RenderObjectWorld>(new RenderObjectWorld(client));
             worldId = client.makeId(retval, Client::DataType::RenderObjectWorld);
             return retval;
         }
@@ -72,7 +307,7 @@ struct RenderObjectWorld final
         {
             return retval;
         }
-        retval = shared_ptr<RenderObjectWorld>(new RenderObjectWorld);
+        retval = shared_ptr<RenderObjectWorld>(new RenderObjectWorld(client));
         client.setPtr(retval, worldId, Client::DataType::RenderObjectWorld);
         return retval;
     }
@@ -85,72 +320,26 @@ private:
     shared_ptr<RenderObjectWorld> world;
 public:
     const bool nxBlocked, pxBlocked, nyBlocked, pyBlocked, nzBlocked, pzBlocked;
+    const LightProperties lightProperties;
     const RenderLayer rl;
-    void render(Mesh dest, RenderLayer rl, PositionI pos, Client &client);
-    RenderObjectBlockMesh(Mesh center, Mesh nx, Mesh px, Mesh ny, Mesh py, Mesh nz, Mesh pz, bool nxBlocked, bool pxBlocked, bool nyBlocked, bool pyBlocked, bool nzBlocked, bool pzBlocked, RenderLayer rl)
-        : center(center), nx(nx), px(px), ny(ny), py(py), nz(nz), pz(pz), nxBlocked(nxBlocked), pxBlocked(pxBlocked), nyBlocked(nyBlocked), pyBlocked(pyBlocked), nzBlocked(nzBlocked), pzBlocked(pzBlocked), rl(rl)
+    void render(Mesh dest, RenderLayer rl, RenderObjectWorld::BlockIterator bi);
+    void render(Mesh dest, RenderLayer rl, PositionI pos, Client &client)
     {
-    }
-    static shared_ptr<RenderObjectBlockMesh> read(Reader &reader, Client &client)
-    {
-        Client::IdType id = Client::readIdNonNull(reader);
-        shared_ptr<RenderObjectBlockMesh> retval = client.getPtr<RenderObjectBlockMesh>(id, Client::DataType::RenderObjectBlockMesh);
-        if(retval != nullptr)
+        if(rl != this->rl)
         {
-            return retval;
-        }
-        Mesh center, nx, px, ny, py, nz, pz;
-        center = readMesh(reader, client);
-        nx = readMesh(reader, client);
-        px = readMesh(reader, client);
-        ny = readMesh(reader, client);
-        py = readMesh(reader, client);
-        nz = readMesh(reader, client);
-        pz = readMesh(reader, client);
-        RenderLayer rl = readRenderLayer(reader);
-        uint8_t blockedMask = reader.readU8();
-        bool nxBlocked = blockedMask & (1 << (int)BlockFace::NX);
-        bool pxBlocked = blockedMask & (1 << (int)BlockFace::PX);
-        bool nyBlocked = blockedMask & (1 << (int)BlockFace::NY);
-        bool pyBlocked = blockedMask & (1 << (int)BlockFace::PY);
-        bool nzBlocked = blockedMask & (1 << (int)BlockFace::NZ);
-        bool pzBlocked = blockedMask & (1 << (int)BlockFace::PZ);
-        retval = shared_ptr<RenderObjectBlockMesh>(new RenderObjectBlockMesh(center, nx, px, ny, py, nz, pz, nxBlocked, pxBlocked, nyBlocked, pyBlocked, nzBlocked, pzBlocked, rl));
-        client.setPtr(retval, id, Client::DataType::RenderObjectBlockMesh);
-        return retval;
-    }
-    void write(Writer &writer, Client &client)
-    {
-        Client::IdType id = client.getId(shared_from_this(), Client::DataType::RenderObjectBlockMesh);
-        if(id != Client::NullId)
-        {
-            Client::writeId(writer, id);
             return;
         }
-        id = client.makeId(shared_from_this(), Client::DataType::RenderObjectBlockMesh);
-        Client::writeId(writer, id);
-        writeMesh(center, writer, client);
-        writeMesh(nx, writer, client);
-        writeMesh(px, writer, client);
-        writeMesh(ny, writer, client);
-        writeMesh(py, writer, client);
-        writeMesh(nz, writer, client);
-        writeMesh(pz, writer, client);
-        writeRenderLayer(rl, writer);
-        uint8_t blockedMask = 0;
-        if(nxBlocked)
-            blockedMask |= 1 << (int)BlockFace::NX;
-        if(pxBlocked)
-            blockedMask |= 1 << (int)BlockFace::PX;
-        if(nyBlocked)
-            blockedMask |= 1 << (int)BlockFace::NY;
-        if(pyBlocked)
-            blockedMask |= 1 << (int)BlockFace::PY;
-        if(nzBlocked)
-            blockedMask |= 1 << (int)BlockFace::NZ;
-        if(pzBlocked)
-            blockedMask |= 1 << (int)BlockFace::PZ;
+        LockedClient lock(client);
+        shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
+        RenderObjectWorld::BlockIterator bi(world, pos);
+        render(dest, rl, bi);
     }
+    RenderObjectBlockMesh(LightProperties lightProperties, Mesh center, Mesh nx, Mesh px, Mesh ny, Mesh py, Mesh nz, Mesh pz, bool nxBlocked, bool pxBlocked, bool nyBlocked, bool pyBlocked, bool nzBlocked, bool pzBlocked, RenderLayer rl)
+        : center(center), nx(nx), px(px), ny(ny), py(py), nz(nz), pz(pz), nxBlocked(nxBlocked), pxBlocked(pxBlocked), nyBlocked(nyBlocked), pyBlocked(pyBlocked), nzBlocked(nzBlocked), pzBlocked(pzBlocked), lightProperties(lightProperties), rl(rl)
+    {
+    }
+    static shared_ptr<RenderObjectBlockMesh> read(Reader &reader, Client &client);
+    void write(Writer &writer, Client &client);
 };
 
 class RenderObjectBlock final : public RenderObject
@@ -177,19 +366,7 @@ protected:
         writer.writeDimension(pos.d);
     }
 public:
-    static shared_ptr<RenderObjectBlock> read(Reader &reader, Client &client)
-    {
-        shared_ptr<RenderObjectBlockMesh> block = RenderObjectBlockMesh::read(reader, client);
-        PositionI pos;
-        pos.x = reader.readS32();
-        pos.y = reader.readS32();
-        pos.z = reader.readS32();
-        pos.d = reader.readDimension();
-        auto retval = shared_ptr<RenderObjectBlock>(new RenderObjectBlock(block, pos));
-        shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
-        world->blocks[pos] = retval;
-        return retval;
-    }
+    static shared_ptr<RenderObjectBlock> read(Reader &reader, Client &client);
     void render(Mesh dest, RenderLayer rl, Dimension d, Client &client) override
     {
         if(d == pos.d)
@@ -210,50 +387,40 @@ public:
     }
     void addToClient(Client &client)
     {
+        LockedClient lock(client);
         shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
-        world->blocks[pos] = shared_from_this();
+        RenderObjectWorld::BlockIterator bi(world, pos);
+        bi.setMesh(block);
     }
 };
 
-inline void RenderObjectBlockMesh::render(Mesh dest, RenderLayer rl, PositionI pos, Client &client)
+inline void RenderObjectBlockMesh::render(Mesh dest, RenderLayer rl, RenderObjectWorld::BlockIterator bi)
 {
+    //TODO(#jacob): add lighting
     if(rl != this->rl)
     {
         return;
     }
-    shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
-    shared_ptr<RenderObjectBlock> nxBlock = world->blocks[pos + VectorI(-1, 0, 0)];
-    shared_ptr<RenderObjectBlock> pxBlock = world->blocks[pos + VectorI(1, 0, 0)];
-    shared_ptr<RenderObjectBlock> nyBlock = world->blocks[pos + VectorI(0, -1, 0)];
-    shared_ptr<RenderObjectBlock> pyBlock = world->blocks[pos + VectorI(0, 1, 0)];
-    shared_ptr<RenderObjectBlock> nzBlock = world->blocks[pos + VectorI(0, 0, -1)];
-    shared_ptr<RenderObjectBlock> pzBlock = world->blocks[pos + VectorI(0, 0, 1)];
-    Matrix tform = Matrix::translate(pos);
-    if(nxBlock != nullptr && !nxBlock->getBlockMesh()->pxBlocked)
+    Matrix tform = Matrix::translate(bi.getPosition());
+    shared_ptr<RenderObjectBlockMesh> nxMesh = bi.getNX().getMesh();
+    shared_ptr<RenderObjectBlockMesh> pxMesh = bi.getPX().getMesh();
+    shared_ptr<RenderObjectBlockMesh> nyMesh = bi.getNY().getMesh();
+    shared_ptr<RenderObjectBlockMesh> pyMesh = bi.getPY().getMesh();
+    shared_ptr<RenderObjectBlockMesh> nzMesh = bi.getNZ().getMesh();
+    shared_ptr<RenderObjectBlockMesh> pzMesh = bi.getPZ().getMesh();
+    if(nxMesh != nullptr && !nxMesh->pxBlocked)
         dest->add(transform(tform, nx));
-    if(pxBlock != nullptr && !pxBlock->getBlockMesh()->nxBlocked)
+    if(pxMesh != nullptr && !pxMesh->nxBlocked)
         dest->add(transform(tform, px));
-    if(nyBlock != nullptr && !nyBlock->getBlockMesh()->pyBlocked)
+    if(nyMesh != nullptr && !nyMesh->pyBlocked)
         dest->add(transform(tform, ny));
-    if(pyBlock != nullptr && !pyBlock->getBlockMesh()->nyBlocked)
+    if(pyMesh != nullptr && !pyMesh->nyBlocked)
         dest->add(transform(tform, py));
-    if(nzBlock != nullptr && !nzBlock->getBlockMesh()->pzBlocked)
+    if(nzMesh != nullptr && !nzMesh->pzBlocked)
         dest->add(transform(tform, nz));
-    if(pzBlock != nullptr && !pzBlock->getBlockMesh()->nzBlocked)
+    if(pzMesh != nullptr && !pzMesh->nzBlocked)
         dest->add(transform(tform, pz));
     dest->add(transform(tform, center));
-}
-
-inline shared_ptr<RenderObject> RenderObject::read(Reader &reader, Client &client)
-{
-    Type type = (Type)reader.readLimitedU8(0, (uint8_t)Type::Last);
-    switch(type)
-    {
-    case Type::Block:
-        return RenderObjectBlock::read(reader, client);
-    default:
-        throw new InvalidDataValueException("read RenderObject type not implemented");
-    }
 }
 
 #endif // RENDER_OBJECT_H_INCLUDED

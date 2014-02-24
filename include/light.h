@@ -2,11 +2,11 @@
 #define LIGHT_H_INCLUDED
 
 #include <cstdint>
-#include "game_stream.h"
+#include "stream.h"
 
 using namespace std;
 
-enum class LightProperties : uint8_t
+enum class LightPropertiesType : uint8_t
 {
     Transparent,
     ScatteringTranslucent,
@@ -14,6 +14,23 @@ enum class LightProperties : uint8_t
     Water,
     Opaque,
     Last
+};
+
+struct LightProperties final
+{
+    LightPropertiesType type;
+    uint8_t emit;
+    LightProperties() = default;
+    LightProperties(LightPropertiesType type, uint8_t emit)
+        : type(type), emit(emit)
+    {
+    }
+    void write(Writer & writer) const
+    {
+        writer.writeU8((uint8_t)type);
+        writer.writeU8((uint8_t)emit);
+    }
+    static LightProperties read(Reader & reader);
 };
 
 class Lighting final
@@ -26,7 +43,7 @@ private:
     }
 public:
     static constexpr unsigned MAX_INTENSITY = (1 << 4) - 1; // 4 bits
-    static Lighting calc(LightProperties p, uint8_t emit, Lighting nx, Lighting px, Lighting ny, Lighting py, Lighting nz, Lighting pz)
+    static Lighting calc(LightPropertiesType p, uint8_t emit, Lighting nx, Lighting px, Lighting ny, Lighting py, Lighting nz, Lighting pz)
     {
         assert(emit <= MAX_INTENSITY);
         Lighting v = py;
@@ -46,20 +63,20 @@ public:
         v.scatteredNaturalLight = max<uint8_t>(1, v.scatteredNaturalLight) - 1;
         switch(p)
         {
-        case LightProperties::Transparent:
+        case LightPropertiesType::Transparent:
             break;
-        case LightProperties::ScatteringTranslucent:
+        case LightPropertiesType::ScatteringTranslucent:
             v.directNaturalLight = 0;
             break;
-        case LightProperties::Water:
+        case LightPropertiesType::Water:
             v.directNaturalLight = max<uint8_t>(2, v.directNaturalLight) - 2;
             v.artificialLight = max<uint8_t>(1, v.artificialLight) - 1;
             v.scatteredNaturalLight = max<uint8_t>(1, v.scatteredNaturalLight) - 1;
             break;
-        case LightProperties::NonscatteringTranslucent:
+        case LightPropertiesType::NonscatteringTranslucent:
             v.directNaturalLight = max<uint8_t>(1, v.directNaturalLight) - 1;
             break;
-        case LightProperties::Opaque:
+        case LightPropertiesType::Opaque:
             v = Lighting();
             break;
         default:
@@ -68,6 +85,10 @@ public:
         v.artificialLight = max(v.artificialLight, emit);
         v.scatteredNaturalLight = max(v.scatteredNaturalLight, v.directNaturalLight);
         return v;
+    }
+    static Lighting calc(LightProperties p, Lighting nx, Lighting px, Lighting ny, Lighting py, Lighting nz, Lighting pz)
+    {
+        return calc(p.type, p.emit, nx, px, ny, py, nz, pz);
     }
     Lighting()
         : artificialLight(0), scatteredNaturalLight(0), directNaturalLight(0)
@@ -81,7 +102,7 @@ public:
     {
         return max((unsigned)artificialLight, (unsigned)(scatteredNaturalLight * naturalBrightness) / MAX_INTENSITY);
     }
-    void write(GameStoreStream & gss) const
+    void write(Writer & writer) const
     {
         static_assert(MAX_INTENSITY + 1 == 1 << 4, "MAX_INTENSITY must be 1111b"); // must be 4 bits
         uint_fast16_t v = artificialLight;
@@ -89,14 +110,20 @@ public:
         v |= scatteredNaturalLight;
         v <<= 4;
         v |= directNaturalLight;
-        gss.writeU16(v);
+        writer.writeU16(v);
     }
-    static Lighting read(GameLoadStream & gls)
+    static Lighting read(Reader & reader)
     {
         static_assert(MAX_INTENSITY + 1 == 1 << 4, "MAX_INTENSITY must be 1111b"); // must be 4 bits
-        uint_fast16_t v = gls.readLimitedU16(0, (1 << 12) - 1);
+        uint_fast16_t v = reader.readLimitedU16(0, (1 << 12) - 1);
         return Lighting((v >> 8) & MAX_INTENSITY, (v >> 4) & MAX_INTENSITY, v & MAX_INTENSITY);
     }
 };
+
+inline LightProperties LightProperties::read(Reader & reader)
+{
+    LightPropertiesType type = (LightPropertiesType)reader.readLimitedU8(0, (uint8_t)LightPropertiesType::Last);
+    return LightProperties(type, reader.readLimitedU8(0, Lighting::MAX_INTENSITY));
+}
 
 #endif // LIGHT_H_INCLUDED

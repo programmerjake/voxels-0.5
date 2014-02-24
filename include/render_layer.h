@@ -23,4 +23,6 @@ inline RenderLayer readRenderLayer(Reader &reader)
     return (RenderLayer)reader.readLimitedU8(0, (uint8_t)RenderLayer::Last);
 }
 
+void renderLayerSetup(RenderLayer rl); // in world.cpp
+
 #endif // RENDER_LAYER_H_INCLUDED

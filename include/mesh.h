@@ -126,23 +126,28 @@ private:
     friend class Renderer;
     Mesh_t(Reader &reader, Client &client)
     {
+        DUMP_V(Mesh_t::Mesh_t, "reading mesh");
         length = reader.readU32();
         points.resize(floatsPerPoint * pointsPerTriangle * length);
         colors.resize(floatsPerColor * colorsPerTriangle * length);
         textureCoords.resize(floatsPerTextureCoord * textureCoordsPerTriangle * length);
         textureInternal = Image::read(reader, client);
+        DUMP_V(Mesh_t::Mesh_t, "reading mesh : read texture");
         for(float & v : points)
         {
             v = reader.readFiniteF32();
         }
+        DUMP_V(Mesh_t::Mesh_t, "reading mesh : read points");
         for(float & v : textureCoords)
         {
             v = reader.readFiniteF32();
         }
+        DUMP_V(Mesh_t::Mesh_t, "reading mesh : read textureCoords");
         for(float & v : colors)
         {
             v = reader.readFiniteF32();
         }
+        DUMP_V(Mesh_t::Mesh_t, "reading mesh : read colors");
     }
 public:
     Mesh_t()

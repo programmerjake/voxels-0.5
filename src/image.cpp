@@ -218,13 +218,16 @@ void Image::write(Writer &writer, Client &client) const
         Client::writeId(writer, Client::NullId);
         return;
     }
+    client.lock();
     Client::IdType id = client.getId(data, Client::DataType::Image);
     if(id != Client::NullId)
     {
+        client.unlock();
         Client::writeId(writer, id);
         return;
     }
     id = client.makeId(data, Client::DataType::Image);
+    client.unlock();
     Client::writeId(writer, id);
     writer.writeU32(width());
     writer.writeU32(height());
@@ -246,8 +249,10 @@ Image Image::read(Reader &reader, Client &client)
     retval.data = client.getPtr<Image::data_t>(id, Client::DataType::Image);
     if(retval.data != nullptr)
     {
+        DUMP_V(Image::read, "read old image");
         return retval;
     }
+    DUMP_V(Image::read, "reading new image");
     uint32_t w, h;
     w = reader.readU32();
     h = reader.readU32();

@@ -27,6 +27,12 @@
 #include <memory>
 #include "util.h"
 #include "dimension.h"
+#ifdef DEBUG_STREAM
+#include <iostream>
+#define DUMP_V(fn, v) do {cerr << #fn << ": read " << v << endl;} while(false)
+#else
+#define DUMP_V(fn, v)
+#endif
 
 using namespace std;
 
@@ -84,7 +90,7 @@ private:
     {
         if(v < min || v > max)
         {
-            throw new InvalidDataValueException("read value out of range");
+            throw new InvalidDataValueException("read value out of range : " + to_string(v));
         }
         return v;
     }
@@ -107,38 +113,54 @@ public:
     }
     uint8_t readU8()
     {
-        return readByte();
+        uint8_t retval = readByte();
+        DUMP_V(readU8, (unsigned)retval);
+        return retval;
     }
     int8_t readS8()
     {
-        return readByte();
+        int8_t retval = readByte();
+        DUMP_V(readS8, (int)retval);
+        return retval;
     }
     uint16_t readU16()
     {
         uint16_t v = readU8();
-        return (v << 8) | readU8();
+        uint16_t retval = (v << 8) | readU8();
+        DUMP_V(readU16, retval);
+        return retval;
     }
     int16_t readS16()
     {
-        return readU16();
+        int16_t retval = readU16();
+        DUMP_V(readS16, retval);
+        return retval;
     }
     uint32_t readU32()
     {
         uint32_t v = readU16();
-        return (v << 16) | readU16();
+        uint32_t retval = (v << 16) | readU16();
+        DUMP_V(readU32, retval);
+        return retval;
     }
     int32_t readS32()
     {
-        return readU32();
+        int32_t retval = readU32();
+        DUMP_V(readS32, retval);
+        return retval;
     }
     uint64_t readU64()
     {
         uint64_t v = readU32();
-        return (v << 32) | readU32();
+        uint64_t retval = (v << 32) | readU32();
+        DUMP_V(readU64, retval);
+        return retval;
     }
     int64_t readS64()
     {
-        return readU64();
+        int64_t retval = readU64();
+        DUMP_V(readS64, retval);
+        return retval;
     }
     float readF32()
     {
@@ -149,7 +171,9 @@ public:
             float fval;
         };
         ival = readU32();
-        return fval;
+        float retval = fval;
+        DUMP_V(readF32, retval);
+        return retval;
     }
     double readF64()
     {
@@ -160,7 +184,9 @@ public:
             double fval;
         };
         ival = readU64();
-        return fval;
+        double retval = fval;
+        DUMP_V(readF64, retval);
+        return retval;
     }
     bool readBool()
     {
@@ -174,6 +200,7 @@ public:
             uint32_t b1 = readU8();
             if(b1 == 0)
             {
+                DUMP_V(readString, "\"" + wcsrtombs(retval) + "\"");
                 return retval;
             }
             else if((b1 & 0x80) == 0)
@@ -337,8 +364,8 @@ public:
     }
     void writeU64(uint64_t v)
     {
-        writeU64((uint64_t)(v >> 32));
-        writeU64((uint64_t)(v & 0xFFFFFFFFU));
+        writeU32((uint64_t)(v >> 32));
+        writeU32((uint64_t)(v & 0xFFFFFFFFU));
     }
     void writeS64(int64_t v)
     {
@@ -487,6 +514,18 @@ public:
     {
         return *writerInternal;
     }
+};
+
+class DumpingReader final : public Reader
+{
+private:
+    Reader &reader;
+public:
+    DumpingReader(Reader& reader)
+        : reader(reader)
+    {
+    }
+    virtual uint8_t readByte() override;
 };
 
 #endif // STREAM_H

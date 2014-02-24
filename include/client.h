@@ -28,11 +28,15 @@ public:
     }
     static IdType readId(Reader &reader)
     {
-        return reader.readU64();
+        IdType retval = reader.readU64();
+        DUMP_V(Client::readId, retval);
+        return retval;
     }
     static IdType readIdNonNull(Reader &reader)
     {
-        return reader.readLimitedU64(1, ~(uint64_t)0);
+        IdType retval = reader.readLimitedU64(1, ~(uint64_t)0);
+        DUMP_V(Client::readIdNonNull, retval);
+        return retval;
     }
 private:
     static atomic_uint_fast64_t nextId;
@@ -43,7 +47,6 @@ public:
     Client()
     {
     }
-    #error add locking and unlocking to all uses of Client
     void lock()
     {
         theLock.lock();

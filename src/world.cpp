@@ -5,8 +5,6 @@
 
 using namespace std;
 
-namespace
-{
 void renderLayerSetup(RenderLayer rl)
 {
     switch(rl)
@@ -23,7 +21,6 @@ void renderLayerSetup(RenderLayer rl)
     default:
         break;
     }
-}
 }
 
 BlockIterator::BlockIterator(shared_ptr<World> w, PositionI pos)

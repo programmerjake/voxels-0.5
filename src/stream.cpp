@@ -18,6 +18,9 @@
 #include "stream.h"
 #include <sys/types.h>
 #include <unistd.h>
+#include <iostream>
+
+using namespace std;
 
 StreamPipe::StreamPipe()
 {
@@ -30,4 +33,11 @@ StreamPipe::StreamPipe()
     }
     readerInternal = unique_ptr<Reader>(new FileReader(fdopen(fd[0], "r")));
     writerInternal = unique_ptr<Writer>(new FileWriter(fdopen(fd[1], "w")));
+}
+
+uint8_t DumpingReader::readByte()
+{
+    uint8_t retval = reader.readByte();
+    cerr << "Read Byte : " << (unsigned)retval << "\n";
+    return retval;
 }
