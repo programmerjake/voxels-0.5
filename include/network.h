@@ -13,7 +13,7 @@ public:
     }
 };
 
-class NetworkConnection final
+class NetworkConnection final : public StreamRW
 {
     friend class NetworkServer;
 private:
@@ -25,17 +25,17 @@ private:
     }
 public:
     explicit NetworkConnection(wstring url, uint16_t port);
-    Reader & reader()
+    Reader & reader() override
     {
         return *readerInternal;
     }
-    Writer & writer()
+    Writer & writer() override
     {
         return *writerInternal;
     }
 };
 
-class NetworkServer final
+class NetworkServer final : public StreamServer
 {
     NetworkServer(const NetworkServer &) = delete;
     const NetworkServer & operator =(const NetworkServer &) = delete;
@@ -44,7 +44,7 @@ private:
 public:
     explicit NetworkServer(uint16_t port);
     ~NetworkServer();
-    shared_ptr<NetworkConnection> accept();
+    shared_ptr<StreamRW> accept() override;
 };
 
 #endif // NETWORK_H_INCLUDED

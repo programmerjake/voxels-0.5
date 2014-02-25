@@ -15,81 +15,128 @@
  * MA 02110-1301, USA.
  *
  */
-#include <iostream>
-#include <sstream>
-#include "platform.h"
-#include "generate.h"
-#include "texture_atlas.h"
-#include "text.h"
-#include "game_version.h"
-#include "event.h"
-#include "util.h"
-#include "render_object.h"
 #include "client.h"
-#include "network_protocol.h"
+#include "server.h"
+#include "stream.h"
+#include "network.h"
+#include "util.h"
+#include "game_version.h"
 #include <thread>
-#include <chrono>
+#include <vector>
+#include <iostream>
 
 using namespace std;
 
-const int size = 4;
-
-void sourceThreadFn(Reader *preader, Writer *pwriter)
+namespace
 {
-    Reader &reader = *preader;
-    Writer &writer = *pwriter;
-    Client client;
-    shared_ptr<RenderObjectBlockMesh> air, wood;
-    air = make_shared<RenderObjectBlockMesh>(LightProperties(LightPropertiesType::Transparent, 15), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), false, false, false, false, false, false, RenderLayer::Opaque);
-    wood = make_shared<RenderObjectBlockMesh>(LightProperties(LightPropertiesType::Opaque, 0), Mesh(new Mesh_t),
-            Generate::unitBox(TextureAtlas::OakWood.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-            Generate::unitBox(TextureDescriptor(), TextureAtlas::OakWood.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureAtlas::WoodEnd.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::WoodEnd.td(), TextureDescriptor(), TextureDescriptor()),
-            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::OakWood.td(), TextureDescriptor()),
-            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::OakWood.td()),
-            true, true, true, true, true, true, RenderLayer::Opaque
-                                             );
-    vector<shared_ptr<RenderObjectBlock>> objects;
-    for(int dx = -size; dx <= size; dx++)
-    {
-        for(int dy = -size; dy <= size; dy++)
-        {
-            for(int dz = -size; dz <= size; dz++)
-            {
-                shared_ptr<RenderObjectBlock> block = make_shared<RenderObjectBlock>((dx * dx + dy * dy + dz * dz < size * size) ? wood : air, PositionI(dx, dy, dz, Dimension::Overworld));
-                block->addToClient(client);
-                objects.push_back(block);
-            }
-        }
-    }
-    NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdateRenderObjects);
-    writer.writeU64(objects.size());
-    for(shared_ptr<RenderObject> object : objects)
-    {
-        object->write(writer, client);
-    }
-    writer.flush();
-    while(true)
-    {
-        this_thread::sleep_for(chrono::milliseconds(10));
-        int dx = rand() % (size * 2 + 1 - 2) - size + 1;
-        int dy = rand() % (size * 2 + 1 - 2) - size + 1;
-        int dz = rand() % (size * 2 + 1 - 2) - size + 1;
-        shared_ptr<RenderObjectBlock> block = make_shared<RenderObjectBlock>((rand() % 2) ? wood : air, PositionI(dx, dy, dz, Dimension::Overworld));
-        block->addToClient(client);
-        NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdateRenderObjects);
-        writer.writeU64(1);
-        block->write(writer, client);
-        writer.flush();
-    }
+void serverThreadFn(shared_ptr<StreamServer> server)
+{
+    runServer(*server);
 }
 
-int main()
+bool isQuiet = false;
+
+void outputVersion()
 {
-    StreamPipe pipe1, pipe2;
-    //DumpingReader dumpRead(pipe2.reader());
-    thread sourceThread(sourceThreadFn, &pipe1.reader(), &pipe2.writer());
-    clientProcess(pipe2.reader(), pipe1.writer());
+    if(isQuiet)
+        return;
+    static bool didOutputVersion = false;
+    if(didOutputVersion)
+        return;
+    didOutputVersion = true;
+    cout << "voxels " << wcsrtombs(GameVersion::VERSION) << "\n";
+}
+
+void help()
+{
+    isQuiet = false;
+    outputVersion();
+    cout << "usage : voxels [-h | --help] [-q | --quiet] [--server] [--client <server url>]\n";
+}
+
+int error(wstring msg)
+{
+    outputVersion();
+    cout << "error : " << wcsrtombs(msg) << "\n";
+    if(!isQuiet)
+        help();
+    return 1;
+}
+}
+
+int myMain(vector<wstring> args)
+{
+    args.erase(args.begin());
+    bool isServer = false, isClient = false;
+    wstring clientAddr;
+    for(auto i = args.begin(); i != args.end(); i++)
+    {
+        wstring arg = *i;
+        if(arg == L"--help" || arg == L"-h")
+        {
+            help();
+            return 0;
+        }
+        else if(arg == L"-q" || arg == L"--quiet")
+        {
+            isQuiet = true;
+        }
+        else if(arg == L"--server")
+        {
+            if(isServer)
+                return error(L"can't specify two server flags");
+            if(isClient)
+                return error(L"can't specify both server and client");
+            isServer = true;
+        }
+        else if(arg == L"--client")
+        {
+            if(isServer)
+                return error(L"can't specify both server and client");
+            if(isClient)
+                return error(L"can't specify two client flags");
+            isClient = true;
+            i++;
+            if(i == args.end())
+                return error(L"--client missing server url");
+            arg = *i;
+            clientAddr = arg;
+        }
+        else
+            return error(L"unrecognized argument : " + arg);
+    }
+    try
+    {
+        if(isServer)
+        {
+            NetworkServer server(GameVersion::port);
+            runServer(server);
+            return 0;
+        }
+        if(isClient)
+        {
+            NetworkConnection connection(clientAddr, GameVersion::port);
+            clientProcess(connection);
+            return 0;
+        }
+        StreamBidirectionalPipe pipe;
+        thread serverThread(serverThreadFn, shared_ptr<StreamServer>(new StreamServerWrapper(list<shared_ptr<StreamRW>>{pipe.pport1()})));
+        clientProcess(pipe.port2());
+    }
+    catch(exception * e)
+    {
+        return error(mbsrtowcs(e->what()));
+    }
     return 0;
+}
+
+int main(int argc, char ** argv)
+{
+    vector<wstring> args;
+    args.resize(argc);
+    for(int i = 0; i < argc; i++)
+    {
+        args[i] = mbsrtowcs(argv[i]);
+    }
+    return myMain(args);
 }

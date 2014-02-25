@@ -25,6 +25,7 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <list>
 #include "util.h"
 #include "dimension.h"
 #ifdef DEBUG_STREAM
@@ -60,6 +61,15 @@ class EOFException final : public IOException
 public:
     explicit EOFException()
         : IOException("IO Error : reached end of file")
+    {
+    }
+};
+
+class NoStreamsLeftException final : public IOException
+{
+public:
+    explicit NoStreamsLeftException()
+        : IOException("IO Error : no streams left")
     {
     }
 };
@@ -501,9 +511,11 @@ public:
 
 class StreamPipe final
 {
+    StreamPipe(const StreamPipe &) = delete;
+    const StreamPipe & operator =(const StreamPipe &) = delete;
 private:
-    unique_ptr<Reader> readerInternal;
-    unique_ptr<Writer> writerInternal;
+    shared_ptr<Reader> readerInternal;
+    shared_ptr<Writer> writerInternal;
 public:
     StreamPipe();
     Reader & reader()
@@ -513,6 +525,14 @@ public:
     Writer & writer()
     {
         return *writerInternal;
+    }
+    shared_ptr<Reader> preader()
+    {
+        return readerInternal;
+    }
+    shared_ptr<Writer> pwriter()
+    {
+        return writerInternal;
     }
 };
 
@@ -526,6 +546,103 @@ public:
     {
     }
     virtual uint8_t readByte() override;
+};
+
+struct StreamRW
+{
+    StreamRW()
+    {
+    }
+    StreamRW(const StreamRW &) = delete;
+    const StreamRW & operator =(const StreamRW &) = delete;
+    virtual ~StreamRW()
+    {
+    }
+    virtual Reader & reader() = 0;
+    virtual Writer & writer() = 0;
+};
+
+class StreamRWWrapper final : public StreamRW
+{
+private:
+    shared_ptr<Reader> preader;
+    shared_ptr<Writer> pwriter;
+public:
+    StreamRWWrapper(shared_ptr<Reader> preader, shared_ptr<Writer> pwriter)
+        : preader(preader), pwriter(pwriter)
+    {
+    }
+
+    virtual Reader & reader() override
+    {
+        return *preader;
+    }
+
+    virtual Writer & writer() override
+    {
+        return *pwriter;
+    }
+};
+
+class StreamBidirectionalPipe final
+{
+private:
+    StreamPipe pipe1, pipe2;
+    shared_ptr<StreamRW> port1Internal, port2Internal;
+public:
+    StreamBidirectionalPipe()
+    {
+        port1Internal = shared_ptr<StreamRW>(new StreamRWWrapper(pipe1.preader(), pipe2.pwriter()));
+        port2Internal = shared_ptr<StreamRW>(new StreamRWWrapper(pipe2.preader(), pipe1.pwriter()));
+    }
+    shared_ptr<StreamRW> pport1()
+    {
+        return port1Internal;
+    }
+    shared_ptr<StreamRW> pport2()
+    {
+        return port2Internal;
+    }
+    StreamRW & port1()
+    {
+        return *port1Internal;
+    }
+    StreamRW & port2()
+    {
+        return *port2Internal;
+    }
+};
+
+struct StreamServer
+{
+    StreamServer()
+    {
+    }
+    StreamServer(const StreamServer &) = delete;
+    const StreamServer & operator =(const StreamServer &) = delete;
+    virtual ~StreamServer()
+    {
+    }
+    virtual shared_ptr<StreamRW> accept() = 0;
+};
+
+class StreamServerWrapper final : public StreamServer
+{
+private:
+    list<shared_ptr<StreamRW>> streams;
+public:
+    StreamServerWrapper(list<shared_ptr<StreamRW>> streams)
+        : streams(streams)
+    {
+    }
+    virtual shared_ptr<StreamRW> accept() override
+    {
+        if(streams.empty())
+            throw new NoStreamsLeftException();
+        shared_ptr<StreamRW> retval = streams.front();
+        streams.pop_front();
+        return retval;
+    }
 };
 
 #endif // STREAM_H

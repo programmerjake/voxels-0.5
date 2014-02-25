@@ -29,6 +29,7 @@ shared_ptr<RenderObjectBlockMesh> RenderObjectBlockMesh::read(Reader &reader, Cl
     DUMP_V(RenderObjectBlockMesh::read, "read new block meshes");
     LightProperties lightProperties = LightProperties::read(reader);
     RenderLayer rl = readRenderLayer(reader);
+    RenderObjectBlockClass blockClass = readRenderObjectBlockClass(reader);
     uint8_t blockedMask = reader.readU8();
     bool nxBlocked = blockedMask & (1 << (int)BlockFace::NX);
     bool pxBlocked = blockedMask & (1 << (int)BlockFace::PX);
@@ -36,7 +37,7 @@ shared_ptr<RenderObjectBlockMesh> RenderObjectBlockMesh::read(Reader &reader, Cl
     bool pyBlocked = blockedMask & (1 << (int)BlockFace::PY);
     bool nzBlocked = blockedMask & (1 << (int)BlockFace::NZ);
     bool pzBlocked = blockedMask & (1 << (int)BlockFace::PZ);
-    retval = shared_ptr<RenderObjectBlockMesh>(new RenderObjectBlockMesh(lightProperties, center, nx, px, ny, py, nz, pz, nxBlocked, pxBlocked, nyBlocked, pyBlocked, nzBlocked, pzBlocked, rl));
+    retval = shared_ptr<RenderObjectBlockMesh>(new RenderObjectBlockMesh(blockClass, lightProperties, center, nx, px, ny, py, nz, pz, nxBlocked, pxBlocked, nyBlocked, pyBlocked, nzBlocked, pzBlocked, rl));
     client.setPtr(retval, id, Client::DataType::RenderObjectBlockMesh);
     DUMP_V(RenderObjectBlockMesh::read, "read new block");
     return retval;
@@ -76,6 +77,7 @@ void RenderObjectBlockMesh::write(Writer &writer, Client &client)
     writeMesh(pz, writer, client);
     lightProperties.write(writer);
     writeRenderLayer(rl, writer);
+    writeRenderObjectBlockClass(writer, blockClass);
     uint8_t blockedMask = 0;
 
     if(nxBlocked)

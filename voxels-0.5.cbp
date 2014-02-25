@@ -11,6 +11,7 @@
 				<Option object_output="obj/Debug/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
+				<Option parameters="--server" />
 				<Compiler>
 					<Add option="-g" />
 					<Add option="-fno-inline" />
@@ -72,6 +73,7 @@
 		<Unit filename="include/position.h" />
 		<Unit filename="include/render_layer.h" />
 		<Unit filename="include/render_object.h" />
+		<Unit filename="include/server.h" />
 		<Unit filename="include/stream.h" />
 		<Unit filename="include/text.h" />
 		<Unit filename="include/texture_atlas.h" />
@@ -93,6 +95,7 @@
 		</Unit>
 		<Unit filename="src/png_decoder.cpp" />
 		<Unit filename="src/render_object.cpp" />
+		<Unit filename="src/server.cpp" />
 		<Unit filename="src/stream.cpp" />
 		<Unit filename="src/text.cpp" />
 		<Unit filename="src/texture_atlas.cpp" />

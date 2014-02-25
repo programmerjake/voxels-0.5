@@ -239,5 +239,7 @@ namespace Display
     VectorF transformMouseTo3D(float x, float y, float depth = 1.0f);
 }
 
+void startGraphics();
+
 #endif // PLATFORM_H_INCLUDED
 #include "event.h"

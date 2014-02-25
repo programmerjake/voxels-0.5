@@ -231,12 +231,30 @@ void Image::write(Writer &writer, Client &client) const
     Client::writeId(writer, id);
     writer.writeU32(width());
     writer.writeU32(height());
-    for(size_t i = 0; i < BytesPerPixel * data->w * data->h; i++)
+    vector<uint8_t> row;
+    row.resize(width() * BytesPerPixel);
+    for(size_t y = 0; y < height(); y++)
     {
         data->lock.lock();
-        uint8_t b = data->data[i];
+        size_t adjustedY = y;
+        if(data->rowOrder == BottomToTop)
+        {
+            adjustedY = data->h - adjustedY - 1;
+        }
+
+        uint8_t *prow = &data->data[BytesPerPixel * (adjustedY * data->w)];
+        for(size_t x = 0, i = 0; x < width(); x++)
+        {
+            row[i++] = *prow++;
+            row[i++] = *prow++;
+            row[i++] = *prow++;
+            row[i++] = *prow++;
+        }
         data->lock.unlock();
-        writer.writeU8(b);
+        for(uint8_t v : row)
+        {
+            writer.writeU8(v);
+        }
     }
 }
 
@@ -257,6 +275,7 @@ Image Image::read(Reader &reader, Client &client)
     w = reader.readU32();
     h = reader.readU32();
     retval = Image(w, h);
+    retval.setRowOrder(RowOrder::TopToBottom);
     for(size_t i = 0; i < BytesPerPixel * w * h; i++)
     {
         retval.data->data[i] = reader.readU8();

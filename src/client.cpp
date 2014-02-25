@@ -7,6 +7,8 @@
 #include <thread>
 #include <iostream>
 #include <sstream>
+#include <mutex>
+#include <condition_variable>
 
 using namespace std;
 
@@ -113,71 +115,140 @@ Mesh makeRenderMesh(Client &client, RenderLayer rl, PositionI pos, int renderDis
     return retval;
 }
 
-class ExampleEventHandler final : public EventHandler
+void meshMakerThread(atomic_bool * pdone, Mesh meshes[], bool * pneedMeshes, const int * prenderDistance, const PositionI * ppos, condition_variable_any * cond, mutex * lock, Client * pclient)
 {
+    atomic_bool & done = *pdone;
+    bool & needMeshes = *pneedMeshes;
+    lock->lock();
+    const int & renderDistance = *prenderDistance;
+    const PositionI & pos = *ppos;
+    Client &client = *pclient;
+    while(!done)
+    {
+        while(!done && !needMeshes)
+            cond->wait(*lock);
+        if(done)
+            break;
+        needMeshes = false;
+        lock->unlock();
+        Mesh tempMeshes[(int)RenderLayer::Last];
+        for(RenderLayer rl = (RenderLayer)0; rl < RenderLayer::Last; rl = (RenderLayer)((int)rl + 1))
+        {
+            tempMeshes[(int)rl] = makeRenderMesh(client, rl, pos, renderDistance);
+        }
+        lock->lock();
+        for(RenderLayer rl = (RenderLayer)0; rl < RenderLayer::Last; rl = (RenderLayer)((int)rl + 1))
+        {
+            meshes[(int)rl] = tempMeshes[(int)rl];
+        }
+    }
+    lock->unlock();
+}
+
+class ClientEventHandler final : public EventHandler
+{
+    float & dtheta;
+    float & dphi;
+    bool & paused;
+public:
+    ClientEventHandler(float & dtheta, float & dphi, bool &paused)
+        : dtheta(dtheta), dphi(dphi), paused(paused)
+    {
+    }
     virtual bool handleMouseUp(MouseUpEvent &event) override
     {
-        cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Up    : " << event.button << endl;
+        //cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Up    : " << event.button << endl;
         return true;
     }
     virtual bool handleMouseDown(MouseDownEvent &event) override
     {
-        cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Down  : " << event.button << endl;
+        //cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Down  : " << event.button << endl;
         return true;
     }
     virtual bool handleMouseMove(MouseMoveEvent &event) override
     {
-        cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Move\n";
+        //cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Move\n";
+        if(paused)
+            return true;
+        if(event.deltaX > 0)
+            dtheta += limit(event.deltaX, 0.0f, 10.0f) * event.deltaX / 1000.0 * M_PI;
+        else
+            dtheta -= limit(event.deltaX, -10.0f, 0.0f) * event.deltaX / 1000.0 * M_PI;
+        if(event.deltaY > 0)
+            dphi -= limit(event.deltaY, 0.0f, 10.0f) * event.deltaY / 1000.0 * M_PI;
+        else
+            dphi += limit(event.deltaY, -10.0f, 0.0f) * event.deltaY / 1000.0 * M_PI;
         return true;
     }
     virtual bool handleMouseScroll(MouseScrollEvent &event) override
     {
-        cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Scroll : (" << event.scrollX << ", " << event.scrollY << ")\n";
+        //cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Scroll : (" << event.scrollX << ", " << event.scrollY << ")\n";
         return true;
     }
     virtual bool handleKeyUp(KeyUpEvent &event) override
     {
-        cout << "Key Up  : " << event.key << " : " << event.mods << endl;
+        //cout << "Key Up  : " << event.key << " : " << event.mods << endl;
         return true;
     }
     virtual bool handleKeyDown(KeyDownEvent &event) override
     {
-        cout << "Key Down : " << event.key << " : " << event.mods << (event.isRepetition ? " : Repeated\n" : " : First\n");
-        return true;
+        //cout << "Key Down : " << event.key << " : " << event.mods << (event.isRepetition ? " : Repeated\n" : " : First\n");
+        if(event.key == KeyboardKey::KeyboardKey_P)
+        {
+            paused = !paused;
+        }
+        return false;
     }
     virtual bool handleKeyPress(KeyPressEvent &event) override
     {
-        cout << "Key : \'" << wcsrtombs(wstring(L"") + event.character) << "\'\n";
+        //cout << "Key : \'" << wcsrtombs(wstring(L"") + event.character) << "\'\n";
         return true;
     }
     virtual bool handleQuit(QuitEvent &) override
     {
-        cout << "Quit\n";
+        //cout << "Quit\n";
         return false; // so that the program will actually quit
     }
 };
 }
 
-void clientProcess(Reader &reader, Writer &writer)
+void clientProcess(StreamRW & streamRW)
 {
+    startGraphics();
+    Reader &reader = streamRW.reader();
+    Writer &writer = streamRW.writer();
     Client client;
     atomic_bool done(false);
     thread networkThread(clientProcessReader, &reader, &client, &done);
     Renderer r;
-    const int size = 5;
+    float theta = 0, phi = 0, dtheta = 0, dphi = 0;
+    bool paused = true;
+    mutex meshGenLock;
+    condition_variable_any meshGenCond;
+    bool needMeshes = true;
+    int renderDistance = 20;
+    PositionI pos(0, 0, 0, Dimension::Overworld);
+    Mesh meshes[(int)RenderLayer::Last];
+    thread renderThread(meshMakerThread, &done, (Mesh *)meshes, &needMeshes, &renderDistance, &pos, &meshGenCond, &meshGenLock, &client);
 
     while(!done)
     {
+        meshGenLock.lock();
+        needMeshes = true;
+        meshGenCond.notify_all();
+        meshGenLock.unlock();
         Display::initFrame();
         glClearColor(0, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        Matrix tform = Matrix::rotateY(M_PI / 40 * Display::timer()).concat(Matrix::rotateX(Display::timer() / 10)).concat(Matrix::translate(0, 0, -4 * size)).concat(Matrix::scale(1.0f / size));
+        Matrix tform = Matrix::translate(-0.5, -0.5, -0.5).concat(Matrix::rotateY(theta)).concat(Matrix::rotateX(-phi));
+        meshGenLock.lock();
         for(RenderLayer rl = (RenderLayer)0; rl < RenderLayer::Last; rl = (RenderLayer)((int)rl + 1))
         {
-            Mesh mesh = makeRenderMesh(client, rl, PositionI(0, 0, 0, Dimension::Overworld));
+            Mesh mesh = meshes[(int)rl];
             renderLayerSetup(rl);
             r << transform(tform, mesh);
         }
+        meshGenLock.unlock();
         renderLayerSetup(RenderLayer::Last);
         Display::initOverlay();
         wstringstream s;
@@ -191,7 +262,16 @@ void clientProcess(Reader &reader, Writer &writer)
         s << "\nFPS : " << Display::averageFPS() << endl;
         r << transform(Matrix::translate(-40 * Display::scaleX(), 40 * Display::scaleY() - Text::height(s.str()), -40 * Display::scaleX()), Text::mesh(s.str(), Color(1, 0, 1)));
         Display::flip();
-        Display::handleEvents(shared_ptr<EventHandler>(new ExampleEventHandler));
+        Display::handleEvents(shared_ptr<EventHandler>(new ClientEventHandler(dtheta, dphi, paused)));
+        theta = fmod(theta + dtheta / 2, M_PI * 2);
+        phi = limit(phi + dphi / 2, -(float)M_PI / 2, (float)M_PI / 2);
+        dtheta /= 2;
+        dphi /= 2;
+        if(paused == Display::grabMouse())
+            Display::grabMouse(!paused);
     }
+    meshGenCond.notify_all();
+    networkThread.join();
+    renderThread.join();
 }
 

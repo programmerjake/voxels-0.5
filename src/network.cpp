@@ -106,7 +106,7 @@ NetworkServer::~NetworkServer()
     close(fd);
 }
 
-shared_ptr<NetworkConnection> NetworkServer::accept()
+shared_ptr<StreamRW> NetworkServer::accept()
 {
     int fd2 = ::accept(fd, nullptr, nullptr);
     if(fd2 < 0)
@@ -115,5 +115,7 @@ shared_ptr<NetworkConnection> NetworkServer::accept()
         msg += strerror(errno);
         throw new NetworkException(msg);
     }
-    return shared_ptr<NetworkConnection>(new NetworkConnection(dup(fd), fd));
+    shared_ptr<Reader> reader = shared_ptr<Reader>(new FileReader(fdopen(dup(fd2), "r")));
+    shared_ptr<Writer> writer = shared_ptr<Writer>(new FileWriter(fdopen(fd2, "w")));
+    return shared_ptr<StreamRW>(new StreamRWWrapper(reader, writer));
 }

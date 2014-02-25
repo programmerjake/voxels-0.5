@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <vector>
+#include "render_object.h"
 
 using namespace std;
 
@@ -80,6 +81,7 @@ public:
     virtual ~BlockDescriptor()
     {
     }
+    virtual shared_ptr<RenderObjectBlockMesh> getBlockMesh(BlockIterator bi) const = 0;
 protected:
     virtual BlockData loadInternal(GameLoadStream & gls) const = 0;
     virtual void storeInternal(BlockData data, GameStoreStream & gss) const = 0;

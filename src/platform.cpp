@@ -101,9 +101,12 @@ static const auto ImageDecoderFlags = IMG_INIT_PNG;
 static int xResInternal, yResInternal;
 
 static SDL_Surface *videoSurface = nullptr;
+static atomic_bool runningGraphics(false);
 
-initializer initializer2([]()
+void startGraphics()
 {
+    if(runningGraphics.exchange(true))
+        return;
     if(0 != SDL_Init(SDL_INIT_TIMER | SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     {
         cerr << "error : can't start SDL : " << SDL_GetError() << endl;
@@ -117,20 +120,24 @@ initializer initializer2([]()
     }
     atexit(IMG_Quit);
 #if 0
-    const(SDL_VideoInfo) * vidInfo = SDL_GetVideoInfo();
-    if(vidInfo is null)
+    const SDL_VideoInfo * vidInfo = SDL_GetVideoInfo();
+    if(vidInfo == nullptr)
     {
         xResInternal = 800;
         yResInternal = 600;
     }
     else
     {
-        xResInternal = vidInfo.current_w;
-        yResInternal = vidInfo.current_h;
+        xResInternal = vidInfo->current_w;
+        yResInternal = vidInfo->current_h;
+        if(xResInternal == 32 * yResInternal / 9)
+            xResInternal /= 2;
+        else if(xResInternal == 32 * yResInternal / 10)
+            xResInternal /= 2;
     }
 #else
-    xResInternal = 1024;
-    yResInternal = 768;
+    xResInternal = 1280;
+    yResInternal = 1024;
 #endif
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
@@ -145,7 +152,7 @@ initializer initializer2([]()
     }
     SDL_EnableUNICODE(1);
     SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
-});
+}
 
 static volatile double lastFlipTime = 0;
 

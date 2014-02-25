@@ -112,6 +112,6 @@ public:
     }
 };
 
-void clientProcess(Reader & reader, Writer & writer);
+void clientProcess(StreamRW & streamRW);
 
 #endif // CLIENT_H_INCLUDED

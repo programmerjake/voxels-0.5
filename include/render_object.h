@@ -74,7 +74,7 @@ struct RenderObjectWorld final
     }
     struct Chunk final
     {
-        static constexpr int log2_size = 4;
+        static constexpr int log2_size = 3;
         static constexpr int size = 1 << log2_size;
         static constexpr int mod_size_mask = size - 1;
         static constexpr int floor_size_mask = ~mod_size_mask;
@@ -152,16 +152,56 @@ struct RenderObjectWorld final
         {
             return chunk->blocksLighting[modPos.x][modPos.y][modPos.z];
         }
+        void invalidate()
+        {
+            chunk->invalidateMesh();
+            if(modPos.x <= 0)
+            {
+                shared_ptr<Chunk> c = chunk->nx.lock();
+                if(c != nullptr)
+                    c->invalidateMesh();
+            }
+            if(modPos.x >= Chunk::size - 1)
+            {
+                shared_ptr<Chunk> c = chunk->px.lock();
+                if(c != nullptr)
+                    c->invalidateMesh();
+            }
+            if(modPos.y <= 0)
+            {
+                shared_ptr<Chunk> c = chunk->ny.lock();
+                if(c != nullptr)
+                    c->invalidateMesh();
+            }
+            if(modPos.y >= Chunk::size - 1)
+            {
+                shared_ptr<Chunk> c = chunk->py.lock();
+                if(c != nullptr)
+                    c->invalidateMesh();
+            }
+            if(modPos.z <= 0)
+            {
+                shared_ptr<Chunk> c = chunk->nz.lock();
+                if(c != nullptr)
+                    c->invalidateMesh();
+            }
+            if(modPos.z >= Chunk::size - 1)
+            {
+                shared_ptr<Chunk> c = chunk->pz.lock();
+                if(c != nullptr)
+                    c->invalidateMesh();
+            }
+        }
         void setMesh(shared_ptr<RenderObjectBlockMesh> v)
         {
             chunk->blocksMesh[modPos.x][modPos.y][modPos.z] = v;
-            chunk->invalidateMesh();
+            invalidate();
             world->addLightingUpdate(pos);
         }
         void setLighting(Lighting v)
         {
             chunk->blocksLighting[modPos.x][modPos.y][modPos.z] = v;
-            chunk->invalidateMesh();
+            invalidate();
         }
         void moveNX()
         {
@@ -313,8 +353,22 @@ struct RenderObjectWorld final
     }
 };
 
+typedef uint16_t RenderObjectBlockClass;
+
+inline RenderObjectBlockClass readRenderObjectBlockClass(Reader &reader)
+{
+    return reader.readU16();
+}
+
+inline void writeRenderObjectBlockClass(Writer &writer, RenderObjectBlockClass v)
+{
+    writer.writeU16(v);
+}
+
 class RenderObjectBlockMesh final : public enable_shared_from_this<RenderObjectBlockMesh>
 {
+public:
+    const RenderObjectBlockClass blockClass;
 private:
     Mesh center, nx, px, ny, py, nz, pz;
     shared_ptr<RenderObjectWorld> world;
@@ -334,8 +388,8 @@ public:
         RenderObjectWorld::BlockIterator bi(world, pos);
         render(dest, rl, bi);
     }
-    RenderObjectBlockMesh(LightProperties lightProperties, Mesh center, Mesh nx, Mesh px, Mesh ny, Mesh py, Mesh nz, Mesh pz, bool nxBlocked, bool pxBlocked, bool nyBlocked, bool pyBlocked, bool nzBlocked, bool pzBlocked, RenderLayer rl)
-        : center(center), nx(nx), px(px), ny(ny), py(py), nz(nz), pz(pz), nxBlocked(nxBlocked), pxBlocked(pxBlocked), nyBlocked(nyBlocked), pyBlocked(pyBlocked), nzBlocked(nzBlocked), pzBlocked(pzBlocked), lightProperties(lightProperties), rl(rl)
+    RenderObjectBlockMesh(RenderObjectBlockClass blockClass, LightProperties lightProperties, Mesh center, Mesh nx, Mesh px, Mesh ny, Mesh py, Mesh nz, Mesh pz, bool nxBlocked, bool pxBlocked, bool nyBlocked, bool pyBlocked, bool nzBlocked, bool pzBlocked, RenderLayer rl)
+        : blockClass(blockClass), center(center), nx(nx), px(px), ny(ny), py(py), nz(nz), pz(pz), nxBlocked(nxBlocked), pxBlocked(pxBlocked), nyBlocked(nyBlocked), pyBlocked(pyBlocked), nzBlocked(nzBlocked), pzBlocked(pzBlocked), lightProperties(lightProperties), rl(rl)
     {
     }
     static shared_ptr<RenderObjectBlockMesh> read(Reader &reader, Client &client);
@@ -408,17 +462,17 @@ inline void RenderObjectBlockMesh::render(Mesh dest, RenderLayer rl, RenderObjec
     shared_ptr<RenderObjectBlockMesh> pyMesh = bi.getPY().getMesh();
     shared_ptr<RenderObjectBlockMesh> nzMesh = bi.getNZ().getMesh();
     shared_ptr<RenderObjectBlockMesh> pzMesh = bi.getPZ().getMesh();
-    if(nxMesh != nullptr && !nxMesh->pxBlocked)
+    if(nxMesh != nullptr && !nxMesh->pxBlocked && nxMesh->blockClass != blockClass)
         dest->add(transform(tform, nx));
-    if(pxMesh != nullptr && !pxMesh->nxBlocked)
+    if(pxMesh != nullptr && !pxMesh->nxBlocked && pxMesh->blockClass != blockClass)
         dest->add(transform(tform, px));
-    if(nyMesh != nullptr && !nyMesh->pyBlocked)
+    if(nyMesh != nullptr && !nyMesh->pyBlocked && nyMesh->blockClass != blockClass)
         dest->add(transform(tform, ny));
-    if(pyMesh != nullptr && !pyMesh->nyBlocked)
+    if(pyMesh != nullptr && !pyMesh->nyBlocked && pyMesh->blockClass != blockClass)
         dest->add(transform(tform, py));
-    if(nzMesh != nullptr && !nzMesh->pzBlocked)
+    if(nzMesh != nullptr && !nzMesh->pzBlocked && nzMesh->blockClass != blockClass)
         dest->add(transform(tform, nz));
-    if(pzMesh != nullptr && !pzMesh->nzBlocked)
+    if(pzMesh != nullptr && !pzMesh->nzBlocked && pzMesh->blockClass != blockClass)
         dest->add(transform(tform, pz));
     dest->add(transform(tform, center));
 }
