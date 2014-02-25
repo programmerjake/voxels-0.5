@@ -505,7 +505,8 @@ public:
     }
     virtual void flush() override
     {
-        fflush(f);
+        if(EOF == fflush(f))
+            throw new IOException("IO Error : can't write to file");
     }
 };
 
