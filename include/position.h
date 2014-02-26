@@ -4,6 +4,8 @@
 #include "dimension.h"
 #include "vector.h"
 #include "util.h"
+#include <unordered_set>
+#include <vector>
 
 struct PositionI : public VectorI
 {
@@ -254,5 +256,25 @@ struct PositionF : public VectorF
         return *this;
     }
 };
+
+struct UpdateList // in here because of include issues : should be in util.h
+{
+    unordered_set<PositionI> updatesSet;
+    vector<PositionI> updatesList;
+    void add(PositionI pos)
+    {
+        if(get<1>(updatesSet.insert(pos)))
+        {
+            updatesList.push_back(pos);
+        }
+    }
+    void clear()
+    {
+        updatesList.clear();
+        updatesSet.clear();
+    }
+};
+
+
 
 #endif // POSITION_H_INCLUDED

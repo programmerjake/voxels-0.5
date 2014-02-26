@@ -54,6 +54,7 @@
 		</Linker>
 		<Unit filename="include/block.h" />
 		<Unit filename="include/block_face.h" />
+		<Unit filename="include/builtin_blocks.h" />
 		<Unit filename="include/chunk.h" />
 		<Unit filename="include/client.h" />
 		<Unit filename="include/color.h" />
@@ -74,6 +75,7 @@
 		<Unit filename="include/render_layer.h" />
 		<Unit filename="include/render_object.h" />
 		<Unit filename="include/server.h" />
+		<Unit filename="include/stonelikeblock.h" />
 		<Unit filename="include/stream.h" />
 		<Unit filename="include/text.h" />
 		<Unit filename="include/texture_atlas.h" />
@@ -82,6 +84,7 @@
 		<Unit filename="include/vector.h" />
 		<Unit filename="include/world.h" />
 		<Unit filename="src/block.cpp" />
+		<Unit filename="src/builtin_blocks.cpp" />
 		<Unit filename="src/client.cpp" />
 		<Unit filename="src/game_stream.cpp" />
 		<Unit filename="src/game_version.cpp" />
@@ -96,6 +99,7 @@
 		<Unit filename="src/png_decoder.cpp" />
 		<Unit filename="src/render_object.cpp" />
 		<Unit filename="src/server.cpp" />
+		<Unit filename="src/stonelikeblock.cpp" />
 		<Unit filename="src/stream.cpp" />
 		<Unit filename="src/text.cpp" />
 		<Unit filename="src/texture_atlas.cpp" />

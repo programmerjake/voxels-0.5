@@ -35,7 +35,7 @@ struct BlockData
     int32_t idata;
     Lighting light;
     shared_ptr<ExtraBlockData> extraData;
-    explicit BlockData(weak_ptr<BlockDescriptor> desc = weak_ptr<BlockDescriptor>(), int32_t idata = 0, shared_ptr<ExtraBlockData> extraData = nullptr)
+    explicit BlockData(shared_ptr<BlockDescriptor> desc = shared_ptr<BlockDescriptor>(), int32_t idata = 0, shared_ptr<ExtraBlockData> extraData = nullptr)
         : desc(desc), idata(idata), light(), extraData(extraData)
     {
     }
@@ -50,6 +50,7 @@ struct BlockDescriptor : public enable_shared_from_this<BlockDescriptor>
 private:
     static map<wstring, BlockDescriptorPtr> *blocks;
     static vector<BlockDescriptorPtr> *blocksList;
+protected:
     static void addToBlocksList(BlockDescriptorPtr bd) /// call with all constructed BlockDescriptor daughter classes
     {
         if(blocks == nullptr) // so that we don't have problems with static initialization order
@@ -74,15 +75,15 @@ public:
             return nullptr;
         return blocks->at(name);
     }
-    BlockDescriptor(wstring name)
-        : name(name)
-    {
-    }
     virtual ~BlockDescriptor()
     {
     }
     virtual shared_ptr<RenderObjectBlockMesh> getBlockMesh(BlockIterator bi) const = 0;
 protected:
+    BlockDescriptor(wstring name)
+        : name(name)
+    {
+    }
     virtual BlockData loadInternal(GameLoadStream & gls) const = 0;
     virtual void storeInternal(BlockData data, GameStoreStream & gss) const = 0;
 public:

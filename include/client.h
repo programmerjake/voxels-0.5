@@ -18,6 +18,7 @@ public:
         Image,
         RenderObjectBlockMesh,
         RenderObjectWorld,
+        ServerFlag,
         Last
     };
     typedef uint_fast64_t IdType;
@@ -37,6 +38,10 @@ public:
         IdType retval = reader.readLimitedU64(1, ~(uint64_t)0);
         DUMP_V(Client::readIdNonNull, retval);
         return retval;
+    }
+    static IdType getNewId()
+    {
+        return nextId++;
     }
 private:
     static atomic_uint_fast64_t nextId;
@@ -69,7 +74,7 @@ public:
     {
         assert(ptr != nullptr);
         lock();
-        IdType retval = idMap[(int)dataType][ptr] = nextId++;
+        IdType retval = idMap[(int)dataType][ptr] = getNewId();
         ptrMap[(int)dataType][retval] = ptr;
         unlock();
         return retval;

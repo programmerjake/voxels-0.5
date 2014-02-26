@@ -59,18 +59,14 @@ class RenderObjectBlockMesh;
 struct RenderObjectWorld final
 {
     Client & client;
-    vector<PositionI> lightingUpdatesVector;
-    unordered_set<PositionI> lightingUpdatesSet;
+    UpdateList lightingUpdates;
     RenderObjectWorld(Client & client)
         : client(client)
     {
     }
     void addLightingUpdate(PositionI pos)
     {
-        if(get<1>(lightingUpdatesSet.insert(pos)))
-        {
-            lightingUpdatesVector.push_back(pos);
-        }
+        lightingUpdates.add(pos);
     }
     struct Chunk final
     {
@@ -363,6 +359,12 @@ inline RenderObjectBlockClass readRenderObjectBlockClass(Reader &reader)
 inline void writeRenderObjectBlockClass(Writer &writer, RenderObjectBlockClass v)
 {
     writer.writeU16(v);
+}
+
+inline RenderObjectBlockClass getRenderObjectBlockClass()
+{
+    static atomic_uint_fast16_t next(0);
+    return next++;
 }
 
 class RenderObjectBlockMesh final : public enable_shared_from_this<RenderObjectBlockMesh>

@@ -2,8 +2,6 @@
 #include "world.h"
 #include "client.h"
 #include "network_protocol.h"
-#include "texture_atlas.h"
-#include "generate.h"
 #include <thread>
 #include <list>
 
@@ -11,72 +9,61 @@ using namespace std;
 
 namespace
 {
-void runServerThread(shared_ptr<StreamRW> connection)
+inline Client::IdType getUpdateListId()
 {
+    static Client::IdType updateListId = Client::NullId;
+    if(updateListId == Client::NullId)
+        updateListId = Client::getNewId();
+    return updateListId;
+}
+
+inline flag & getClientTerminatedFlag(Client &client)
+{
+    static Client::IdType terminatedId = Client::NullId;
+    shared_ptr<flag> retval;
+    if(terminatedId == Client::NullId)
+    {
+        retval = make_shared<flag>(false);
+        terminatedId = client.makeId(retval, Client::DataType::ServerFlag);
+        return *retval;
+    }
+    LockedClient lock(client);
+    retval = client.getPtr<flag>(terminatedId, Client::DataType::ServerFlag);
+    if(retval == nullptr)
+    {
+        retval = make_shared<flag>(false);
+        client.setPtr(retval, terminatedId, Client::DataType::ServerFlag);
+    }
+    return *retval;
+}
+
+void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> pclient, shared_ptr<World> world)
+{
+    Reader &reader = connection->reader();
+    Client &client = *pclient;
+    flag &terminated = getClientTerminatedFlag(client);
+    try
+    {
+        terminated.wait(true);
+    }
+    catch(exception * e)
+    {
+        cerr << "Error : " << e->what() << endl;
+        delete e;
+    }
+    terminated = true;
+}
+
+void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> pclient, shared_ptr<World> world)
+{
+    Writer &writer = connection->writer();
+    Client &client = *pclient;
+    flag &terminated = getClientTerminatedFlag(client);
     const int size = 10;
     cout << "connected\n";
 
     try
     {
-        Reader &reader = connection->reader();
-        Writer &writer = connection->writer();
-        Client client;
-        shared_ptr<RenderObjectBlockMesh> air, oakWood, birchWood, spruceWood, jungleWood, glass, water;
-        air = make_shared<RenderObjectBlockMesh>(0, LightProperties(LightPropertiesType::Transparent, 15), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), false, false, false, false, false, false, RenderLayer::Opaque);
-        oakWood = make_shared<RenderObjectBlockMesh>(1, LightProperties(LightPropertiesType::Opaque, 0), Mesh(new Mesh_t),
-                Generate::unitBox(TextureAtlas::OakWood.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureAtlas::OakWood.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureAtlas::WoodEnd.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::WoodEnd.td(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::OakWood.td(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::OakWood.td()),
-                true, true, true, true, true, true, RenderLayer::Opaque
-                                                 );
-        birchWood = make_shared<RenderObjectBlockMesh>(1, LightProperties(LightPropertiesType::Opaque, 0), Mesh(new Mesh_t),
-                Generate::unitBox(TextureAtlas::BirchWood.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureAtlas::BirchWood.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureAtlas::WoodEnd.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::WoodEnd.td(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::BirchWood.td(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::BirchWood.td()),
-                true, true, true, true, true, true, RenderLayer::Opaque
-                                                 );
-        spruceWood = make_shared<RenderObjectBlockMesh>(1, LightProperties(LightPropertiesType::Opaque, 0), Mesh(new Mesh_t),
-                Generate::unitBox(TextureAtlas::SpruceWood.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureAtlas::SpruceWood.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureAtlas::WoodEnd.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::WoodEnd.td(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::SpruceWood.td(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::SpruceWood.td()),
-                true, true, true, true, true, true, RenderLayer::Opaque
-                                                 );
-        jungleWood = make_shared<RenderObjectBlockMesh>(1, LightProperties(LightPropertiesType::Opaque, 0), Mesh(new Mesh_t),
-                Generate::unitBox(TextureAtlas::JungleWood.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureAtlas::JungleWood.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureAtlas::WoodEnd.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::WoodEnd.td(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::JungleWood.td(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::JungleWood.td()),
-                true, true, true, true, true, true, RenderLayer::Opaque
-                                                 );
-        glass = make_shared<RenderObjectBlockMesh>(2, LightProperties(LightPropertiesType::Transparent, 0), Mesh(new Mesh_t),
-                Generate::unitBox(TextureAtlas::Glass.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureAtlas::Glass.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureAtlas::Glass.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::Glass.td(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::Glass.td(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::Glass.td()),
-                false, false, false, false, false, false, RenderLayer::Opaque
-                                                 );
-        water = make_shared<RenderObjectBlockMesh>(3, LightProperties(LightPropertiesType::Water, 0), Mesh(new Mesh_t),
-                Generate::unitBox(TextureAtlas::WaterSide0.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureAtlas::WaterSide1.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureAtlas::WaterSide2.td(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::WaterSide3.td(), TextureDescriptor(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::WaterSide4.td(), TextureDescriptor()),
-                Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureAtlas::WaterSide5.td()),
-                false, false, false, false, false, false, RenderLayer::Translucent
-                                                 );
         vector<shared_ptr<RenderObjectBlock>> objects;
         for(int dx = -size; dx <= size; dx++)
         {
@@ -109,7 +96,7 @@ void runServerThread(shared_ptr<StreamRW> connection)
         };
         writer.flush();
         int count = 0;
-        while(true)
+        while(!terminated)
         {
             int dx = rand() % (size * 2 + 1 - 2) - size + 1;
             int dy = rand() % (size * 2 + 1 - 2) - size + 1;
@@ -134,17 +121,24 @@ void runServerThread(shared_ptr<StreamRW> connection)
         cerr << "Error : " << e->what() << endl;
         delete e;
     }
+    terminated = true;
 }
 }
 
 void runServer(StreamServer & server)
 {
     list<thread> threads;
+    list<shared_ptr<Client>> clients;
+    shared_ptr<World> world = make_shared<World>();
     try
     {
         while(true)
         {
-            threads.push_back(thread(runServerThread, server.accept()));
+            shared_ptr<StreamRW> stream = server.accept();
+            shared_ptr<Client> pclient = make_shared<Client>();
+            clients.push_back(pclient);
+            threads.push_back(thread(runServerWriterThread, stream, pclient, world));
+            threads.push_back(thread(runServerReaderThread, stream, pclient, world));
         }
     }
     catch(NoStreamsLeftException * e)

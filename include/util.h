@@ -15,6 +15,7 @@
  * MA 02110-1301, USA.
  *
  */
+#include "position.h"
 #ifndef UTIL_H
 #define UTIL_H
 
@@ -28,6 +29,9 @@
 #include <cwchar>
 #include <string>
 #include <cstring>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
 
 using namespace std;
 
@@ -135,5 +139,53 @@ inline wstring mbsrtowcs(string str)
     delete []wstr;
     return retval;
 }
+
+class flag final
+{
+private:
+    mutex lock;
+    condition_variable_any cond;
+    atomic_bool value;
+public:
+    flag(bool value = false)
+        : value(value)
+    {
+    }
+    const flag & operator =(bool v)
+    {
+        if(value.exchange(v) != v)
+            cond.notify_all();
+        return *this;
+    }
+    operator bool()
+    {
+        bool retval = value;
+        return retval;
+    }
+    bool operator !()
+    {
+        bool retval = value;
+        return !retval;
+    }
+    void wait(bool v = true) /// waits until value == v
+    {
+        if(v == value)
+            return;
+        lock.lock();
+        while(v != value)
+        {
+            cond.wait(lock);
+        }
+        lock.unlock();
+    }
+    void set()
+    {
+        *this = true;
+    }
+    void reset()
+    {
+        *this = false;
+    }
+};
 
 #endif // UTIL_H

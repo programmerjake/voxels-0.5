@@ -75,6 +75,10 @@ struct ChunkPosition
     {
         return !operator ==(l, r);
     }
+    explicit operator PositionI() const
+    {
+        return PositionI(x, 0, z, d);
+    }
 };
 
 namespace std
