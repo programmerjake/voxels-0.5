@@ -51,13 +51,14 @@ protected:
         {
             return blockMesh;
         }
-        return blockMesh = make_shared<RenderObjectBlockMesh>(getRenderObjectBlockClass(), LightProperties(LightPropertiesType::Transparent, 0), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), false, false, false, false, false, false, RenderLayer::Opaque);
+        return blockMesh = makeBlockMesh();
     }
     virtual void onMove(BlockIterator) const override
     {
     }
 private:
     mutable shared_ptr<RenderObjectBlockMesh> blockMesh;
+    static shared_ptr<RenderObjectBlockMesh> makeBlockMesh();
 public:
     static shared_ptr<BlockDescriptor> ptr;
 };

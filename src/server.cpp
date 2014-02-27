@@ -158,6 +158,7 @@ void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                         }
                     }
                 }
+                //cout << "Server : Got Chunk Request : " << origin.x << ", " << origin.y << ", " << origin.z << ", " << (int)origin.d << endl;
                 break;
             }
             default:
@@ -198,10 +199,9 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
     Writer &writer = connection->writer();
     Client &client = *pclient;
     flag &terminated = getClientTerminatedFlag(client);
-    const int size = 50;
     cout << "connected\n";
     UpdateList &clientUpdateList = getClientUpdateList(client);
-    PositionF &clientPosition = getClientPosition(client);
+    //PositionF &clientPosition = getClientPosition(client);
 
     UpdateList updateList;
 
@@ -211,7 +211,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
         {
             vector<shared_ptr<RenderObject>> objects;
             client.lock();
-            PositionF curClientPosition = clientPosition;
+            //PositionF curClientPosition = clientPosition;
             updateList = clientUpdateList;
             clientUpdateList.clear();
             client.unlock();
@@ -285,7 +285,7 @@ struct Periodic
     }
 };
 
-const int worldSize = 5;
+const int worldSize = 10;
 
 void generateInitialWorld(shared_ptr<World> world)
 {
@@ -302,13 +302,13 @@ void generateInitialWorld(shared_ptr<World> world)
 
             for(; bi.position().z <= worldSize; bi += BlockFace::PZ)
             {
-                if(absSquared((VectorI)bi.position()) < worldSize * worldSize)
+                if(absSquared((VectorI)bi.position() - VectorI(0, WorldHeight / 2, 0)) < worldSize * worldSize)
                 {
-                    bi.set(BlockData(AirBlock::ptr));
+                    bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.air")));
                 }
                 else
                 {
-                    bi.set(BlockData(StoneBlock::ptr));
+                    bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.stone")));
                 }
             }
         }
@@ -322,6 +322,7 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
     {
         Periodic periodic;
         generateInitialWorld(world);
+        uint64_t frame = 0;
 
         while(true)
         {
@@ -335,7 +336,28 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                     cul.merge(updateList);
                 }
             }
+            if(frame % 1 == 0)
+            {
+                lock_guard<recursive_mutex> lockIt(world->lock);
+                for(int i = 0; i < 100; i++)
+                {
+                    PositionI pos = PositionI(rand() % 65 - 32, rand() % 65 - 32 + WorldHeight / 2, rand() % 65 - 32, Dimension::Overworld);
+                    if(pos != PositionI(0, WorldHeight / 2, 0, Dimension::Overworld))
+                    {
+                        BlockIterator bi = world->get(pos);
+                        if(rand() % 2)
+                        {
+                            bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.air")));
+                        }
+                        else
+                        {
+                            bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.stone")));
+                        }
+                    }
+                }
+            }
             periodic.runAtFPS(20);
+            frame++;
         }
     }
     catch(exception *e)

@@ -4,6 +4,7 @@
 
 #include "position.h"
 #include <memory>
+#include <array>
 
 using namespace std;
 
@@ -104,7 +105,7 @@ struct Chunk
     weak_ptr<Chunk> px;
     weak_ptr<Chunk> nz;
     weak_ptr<Chunk> pz;
-    BlockData blocks[ChunkSize * ChunkHeight * ChunkSize];
+    array<array<array<BlockData, ChunkSize>, ChunkHeight>, ChunkSize> blocks;
     Chunk(ChunkPosition pos)
         : pos(pos)
     {

@@ -74,7 +74,7 @@ struct RenderObjectWorld final
         static constexpr int size = 1 << log2_size;
         static constexpr int mod_size_mask = size - 1;
         static constexpr int floor_size_mask = ~mod_size_mask;
-        PositionI pos;
+        const PositionI pos;
         array<array<array<shared_ptr<RenderObjectBlockMesh>, size>, size>, size> blocksMesh;
         array<array<array<Lighting, size>, size>, size> blocksLighting;
         weak_ptr<Chunk> nx, px, ny, py, nz, pz;
@@ -90,6 +90,10 @@ struct RenderObjectWorld final
             cachedMeshValid = false;
         }
         int retrieved = 0;
+        Chunk(PositionI pos)
+            : pos(pos)
+        {
+        }
     };
     unordered_map<PositionI, shared_ptr<Chunk>> chunks;
     shared_ptr<Chunk> getChunk(PositionI pos) /// must have the client locked
@@ -97,7 +101,7 @@ struct RenderObjectWorld final
         shared_ptr<Chunk> & chunk = chunks[pos];
         if(chunk != nullptr)
             return chunk;
-        chunk = make_shared<Chunk>();
+        chunk = make_shared<Chunk>(pos);
         shared_ptr<Chunk> nx = chunks[pos - VectorI(Chunk::size, 0, 0)];
         shared_ptr<Chunk> px = chunks[pos + VectorI(Chunk::size, 0, 0)];
         shared_ptr<Chunk> ny = chunks[pos - VectorI(0, Chunk::size, 0)];

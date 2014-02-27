@@ -3,6 +3,9 @@
 
 #include "block.h"
 #include "block_face.h"
+#include <iostream>
+
+using namespace std;
 
 class StoneLikeBlock : public BlockDescriptor
 {
@@ -15,6 +18,7 @@ public:
         {
             didInit = true;
             retval = getRenderObjectBlockClass();
+            //cout << "Stone Class : " << retval << endl;
         }
         return retval;
     }

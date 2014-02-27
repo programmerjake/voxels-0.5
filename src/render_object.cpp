@@ -1,4 +1,7 @@
 #include "render_object.h"
+#include <iostream>
+
+using namespace std;
 
 void RenderObject::write(Writer &writer, Client &client)
 {
@@ -51,6 +54,7 @@ shared_ptr<RenderObjectBlock> RenderObjectBlock::read(Reader &reader, Client &cl
     pos.y = reader.readS32();
     pos.z = reader.readS32();
     pos.d = reader.readDimension();
+    //cout << "Read Block : " << pos.x << ", " << pos.y << ", " << pos.z << ", " << (int)pos.d << endl;
     auto retval = shared_ptr<RenderObjectBlock>(new RenderObjectBlock(block, pos));
     retval->addToClient(client);
     return retval;

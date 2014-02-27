@@ -42,12 +42,13 @@ struct ClientState
     }
 };
 
-namespace
+namespace ClientImplementation
 {
 void clientProcessWriter(Writer *pwriter, ClientState * state)
 {
     Writer &writer = *pwriter;
-    Client &client = state->client;
+    //Client &client = state->client;
+    unordered_set<PositionI> chunksAlreadyRequsted;
 
     try
     {
@@ -70,6 +71,8 @@ void clientProcessWriter(Writer *pwriter, ClientState * state)
             writer.flush();
             for(PositionI p : neededChunkList.updatesList)
             {
+                if(!get<1>(chunksAlreadyRequsted.insert(p)))
+                    continue;
                 NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::RequestChunk);
                 writer.writeS32(p.x);
                 writer.writeS32(p.y);
@@ -186,15 +189,21 @@ Mesh makeChunkRenderMesh(Client &client, shared_ptr<unordered_set<PositionI>> ne
 Mesh makeRenderMesh(Client &client, shared_ptr<unordered_set<PositionI>> neededChunks, RenderLayer rl, PositionI pos, int renderDistance = 40)
 {
     Mesh retval = Mesh(new Mesh_t);
-    PositionI curChunkPos = pos;
 
-    for(curChunkPos.x = (pos.x - renderDistance) & RenderObjectWorld::Chunk::floor_size_mask; curChunkPos.x <= ((pos.x + renderDistance) & RenderObjectWorld::Chunk::floor_size_mask); curChunkPos.x += RenderObjectWorld::Chunk::size)
+    int minX = (pos.x - renderDistance) & RenderObjectWorld::Chunk::floor_size_mask;
+    int minY = (pos.y - renderDistance) & RenderObjectWorld::Chunk::floor_size_mask;
+    int minZ = (pos.z - renderDistance) & RenderObjectWorld::Chunk::floor_size_mask;
+    int maxX = (pos.x + renderDistance) & RenderObjectWorld::Chunk::floor_size_mask;
+    int maxY = (pos.y + renderDistance) & RenderObjectWorld::Chunk::floor_size_mask;
+    int maxZ = (pos.z + renderDistance) & RenderObjectWorld::Chunk::floor_size_mask;
+
+    for(int x = minX; x <= maxX; x+=RenderObjectWorld::Chunk::size)
     {
-        for(curChunkPos.y = (pos.y - renderDistance) & RenderObjectWorld::Chunk::floor_size_mask; curChunkPos.y <= ((pos.y + renderDistance) & RenderObjectWorld::Chunk::floor_size_mask); curChunkPos.y += RenderObjectWorld::Chunk::size)
+        for(int y = minY; y <= maxY; y+=RenderObjectWorld::Chunk::size)
         {
-            for(curChunkPos.z = (pos.z - renderDistance) & RenderObjectWorld::Chunk::floor_size_mask; curChunkPos.z <= ((pos.z + renderDistance) & RenderObjectWorld::Chunk::floor_size_mask); curChunkPos.z += RenderObjectWorld::Chunk::size)
+            for(int z = minZ; z <= maxZ; z+=RenderObjectWorld::Chunk::size)
             {
-                retval->add(makeChunkRenderMesh(client, neededChunks, curChunkPos, rl));
+                retval->add(makeChunkRenderMesh(client, neededChunks, PositionI(x, y, z, pos.d), rl));
             }
         }
     }
@@ -243,12 +252,12 @@ public:
         : clientState(clientState)
     {
     }
-    virtual bool handleMouseUp(MouseUpEvent &event) override
+    virtual bool handleMouseUp(MouseUpEvent &) override
     {
         //cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Up    : " << event.button << endl;
         return true;
     }
-    virtual bool handleMouseDown(MouseDownEvent &event) override
+    virtual bool handleMouseDown(MouseDownEvent &) override
     {
         //cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Down  : " << event.button << endl;
         return true;
@@ -269,12 +278,12 @@ public:
             clientState->dphi += limit(event.deltaY, -10.0f, 0.0f) * event.deltaY / 1000.0 * M_PI;
         return true;
     }
-    virtual bool handleMouseScroll(MouseScrollEvent &event) override
+    virtual bool handleMouseScroll(MouseScrollEvent &) override
     {
         //cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Scroll : (" << event.scrollX << ", " << event.scrollY << ")\n";
         return true;
     }
-    virtual bool handleKeyUp(KeyUpEvent &event) override
+    virtual bool handleKeyUp(KeyUpEvent &) override
     {
         //cout << "Key Up  : " << event.key << " : " << event.mods << endl;
         return true;
@@ -289,7 +298,7 @@ public:
         }
         return false;
     }
-    virtual bool handleKeyPress(KeyPressEvent &event) override
+    virtual bool handleKeyPress(KeyPressEvent &) override
     {
         //cout << "Key : \'" << wcsrtombs(wstring(L"") + event.character) << "\'\n";
         return true;
@@ -302,6 +311,8 @@ public:
 };
 }
 
+using namespace ClientImplementation;
+
 void clientProcess(StreamRW & streamRW)
 {
     startGraphics();
@@ -312,6 +323,10 @@ void clientProcess(StreamRW & streamRW)
     thread networkWriterThread(clientProcessWriter, &writer, &clientState);
     Renderer r;
     Mesh meshes[(int)RenderLayer::Last];
+    for(Mesh & m : meshes)
+    {
+        m = Mesh(new Mesh_t);
+    }
     thread renderThread(meshMakerThread, (Mesh *)meshes, &clientState);
 
     clientState.lock.lock();
@@ -337,7 +352,8 @@ void clientProcess(StreamRW & streamRW)
         for(RenderLayer rl = (RenderLayer)0; rl < RenderLayer::Last; rl = (RenderLayer)((int)rl + 1))
         {
             Mesh mesh = tempMeshes[(int)rl];
-            polyCount += mesh ? mesh->size() : 0;
+            assert(mesh);
+            polyCount += mesh->size();
             renderLayerSetup(rl);
             r << transform(tform, mesh);
         }

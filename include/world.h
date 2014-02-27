@@ -103,7 +103,6 @@ public:
         return pos;
     }
 private:
-    ssize_t chunkIndex;
     shared_ptr<Chunk> chunk;
     BlockIterator(shared_ptr<World> w, PositionI pos);
     static BlockData makeBedrock();
@@ -122,7 +121,8 @@ public:
         }
 
         lock_guard<recursive_mutex> lock(world()->lock);
-        return chunk->blocks[chunkIndex];
+        VectorI rPos = (VectorI)pos - (VectorI)(PositionI)chunk->pos;
+        return chunk->blocks[rPos.x][rPos.y][rPos.z];
     }
     void set(BlockData newBlock)
     {
@@ -137,19 +137,14 @@ public:
         }
 
         lock_guard<recursive_mutex> lock(world()->lock);
-        chunk->blocks[chunkIndex] = newBlock;
+        VectorI rPos = (VectorI)pos - (VectorI)(PositionI)chunk->pos;
+        chunk->blocks[rPos.x][rPos.y][rPos.z] = newBlock;
         world()->addUpdate(pos);
     }
     BlockIterator &operator =(VectorI newPos)
     {
         pos = PositionI(newPos, pos.d);
         ChunkPosition cPos(pos);
-        VectorI rPos = (VectorI)pos - (PositionI)cPos;
-        chunkIndex = rPos.x;
-        chunkIndex *= ChunkHeight;
-        chunkIndex += rPos.y;
-        chunkIndex *= ChunkSize;
-        chunkIndex += rPos.z;
         if(chunk == nullptr || chunk->pos != cPos)
             chunk = world()->getChunk(cPos);
         return *this;
@@ -223,12 +218,6 @@ public:
                 return *this = pos;
             }
         }
-        VectorI rPos = (VectorI)pos - (VectorI)(PositionI)chunk->pos;
-        chunkIndex = rPos.x;
-        chunkIndex *= ChunkHeight;
-        chunkIndex += rPos.y;
-        chunkIndex *= ChunkSize;
-        chunkIndex += rPos.z;
     }
     BlockIterator & operator -=(VectorI v)
     {
@@ -378,12 +367,6 @@ inline BlockIterator::BlockIterator(shared_ptr<World> w, PositionI pos)
     : worldInternal(w), pos(pos)
 {
     ChunkPosition cPos(pos);
-    VectorI rPos = (VectorI)pos - (PositionI)cPos;
-    chunkIndex = rPos.x;
-    chunkIndex *= ChunkHeight;
-    chunkIndex += rPos.y;
-    chunkIndex *= ChunkSize;
-    chunkIndex += rPos.z;
     chunk = world()->getChunk(cPos);
 }
 

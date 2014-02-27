@@ -11,6 +11,7 @@ struct PositionI : public VectorI
 {
     Dimension d;
     PositionI()
+        : d(Dimension::Overworld)
     {
     }
     PositionI(int x, int y, int z, Dimension d)
@@ -123,6 +124,7 @@ struct PositionF : public VectorF
 {
     Dimension d;
     PositionF()
+        : d(Dimension::Overworld)
     {
     }
     explicit PositionF(PositionI p)

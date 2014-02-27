@@ -24,5 +24,14 @@ TextureDescriptor BedrockBlock::getFaceTexture(BlockFace) const
     return TextureAtlas::Bedrock.td();
 }
 
+shared_ptr<RenderObjectBlockMesh> AirBlock::makeBlockMesh()
+{
+    RenderObjectBlockClass airClass = getRenderObjectBlockClass();
+    //cout << "Air Class : " << airClass << endl;
+    return make_shared<RenderObjectBlockMesh>(airClass,
+            LightProperties(LightPropertiesType::Transparent, 0), Mesh(new Mesh_t), Mesh(new Mesh_t),
+            Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), false,
+            false, false, false, false, false, RenderLayer::Opaque);
+}
 
 shared_ptr<BlockDescriptor> StoneBlock::ptr, BedrockBlock::ptr, AirBlock::ptr;
