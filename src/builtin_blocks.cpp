@@ -4,9 +4,9 @@
 
 void initBuiltinBlocks()
 {
-    BlockDescriptor::addToBlocksList(shared_ptr<BlockDescriptor>(new StoneBlock));
-    BlockDescriptor::addToBlocksList(shared_ptr<BlockDescriptor>(new BedrockBlock));
-    BlockDescriptor::addToBlocksList(shared_ptr<BlockDescriptor>(new AirBlock));
+    BlockDescriptor::initBlock(StoneBlock::ptr = shared_ptr<BlockDescriptor>(new StoneBlock));
+    BlockDescriptor::initBlock(BedrockBlock::ptr = shared_ptr<BlockDescriptor>(new BedrockBlock));
+    BlockDescriptor::initBlock(AirBlock::ptr = shared_ptr<BlockDescriptor>(new AirBlock));
 }
 
 namespace
@@ -14,12 +14,15 @@ namespace
 initializer init1(&initBuiltinBlocks);
 }
 
-TextureDescriptor StoneBlock::getFaceTexture(BlockFace face) const
+TextureDescriptor StoneBlock::getFaceTexture(BlockFace) const
 {
     return TextureAtlas::Stone.td();
 }
 
-TextureDescriptor BedrockBlock::getFaceTexture(BlockFace face) const
+TextureDescriptor BedrockBlock::getFaceTexture(BlockFace) const
 {
     return TextureAtlas::Bedrock.td();
 }
+
+
+shared_ptr<BlockDescriptor> StoneBlock::ptr, BedrockBlock::ptr, AirBlock::ptr;

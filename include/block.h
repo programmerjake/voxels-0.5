@@ -31,13 +31,17 @@ typedef shared_ptr<const BlockDescriptor> BlockDescriptorPtr;
 
 struct BlockData
 {
-    shared_ptr<BlockDescriptor> desc;
+    shared_ptr<const BlockDescriptor> desc;
     int32_t idata;
     Lighting light;
     shared_ptr<ExtraBlockData> extraData;
-    explicit BlockData(shared_ptr<BlockDescriptor> desc = shared_ptr<BlockDescriptor>(), int32_t idata = 0, shared_ptr<ExtraBlockData> extraData = nullptr)
+    explicit BlockData(shared_ptr<const BlockDescriptor> desc = shared_ptr<BlockDescriptor>(), int32_t idata = 0, shared_ptr<ExtraBlockData> extraData = nullptr)
         : desc(desc), idata(idata), light(), extraData(extraData)
     {
+    }
+    bool good() const
+    {
+        return desc != nullptr;
     }
 };
 
@@ -51,7 +55,7 @@ private:
     static map<wstring, BlockDescriptorPtr> *blocks;
     static vector<BlockDescriptorPtr> *blocksList;
 protected:
-    static void addToBlocksList(BlockDescriptorPtr bd) /// call with all constructed BlockDescriptor daughter classes
+    static void initBlock(BlockDescriptorPtr bd) /// call with all constructed BlockDescriptor daughter classes
     {
         if(blocks == nullptr) // so that we don't have problems with static initialization order
         {

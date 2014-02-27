@@ -13,6 +13,8 @@ protected:
     {
     }
     virtual TextureDescriptor getFaceTexture(BlockFace face) const override;
+public:
+    static shared_ptr<BlockDescriptor> ptr;
 };
 
 class BedrockBlock final : public StoneLikeBlock
@@ -24,6 +26,8 @@ protected:
     {
     }
     virtual TextureDescriptor getFaceTexture(BlockFace face) const override;
+public:
+    static shared_ptr<BlockDescriptor> ptr;
 };
 
 class AirBlock final : public BlockDescriptor
@@ -34,13 +38,14 @@ protected:
         : BlockDescriptor(L"builtin.air")
     {
     }
-    virtual BlockData loadInternal(GameLoadStream &gls) const override
+    virtual BlockData loadInternal(GameLoadStream &) const override
+    {
+        return BlockData(ptr);
+    }
+    virtual void storeInternal(BlockData, GameStoreStream &) const override
     {
     }
-    virtual void storeInternal(BlockData data, GameStoreStream &gss) const override
-    {
-    }
-    virtual shared_ptr<RenderObjectBlockMesh> getBlockMesh(BlockIterator bi) const override
+    virtual shared_ptr<RenderObjectBlockMesh> getBlockMesh(BlockIterator) const override
     {
         if(blockMesh)
         {
@@ -48,11 +53,13 @@ protected:
         }
         return blockMesh = make_shared<RenderObjectBlockMesh>(getRenderObjectBlockClass(), LightProperties(LightPropertiesType::Transparent, 0), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), false, false, false, false, false, false, RenderLayer::Opaque);
     }
-    virtual void onMove(BlockIterator bi) const override
+    virtual void onMove(BlockIterator) const override
     {
     }
 private:
     mutable shared_ptr<RenderObjectBlockMesh> blockMesh;
+public:
+    static shared_ptr<BlockDescriptor> ptr;
 };
 
 #endif // BUILTIN_BLOCKS_H_INCLUDED

@@ -10,6 +10,8 @@ namespace NetworkProtocol
 enum class NetworkEvent : uint_fast8_t
 {
     UpdateRenderObjects,
+    UpdatePositionAndVelocity,
+    RequestChunk,
     Last
 };
 

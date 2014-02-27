@@ -89,6 +89,7 @@ struct RenderObjectWorld final
             }
             cachedMeshValid = false;
         }
+        int retrieved = 0;
     };
     unordered_map<PositionI, shared_ptr<Chunk>> chunks;
     shared_ptr<Chunk> getChunk(PositionI pos) /// must have the client locked
@@ -190,6 +191,8 @@ struct RenderObjectWorld final
         }
         void setMesh(shared_ptr<RenderObjectBlockMesh> v)
         {
+            if(!chunk->blocksMesh[modPos.x][modPos.y][modPos.z])
+                chunk->retrieved++;
             chunk->blocksMesh[modPos.x][modPos.y][modPos.z] = v;
             invalidate();
             world->addLightingUpdate(pos);

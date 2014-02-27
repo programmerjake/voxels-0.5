@@ -1,6 +1,7 @@
 #include "world.h"
 #include "platform.h"
 #include "render_layer.h"
+#include "builtin_blocks.h"
 #include <memory>
 
 using namespace std;
@@ -23,10 +24,15 @@ void renderLayerSetup(RenderLayer rl)
     }
 }
 
-BlockIterator::BlockIterator(shared_ptr<World> w, PositionI pos)
-    : worldInternal(w), pos(pos)
+BlockData BlockIterator::makeBedrock()
 {
-    chunk = w->getChunk(ChunkPosition(pos));
-    chunkIndex = (ssize_t)(pos.x & ChunkModSizeMask) + ChunkSize * (ssize_t)(pos.y) + ChunkSize * ChunkHeight * (ssize_t)(pos.z & ChunkModSizeMask);
+    return BlockData(BedrockBlock::ptr);
+}
+
+BlockData BlockIterator::makeLitAir()
+{
+    BlockData retval(AirBlock::ptr);
+    retval.light = Lighting::sky();
+    return retval;
 }
 

@@ -4,6 +4,7 @@
 #include "platform.h"
 #include "game_version.h"
 #include "text.h"
+#include "world.h"
 #include <thread>
 #include <iostream>
 #include <sstream>
@@ -14,19 +15,98 @@ using namespace std;
 
 atomic_uint_fast64_t Client::nextId(1);
 
+struct ClientState
+{
+    float theta, phi;
+    float dtheta, dphi;
+    int renderDistance;
+    PositionF pos;
+    VectorF velocity;
+    bool needMeshes;
+    Client client;
+    recursive_mutex & lock;
+    condition_variable_any cond;
+    bool done;
+    bool paused;
+    UpdateList neededChunkList;
+    ClientState()
+        : lock(client.getLock())
+    {
+        pos = PositionF(0.5, WorldHeight / 2 + 0.5, 0.5, Dimension::Overworld);
+        velocity = VectorF(0);
+        theta = phi = dtheta = dphi = 0;
+        renderDistance = 30;
+        needMeshes = true;
+        done = false;
+        paused = GameVersion::DEBUG;
+    }
+};
+
 namespace
 {
-void clientProcessReader(Reader *preader, Client *pclient, atomic_bool *pdone)
+void clientProcessWriter(Writer *pwriter, ClientState * state)
+{
+    Writer &writer = *pwriter;
+    Client &client = state->client;
+
+    try
+    {
+        state->lock.lock();
+        while(!state->done)
+        {
+            PositionF pos = state->pos;
+            VectorF velocity = state->velocity;
+            UpdateList neededChunkList = state->neededChunkList;
+            state->neededChunkList.clear();
+            state->lock.unlock();
+            NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdatePositionAndVelocity);
+            writer.writeF32(pos.x);
+            writer.writeF32(pos.y);
+            writer.writeF32(pos.z);
+            writer.writeDimension(pos.d);
+            writer.writeF32(velocity.x);
+            writer.writeF32(velocity.y);
+            writer.writeF32(velocity.z);
+            writer.flush();
+            for(PositionI p : neededChunkList.updatesList)
+            {
+                NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::RequestChunk);
+                writer.writeS32(p.x);
+                writer.writeS32(p.y);
+                writer.writeS32(p.z);
+                writer.writeDimension(p.d);
+                writer.writeU32(RenderObjectWorld::Chunk::size);
+                writer.flush();
+                //cout << "Client : send chunk request\n";
+            }
+            this_thread::sleep_for(chrono::milliseconds(50));
+            state->lock.lock();
+        }
+        state->lock.unlock();
+    }
+    catch(exception *e)
+    {
+        cerr << e->what() << "\n";
+        delete e;
+    }
+
+    state->lock.lock();
+    state->done = true;
+    state->lock.unlock();
+}
+
+void clientProcessReader(Reader *preader, ClientState * state)
 {
     Reader &reader = *preader;
-    Client &client = *pclient;
-    atomic_bool &done = *pdone;
+    Client &client = state->client;
     NetworkProtocol::NetworkEvent event;
 
     try
     {
-        while(!done)
+        state->lock.lock();
+        while(!state->done)
         {
+            state->lock.unlock();
             event = NetworkProtocol::readNetworkEvent(reader);
 
             switch(event)
@@ -39,14 +119,17 @@ void clientProcessReader(Reader *preader, Client *pclient, atomic_bool *pdone)
                 {
                     shared_ptr<RenderObject> ro = RenderObject::read(reader, client);
                 }
-
-                break;
+                cout << "Client : received " << readCount << " updated render objects\n";
+                state->lock.lock();
+                continue;
             }
 
             case NetworkProtocol::NetworkEvent::Last:
                 assert(false);
             }
+            assert(false);
         }
+        state->lock.unlock();
     }
     catch(exception *e)
     {
@@ -54,15 +137,19 @@ void clientProcessReader(Reader *preader, Client *pclient, atomic_bool *pdone)
         delete e;
     }
 
-    done = true;
+    state->lock.lock();
+    state->done = true;
+    state->lock.unlock();
 }
 
-Mesh makeChunkRenderMesh(Client &client, PositionI chunkPos, RenderLayer rl)
+Mesh makeChunkRenderMesh(Client &client, shared_ptr<unordered_set<PositionI>> neededChunks, PositionI chunkPos, RenderLayer rl)
 {
     LockedClient lock(client);
     shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
     RenderObjectWorld::BlockIterator biX(world, chunkPos);
     shared_ptr<RenderObjectWorld::Chunk> chunk = biX.getChunk();
+    if(chunk->retrieved < RenderObjectWorld::Chunk::size * RenderObjectWorld::Chunk::size * RenderObjectWorld::Chunk::size)
+        neededChunks->insert(chunk->pos);
 
     if(chunk->cachedMesh[(int)rl] != nullptr)
     {
@@ -96,18 +183,18 @@ Mesh makeChunkRenderMesh(Client &client, PositionI chunkPos, RenderLayer rl)
     return retval;
 }
 
-Mesh makeRenderMesh(Client &client, RenderLayer rl, PositionI pos, int renderDistance = 40)
+Mesh makeRenderMesh(Client &client, shared_ptr<unordered_set<PositionI>> neededChunks, RenderLayer rl, PositionI pos, int renderDistance = 40)
 {
     Mesh retval = Mesh(new Mesh_t);
     PositionI curChunkPos = pos;
 
     for(curChunkPos.x = (pos.x - renderDistance) & RenderObjectWorld::Chunk::floor_size_mask; curChunkPos.x <= ((pos.x + renderDistance) & RenderObjectWorld::Chunk::floor_size_mask); curChunkPos.x += RenderObjectWorld::Chunk::size)
     {
-        for(curChunkPos.y = (pos.y - renderDistance) & RenderObjectWorld::Chunk::floor_size_mask; curChunkPos.y <= ((pos.x + renderDistance) & RenderObjectWorld::Chunk::floor_size_mask); curChunkPos.y += RenderObjectWorld::Chunk::size)
+        for(curChunkPos.y = (pos.y - renderDistance) & RenderObjectWorld::Chunk::floor_size_mask; curChunkPos.y <= ((pos.y + renderDistance) & RenderObjectWorld::Chunk::floor_size_mask); curChunkPos.y += RenderObjectWorld::Chunk::size)
         {
-            for(curChunkPos.z = (pos.z - renderDistance) & RenderObjectWorld::Chunk::floor_size_mask; curChunkPos.z <= ((pos.x + renderDistance) & RenderObjectWorld::Chunk::floor_size_mask); curChunkPos.z += RenderObjectWorld::Chunk::size)
+            for(curChunkPos.z = (pos.z - renderDistance) & RenderObjectWorld::Chunk::floor_size_mask; curChunkPos.z <= ((pos.z + renderDistance) & RenderObjectWorld::Chunk::floor_size_mask); curChunkPos.z += RenderObjectWorld::Chunk::size)
             {
-                retval->add(makeChunkRenderMesh(client, curChunkPos, rl));
+                retval->add(makeChunkRenderMesh(client, neededChunks, curChunkPos, rl));
             }
         }
     }
@@ -115,44 +202,45 @@ Mesh makeRenderMesh(Client &client, RenderLayer rl, PositionI pos, int renderDis
     return retval;
 }
 
-void meshMakerThread(atomic_bool * pdone, Mesh meshes[], bool * pneedMeshes, const int * prenderDistance, const PositionI * ppos, condition_variable_any * cond, mutex * lock, Client * pclient)
+void meshMakerThread(Mesh meshes[], ClientState * state)
 {
-    atomic_bool & done = *pdone;
-    bool & needMeshes = *pneedMeshes;
-    lock->lock();
-    const int & renderDistance = *prenderDistance;
-    const PositionI & pos = *ppos;
-    Client &client = *pclient;
-    while(!done)
+    state->lock.lock();
+    while(!state->done)
     {
-        while(!done && !needMeshes)
-            cond->wait(*lock);
-        if(done)
+        while(!state->done && !state->needMeshes)
+            state->cond.wait(state->lock);
+        if(state->done)
             break;
-        needMeshes = false;
-        lock->unlock();
+        state->needMeshes = false;
+        Client & client = state->client;
+        int renderDistance = state->renderDistance;
+        PositionI pos = (PositionI)state->pos;
+        state->lock.unlock();
         Mesh tempMeshes[(int)RenderLayer::Last];
+        shared_ptr<unordered_set<PositionI>> neededChunks = make_shared<unordered_set<PositionI>>();
         for(RenderLayer rl = (RenderLayer)0; rl < RenderLayer::Last; rl = (RenderLayer)((int)rl + 1))
         {
-            tempMeshes[(int)rl] = makeRenderMesh(client, rl, pos, renderDistance);
+            tempMeshes[(int)rl] = makeRenderMesh(client, neededChunks, rl, pos, renderDistance);
         }
-        lock->lock();
+        state->lock.lock();
+        for(PositionI p : *neededChunks)
+        {
+            state->neededChunkList.add(p);
+        }
         for(RenderLayer rl = (RenderLayer)0; rl < RenderLayer::Last; rl = (RenderLayer)((int)rl + 1))
         {
             meshes[(int)rl] = tempMeshes[(int)rl];
         }
     }
-    lock->unlock();
+    state->lock.unlock();
 }
 
 class ClientEventHandler final : public EventHandler
 {
-    float & dtheta;
-    float & dphi;
-    bool & paused;
+    ClientState * clientState;
 public:
-    ClientEventHandler(float & dtheta, float & dphi, bool &paused)
-        : dtheta(dtheta), dphi(dphi), paused(paused)
+    ClientEventHandler(ClientState * clientState)
+        : clientState(clientState)
     {
     }
     virtual bool handleMouseUp(MouseUpEvent &event) override
@@ -168,16 +256,17 @@ public:
     virtual bool handleMouseMove(MouseMoveEvent &event) override
     {
         //cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Move\n";
-        if(paused)
+        lock_guard<recursive_mutex> lockIt(clientState->lock);
+        if(clientState->paused)
             return true;
         if(event.deltaX > 0)
-            dtheta += limit(event.deltaX, 0.0f, 10.0f) * event.deltaX / 1000.0 * M_PI;
+            clientState->dtheta += limit(event.deltaX, 0.0f, 10.0f) * event.deltaX / 1000.0 * M_PI;
         else
-            dtheta -= limit(event.deltaX, -10.0f, 0.0f) * event.deltaX / 1000.0 * M_PI;
+            clientState->dtheta -= limit(event.deltaX, -10.0f, 0.0f) * event.deltaX / 1000.0 * M_PI;
         if(event.deltaY > 0)
-            dphi -= limit(event.deltaY, 0.0f, 10.0f) * event.deltaY / 1000.0 * M_PI;
+            clientState->dphi -= limit(event.deltaY, 0.0f, 10.0f) * event.deltaY / 1000.0 * M_PI;
         else
-            dphi += limit(event.deltaY, -10.0f, 0.0f) * event.deltaY / 1000.0 * M_PI;
+            clientState->dphi += limit(event.deltaY, -10.0f, 0.0f) * event.deltaY / 1000.0 * M_PI;
         return true;
     }
     virtual bool handleMouseScroll(MouseScrollEvent &event) override
@@ -195,7 +284,8 @@ public:
         //cout << "Key Down : " << event.key << " : " << event.mods << (event.isRepetition ? " : Repeated\n" : " : First\n");
         if(event.key == KeyboardKey::KeyboardKey_P)
         {
-            paused = !paused;
+            lock_guard<recursive_mutex> lockIt(clientState->lock);
+            clientState->paused = !clientState->paused;
         }
         return false;
     }
@@ -217,38 +307,40 @@ void clientProcess(StreamRW & streamRW)
     startGraphics();
     Reader &reader = streamRW.reader();
     Writer &writer = streamRW.writer();
-    Client client;
-    atomic_bool done(false);
-    thread networkThread(clientProcessReader, &reader, &client, &done);
+    ClientState clientState;
+    thread networkReaderThread(clientProcessReader, &reader, &clientState);
+    thread networkWriterThread(clientProcessWriter, &writer, &clientState);
     Renderer r;
-    float theta = 0, phi = 0, dtheta = 0, dphi = 0;
-    bool paused = true;
-    mutex meshGenLock;
-    condition_variable_any meshGenCond;
-    bool needMeshes = true;
-    int renderDistance = 20;
-    PositionI pos(0, 0, 0, Dimension::Overworld);
     Mesh meshes[(int)RenderLayer::Last];
-    thread renderThread(meshMakerThread, &done, (Mesh *)meshes, &needMeshes, &renderDistance, &pos, &meshGenCond, &meshGenLock, &client);
+    thread renderThread(meshMakerThread, (Mesh *)meshes, &clientState);
 
-    while(!done)
+    clientState.lock.lock();
+    while(!clientState.done)
     {
-        meshGenLock.lock();
-        needMeshes = true;
-        meshGenCond.notify_all();
-        meshGenLock.unlock();
+        clientState.needMeshes = true;
+        clientState.cond.notify_all();
+        clientState.lock.unlock();
         Display::initFrame();
         glClearColor(0, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        Matrix tform = Matrix::translate(-0.5, -0.5, -0.5).concat(Matrix::rotateY(theta)).concat(Matrix::rotateX(-phi));
-        meshGenLock.lock();
+        clientState.lock.lock();
+        Matrix tform = Matrix::translate(-(VectorF)clientState.pos)
+                        .concat(Matrix::rotateY(clientState.theta))
+                        .concat(Matrix::rotateX(-clientState.phi));
+        Mesh tempMeshes[(int)RenderLayer::Last];
         for(RenderLayer rl = (RenderLayer)0; rl < RenderLayer::Last; rl = (RenderLayer)((int)rl + 1))
         {
-            Mesh mesh = meshes[(int)rl];
+            tempMeshes[(int)rl] = meshes[(int)rl];
+        }
+        clientState.lock.unlock();
+        int polyCount = 0;
+        for(RenderLayer rl = (RenderLayer)0; rl < RenderLayer::Last; rl = (RenderLayer)((int)rl + 1))
+        {
+            Mesh mesh = tempMeshes[(int)rl];
+            polyCount += mesh ? mesh->size() : 0;
             renderLayerSetup(rl);
             r << transform(tform, mesh);
         }
-        meshGenLock.unlock();
         renderLayerSetup(RenderLayer::Last);
         Display::initOverlay();
         wstringstream s;
@@ -259,19 +351,27 @@ void clientProcess(StreamRW & streamRW)
             s << L" Debug";
         }
 
-        s << "\nFPS : " << Display::averageFPS() << endl;
+        s << L"\nFPS : " << Display::averageFPS() << endl;
+        s << L"Triangle Count : " << polyCount << endl;
         r << transform(Matrix::translate(-40 * Display::scaleX(), 40 * Display::scaleY() - Text::height(s.str()), -40 * Display::scaleX()), Text::mesh(s.str(), Color(1, 0, 1)));
         Display::flip();
-        Display::handleEvents(shared_ptr<EventHandler>(new ClientEventHandler(dtheta, dphi, paused)));
-        theta = fmod(theta + dtheta / 2, M_PI * 2);
-        phi = limit(phi + dphi / 2, -(float)M_PI / 2, (float)M_PI / 2);
-        dtheta /= 2;
-        dphi /= 2;
+        Display::handleEvents(shared_ptr<EventHandler>(new ClientEventHandler(&clientState)));
+        clientState.lock.lock();
+        clientState.theta = fmod(clientState.theta + clientState.dtheta / 2, M_PI * 2);
+        clientState.phi = limit(clientState.phi + clientState.dphi / 2, -(float)M_PI / 2, (float)M_PI / 2);
+        clientState.dtheta /= 2;
+        clientState.dphi /= 2;
+        bool paused = clientState.paused;
+        clientState.lock.unlock();
         if(paused == Display::grabMouse())
             Display::grabMouse(!paused);
+        clientState.lock.lock();
+        clientState.cond.notify_all();
     }
-    meshGenCond.notify_all();
-    networkThread.join();
+    clientState.cond.notify_all();
+    clientState.lock.unlock();
+    networkReaderThread.join();
+    networkWriterThread.join();
     renderThread.join();
 }
 

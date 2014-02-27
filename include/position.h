@@ -145,6 +145,10 @@ struct PositionF : public VectorF
     {
         return PositionI(VectorI(x, y, z), d);
     }
+    explicit operator VectorF() const
+    {
+        return VectorF(x, y, z);
+    }
     friend bool operator ==(const PositionF & a, const PositionI & b)
     {
         return a.x == b.x && a.y == b.y && a.z == b.z && a.d == b.d;
@@ -272,6 +276,13 @@ struct UpdateList // in here because of include issues : should be in util.h
     {
         updatesList.clear();
         updatesSet.clear();
+    }
+    void merge(const UpdateList & rt)
+    {
+        for(PositionI pos : rt.updatesList)
+        {
+            add(pos);
+        }
     }
 };
 

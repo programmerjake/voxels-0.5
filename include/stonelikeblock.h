@@ -23,7 +23,7 @@ protected:
     virtual BlockData loadInternal(GameLoadStream & gls) const override;
     virtual void storeInternal(BlockData data, GameStoreStream & gss) const override;
     virtual shared_ptr<RenderObjectBlockMesh> getBlockMesh(BlockIterator bi) const override;
-    virtual void onMove(BlockIterator bi) const override
+    virtual void onMove(BlockIterator) const override
     {
     }
     virtual shared_ptr<RenderObjectBlockMesh> internalMakeBlockMesh() const;

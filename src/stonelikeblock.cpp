@@ -1,28 +1,29 @@
 #include "stonelikeblock.h"
+#include "generate.h"
 
 StoneLikeBlock::StoneLikeBlock(wstring name)
-    : Block(name)
+    : BlockDescriptor(name)
 {
 }
 
-BlockData StoneLikeBlock::loadInternal(GameLoadStream & gls) const
+BlockData StoneLikeBlock::loadInternal(GameLoadStream &) const
 {
     return BlockData(shared_from_this());
 }
 
-void StoneLikeBlock::storeInternal(BlockData data, GameStoreStream & gss) const
+void StoneLikeBlock::storeInternal(BlockData, GameStoreStream & ) const
 {
     // empty on purpose
 }
 
-shared_ptr<RenderObjectBlockMesh> StoneLikeBlock::getBlockMesh(BlockIterator bi) const
+shared_ptr<RenderObjectBlockMesh> StoneLikeBlock::getBlockMesh(BlockIterator ) const
 {
     if(blockMesh == nullptr)
         blockMesh = internalMakeBlockMesh();
     return blockMesh;
 }
 
-virtual shared_ptr<RenderObjectBlockMesh> internalMakeBlockMesh() const
+shared_ptr<RenderObjectBlockMesh> StoneLikeBlock::internalMakeBlockMesh() const
 {
     return make_shared<RenderObjectBlockMesh>(1, LightProperties(LightPropertiesType::Opaque, 0), Mesh(new Mesh_t),
                 Generate::unitBox(getFaceTexture(BlockFace::NX), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),

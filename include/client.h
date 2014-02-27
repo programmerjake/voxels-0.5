@@ -19,6 +19,9 @@ public:
         RenderObjectBlockMesh,
         RenderObjectWorld,
         ServerFlag,
+        UpdateList,
+        VectorF,
+        PositionF,
         Last
     };
     typedef uint_fast64_t IdType;
@@ -59,6 +62,10 @@ public:
     void unlock()
     {
         theLock.unlock();
+    }
+    recursive_mutex & getLock()
+    {
+        return theLock;
     }
     template <typename T>
     IdType getId(shared_ptr<T> ptr, DataType dataType)
