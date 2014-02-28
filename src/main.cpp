@@ -123,9 +123,9 @@ int myMain(vector<wstring> args)
         thread serverThread(serverThreadFn, shared_ptr<StreamServer>(new StreamServerWrapper(list<shared_ptr<StreamRW>>{pipe.pport1()})));
         clientProcess(pipe.port2());
     }
-    catch(exception * e)
+    catch(exception & e)
     {
-        return error(mbsrtowcs(e->what()));
+        return error(mbsrtowcs(e.what()));
     }
     return 0;
 }

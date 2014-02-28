@@ -87,10 +87,9 @@ void clientProcessWriter(Writer *pwriter, ClientState * state)
         }
         state->lock.unlock();
     }
-    catch(exception *e)
+    catch(exception &e)
     {
-        cerr << e->what() << "\n";
-        delete e;
+        cerr << e.what() << "\n";
     }
 
     state->lock.lock();
@@ -134,10 +133,9 @@ void clientProcessReader(Reader *preader, ClientState * state)
         }
         state->lock.unlock();
     }
-    catch(exception *e)
+    catch(exception &e)
     {
-        cerr << e->what() << "\n";
-        delete e;
+        cerr << e.what() << "\n";
     }
 
     state->lock.lock();

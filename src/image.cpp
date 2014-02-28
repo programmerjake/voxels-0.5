@@ -27,11 +27,9 @@ Image::Image(wstring resourceName)
         PngDecoder decoder(getResourceFileName(resourceName));
         data = shared_ptr<data_t>(new data_t(decoder.removeData(), decoder.width(), decoder.height(), TopToBottom));
     }
-    catch(PngLoadError *e)
+    catch(PngLoadError &e)
     {
-        ImageLoadError *e2 = new ImageLoadError(e->what());
-        delete e;
-        throw e2;
+        throw ImageLoadError(e.what());
     }
 }
 

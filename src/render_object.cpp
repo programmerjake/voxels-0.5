@@ -126,7 +126,7 @@ shared_ptr<RenderObject> RenderObject::read(Reader &reader, Client &client)
         return RenderObjectBlock::read(reader, client);
 
     default:
-        throw new InvalidDataValueException("read RenderObject type not implemented");
+        throw InvalidDataValueException("read RenderObject type not implemented");
     }
 }
 

@@ -12,10 +12,9 @@ Image loadImage()
     {
         return Image(L"textures.png");
     }
-    catch(exception *e)
+    catch(exception &e)
     {
-        cerr << "error : " << e->what() << endl;
-        delete e;
+        cerr << "error : " << e.what() << endl;
         exit(1);
     }
 }

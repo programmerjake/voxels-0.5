@@ -19,10 +19,9 @@ public:
         : IOException(msg)
     {
     }
-    explicit InvalidFileFormatException(IOException *e)
-        : IOException(string("IO Error : ") + e->what())
+    explicit InvalidFileFormatException(IOException &e)
+        : IOException(string("IO Error : ") + e.what())
     {
-        delete e;
     }
 };
 
@@ -60,20 +59,20 @@ public:
             {
                 if(testMagicString[i] != MAGIC_STRING[i])
                 {
-                    throw new InvalidFileFormatException("Invalid Magic String");
+                    throw InvalidFileFormatException("Invalid Magic String");
                 }
             }
             fileVersionInternal = reader->readU32();
             if(fileVersionInternal > GameVersion::FILE_VERSION)
             {
-                throw new VersionTooNewException;
+                throw VersionTooNewException();
             }
         }
-        catch(InvalidFileFormatException *e)
+        catch(InvalidFileFormatException &e)
         {
             throw e;
         }
-        catch(IOException *e)
+        catch(IOException &e)
         {
             throw InvalidFileFormatException(e);
         }

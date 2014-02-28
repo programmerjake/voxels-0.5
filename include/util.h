@@ -113,7 +113,7 @@ inline string wcsrtombs(wstring wstr)
     if(v == (size_t)-1)
     {
         delete []str;
-        throw new runtime_error("can't convert wide character string to multi-byte string");
+        throw runtime_error("can't convert wide character string to multi-byte string");
     }
     str[v] = '\0';
     string retval = str;
@@ -132,7 +132,7 @@ inline wstring mbsrtowcs(string str)
     if(v == (size_t)-1)
     {
         delete []wstr;
-        throw new runtime_error("can't convert multi-byte string to wide character string");
+        throw runtime_error("can't convert multi-byte string to wide character string");
     }
     wstr[v] = '\0';
     wstring retval = wstr;

@@ -168,7 +168,7 @@ struct VectorF
         float r = abs(v);
         if(v == 0)
         {
-            throw new domain_error("can't normalize <0, 0, 0>");
+            throw domain_error("can't normalize <0, 0, 0>");
         }
         return v / r;
     }
@@ -179,7 +179,7 @@ struct VectorF
         float r = abs(v);
         if(v == 0)
         {
-            throw new domain_error("can't normalize <0, 0, 0>");
+            throw domain_error("can't normalize <0, 0, 0>");
         }
         return v / r;
     }

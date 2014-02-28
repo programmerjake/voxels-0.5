@@ -31,7 +31,7 @@ NetworkConnection::NetworkConnection(wstring url, uint16_t port)
 
     if(0 != retval)
     {
-        throw new NetworkException(string("getaddrinfo: ") + gai_strerror(retval));
+        throw NetworkException(string("getaddrinfo: ") + gai_strerror(retval));
     }
 
     int fd = -1;
@@ -59,7 +59,7 @@ NetworkConnection::NetworkConnection(wstring url, uint16_t port)
         string msg = "can't connect: ";
         msg += strerror(errno);
         freeaddrinfo(addrList);
-        throw new NetworkException(msg);
+        throw NetworkException(msg);
     }
 
     freeaddrinfo(addrList);
@@ -81,7 +81,7 @@ NetworkServer::NetworkServer(uint16_t port)
 
     if(0 != retval)
     {
-        throw new NetworkException(string("getaddrinfo: ") + gai_strerror(retval));
+        throw NetworkException(string("getaddrinfo: ") + gai_strerror(retval));
     }
 
     fd = -1;
@@ -117,7 +117,7 @@ NetworkServer::NetworkServer(uint16_t port)
         string msg = string(errorStr) + ": ";
         msg += strerror(errno);
         freeaddrinfo(addrList);
-        throw new NetworkException(msg);
+        throw NetworkException(msg);
     }
 
     freeaddrinfo(addrList);
@@ -127,7 +127,7 @@ NetworkServer::NetworkServer(uint16_t port)
         string msg = "listen: ";
         msg += strerror(errno);
         close(fd);
-        throw new NetworkException(msg);
+        throw NetworkException(msg);
     }
 }
 
@@ -144,7 +144,7 @@ shared_ptr<StreamRW> NetworkServer::accept()
     {
         string msg = "accept: ";
         msg += strerror(errno);
-        throw new NetworkException(msg);
+        throw NetworkException(msg);
     }
 
     shared_ptr<Reader> reader = shared_ptr<Reader>(new FileReader(fdopen(dup(fd2), "r")));

@@ -100,7 +100,7 @@ private:
     {
         if(v < min || v > max)
         {
-            throw new InvalidDataValueException("read value out of range : " + to_string(v));
+            throw InvalidDataValueException("read value out of range : " + to_string(v));
         }
         return v;
     }
@@ -221,7 +221,7 @@ public:
             {
                 uint32_t b2 = readU8();
                 if((b2 & 0xC0) != 0x80)
-                    throw new UTFDataFormatException();
+                    throw UTFDataFormatException();
                 uint32_t v = b2 & 0x3F;
                 v |= (b1 & 0x1F) << 6;
                 retval += (wchar_t)v;
@@ -230,10 +230,10 @@ public:
             {
                 uint32_t b2 = readU8();
                 if((b2 & 0xC0) != 0x80)
-                    throw new UTFDataFormatException();
+                    throw UTFDataFormatException();
                 uint32_t b3 = readU8();
                 if((b3 & 0xC0) != 0x80)
-                    throw new UTFDataFormatException();
+                    throw UTFDataFormatException();
                 uint32_t v = b3 & 0x3F;
                 v |= (b2 & 0x3F) << 6;
                 v |= (b1 & 0xF) << 12;
@@ -243,23 +243,23 @@ public:
             {
                 uint32_t b2 = readU8();
                 if((b2 & 0xC0) != 0x80)
-                    throw new UTFDataFormatException();
+                    throw UTFDataFormatException();
                 uint32_t b3 = readU8();
                 if((b3 & 0xC0) != 0x80)
-                    throw new UTFDataFormatException();
+                    throw UTFDataFormatException();
                 uint32_t b4 = readU8();
                 if((b4 & 0xC0) != 0x80)
-                    throw new UTFDataFormatException();
+                    throw UTFDataFormatException();
                 uint32_t v = b4 & 0x3F;
                 v |= (b3 & 0x3F) << 6;
                 v |= (b2 & 0x3F) << 12;
                 v |= (b1 & 0x7) << 18;
                 if(v >= 0x10FFFF)
-                    throw new UTFDataFormatException();
+                    throw UTFDataFormatException();
                 retval += (wchar_t)v;
             }
             else
-                throw new UTFDataFormatException();
+                throw UTFDataFormatException();
         }
     }
     uint8_t readLimitedU8(uint8_t min, uint8_t max)
@@ -299,7 +299,7 @@ public:
         float retval = readF32();
         if(!isfinite(retval))
         {
-            throw new InvalidDataValueException("read value is not finite");
+            throw InvalidDataValueException("read value is not finite");
         }
         return retval;
     }
@@ -308,7 +308,7 @@ public:
         double retval = readF64();
         if(!isfinite(retval))
         {
-            throw new InvalidDataValueException("read value is not finite");
+            throw InvalidDataValueException("read value is not finite");
         }
         return retval;
     }
@@ -453,7 +453,7 @@ public:
         string str = wcsrtombs(fileName);
         f = fopen(str.c_str(), "rb");
         if(f == nullptr)
-            throw new IOException(string("IO Error : ") + strerror(errno));
+            throw IOException(string("IO Error : ") + strerror(errno));
     }
     explicit FileReader(FILE * f)
         : f(f)
@@ -470,8 +470,8 @@ public:
         if(ch == EOF)
         {
             if(ferror(f))
-                throw new IOException("IO Error : can't read from file");
-            throw new EOFException;
+                throw IOException("IO Error : can't read from file");
+            throw EOFException();
         }
         return ch;
     }
@@ -487,7 +487,7 @@ public:
         string str = wcsrtombs(fileName);
         f = fopen(str.c_str(), "wb");
         if(f == nullptr)
-            throw new IOException(string("IO Error : ") + strerror(errno));
+            throw IOException(string("IO Error : ") + strerror(errno));
     }
     explicit FileWriter(FILE * f)
         : f(f)
@@ -501,12 +501,12 @@ public:
     virtual void writeByte(uint8_t v) override
     {
         if(fputc(v, f) == EOF)
-            throw new IOException("IO Error : can't write to file");
+            throw IOException("IO Error : can't write to file");
     }
     virtual void flush() override
     {
         if(EOF == fflush(f))
-            throw new IOException("IO Error : can't write to file");
+            throw IOException("IO Error : can't write to file");
     }
 };
 
@@ -639,7 +639,7 @@ public:
     virtual shared_ptr<StreamRW> accept() override
     {
         if(streams.empty())
-            throw new NoStreamsLeftException();
+            throw NoStreamsLeftException();
         shared_ptr<StreamRW> retval = streams.front();
         streams.pop_front();
         return retval;

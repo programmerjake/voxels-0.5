@@ -59,7 +59,7 @@ public:
     uint8_t operator()(int x, int y, int byteNum) const
     {
         if(x < 0 || (unsigned)x >= w || y < 0 || (unsigned)y >= h || byteNum < 0 || byteNum >= 4)
-            throw new range_error("index out of range in PngDecoder::operator()(int x, int y, int byteNum) const");
+            throw range_error("index out of range in PngDecoder::operator()(int x, int y, int byteNum) const");
         size_t index = y;
         index *= w;
         index += x;

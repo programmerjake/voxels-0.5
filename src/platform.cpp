@@ -73,7 +73,7 @@ static wstring getExecutablePath()
     ssize_t rv = readlink("/proc/self/exe", &buf[0], PATH_MAX);
     if(rv == -1)
     {
-        throw new runtime_error(string("can't get executable path : ") + strerror(errno));
+        throw runtime_error(string("can't get executable path : ") + strerror(errno));
     }
     buf[rv] = '\0';
     return mbsrtowcs(&buf[0]);

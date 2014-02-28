@@ -444,7 +444,7 @@ public:
         {
             if(m.texture() && m.texture() != texture())
             {
-                throw new ImageNotSameException;
+                throw ImageNotSameException();
             }
         }
         else

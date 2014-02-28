@@ -9,7 +9,7 @@ BlockDescriptorPtr GameLoadStream::readBlockDescriptor()
         wstring name = readString();
         BlockDescriptorPtr retval = BlockDescriptor::getBlock(name);
         if(retval == nullptr)
-            throw new InvalidDataValueException("invalid block name");
+            throw InvalidDataValueException("invalid block name");
         blocks.push_back(retval);
         return retval;
     }

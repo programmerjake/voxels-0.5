@@ -135,6 +135,6 @@ PngDecoder::PngDecoder(wstring fileName)
     string errorMsg, str = wcsrtombs(fileName);
     if(!LoadPNG(str.c_str(), data, w, h, errorMsg))
     {
-        throw new PngLoadError(errorMsg);
+        throw PngLoadError(errorMsg);
     }
 }

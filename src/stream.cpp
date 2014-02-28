@@ -65,7 +65,7 @@ public:
             if(pipe->closed)
             {
                 pipe->lock.unlock();
-                throw new EOFException();
+                throw EOFException();
             }
             if(!pipe->buffer.empty())
                 break;
@@ -104,7 +104,7 @@ public:
             if(pipe->closed)
             {
                 pipe->lock.unlock();
-                throw new IOException("IO Error : can't write to pipe");
+                throw IOException("IO Error : can't write to pipe");
             }
             if(pipe->buffer.size() < bufferSize)
                 break;

@@ -162,14 +162,13 @@ void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                 break;
             }
             default:
-                throw new runtime_error("Network Event not implemented");
+                throw runtime_error("Network Event not implemented");
             }
         }
     }
-    catch(exception *e)
+    catch(exception &e)
     {
-        cerr << "Error : " << e->what() << endl;
-        delete e;
+        cerr << "Error : " << e.what() << endl;
     }
 
     terminated = true;
@@ -253,10 +252,9 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
             writer.flush();
         }
     }
-    catch(exception *e)
+    catch(exception &e)
     {
-        cerr << "Error : " << e->what() << endl;
-        delete e;
+        cerr << "Error : " << e.what() << endl;
     }
 
     terminated = true;
@@ -360,9 +358,9 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
             frame++;
         }
     }
-    catch(exception *e)
+    catch(exception &e)
     {
-        cerr << "fatal error : " << e->what() << endl;
+        cerr << "fatal error : " << e.what() << endl;
         exit(1);
     }
 }
@@ -387,9 +385,9 @@ void runServer(StreamServer &server)
             threads->push_back(thread(runServerReaderThread, stream, pclient, world));
         }
     }
-    catch(NoStreamsLeftException *e)
+    catch(NoStreamsLeftException &e)
     {
-        delete e;
+        // do nothing
     }
 
     for(thread &t : *threads)
