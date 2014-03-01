@@ -17,21 +17,21 @@ class NetworkConnection final : public StreamRW
 {
     friend class NetworkServer;
 private:
-    unique_ptr<Reader> readerInternal;
-    unique_ptr<Writer> writerInternal;
+    shared_ptr<Reader> readerInternal;
+    shared_ptr<Writer> writerInternal;
     NetworkConnection(int readFd, int writeFd)
         : readerInternal(new FileReader(fdopen(readFd, "r"))), writerInternal(new FileWriter(fdopen(writeFd, "w")))
     {
     }
 public:
     explicit NetworkConnection(wstring url, uint16_t port);
-    Reader & reader() override
+    shared_ptr<Reader> preader() override
     {
-        return *readerInternal;
+        return readerInternal;
     }
-    Writer & writer() override
+    shared_ptr<Writer> pwriter() override
     {
-        return *writerInternal;
+        return writerInternal;
     }
 };
 

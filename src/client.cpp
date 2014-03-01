@@ -5,6 +5,7 @@
 #include "game_version.h"
 #include "text.h"
 #include "world.h"
+#include "compressed_stream.h"
 #include <thread>
 #include <iostream>
 #include <sstream>
@@ -314,8 +315,10 @@ using namespace ClientImplementation;
 void clientProcess(StreamRW & streamRW)
 {
     startGraphics();
-    Reader &reader = streamRW.reader();
-    Writer &writer = streamRW.writer();
+    shared_ptr<Reader> preader = shared_ptr<Reader>(new ExpandReader(streamRW.preader()));
+    shared_ptr<Writer> pwriter = shared_ptr<Writer>(new CompressWriter(streamRW.pwriter()));
+    Reader &reader = *preader;
+    Writer &writer = *pwriter;
     ClientState clientState;
     thread networkReaderThread(clientProcessReader, &reader, &clientState);
     thread networkWriterThread(clientProcessWriter, &writer, &clientState);

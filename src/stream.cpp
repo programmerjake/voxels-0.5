@@ -62,13 +62,13 @@ public:
         }
         while(true)
         {
+            if(!pipe->buffer.empty())
+                break;
             if(pipe->closed)
             {
                 pipe->lock.unlock();
                 throw EOFException();
             }
-            if(!pipe->buffer.empty())
-                break;
             pipe->cond.wait(pipe->lock);
         }
         uint8_t retval = pipe->buffer.front();

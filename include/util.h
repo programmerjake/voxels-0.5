@@ -104,7 +104,7 @@ public:
 
 inline string wcsrtombs(wstring wstr)
 {
-    size_t destLen = wstr.length() * 4 + 1;
+    size_t destLen = wstr.length() * 4 + 1 + 32/*for extra buffer space*/;
     char * str = new char[destLen];
     const wchar_t * ptr = wstr.c_str();
     mbstate_t mbstate;
@@ -123,7 +123,7 @@ inline string wcsrtombs(wstring wstr)
 
 inline wstring mbsrtowcs(string str)
 {
-    size_t destLen = str.length() + 1;
+    size_t destLen = str.length() + 1 + 32/* for extra buffer space*/;
     wchar_t * wstr = new wchar_t[destLen];
     const char * ptr = str.c_str();
     mbstate_t mbstate;

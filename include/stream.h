@@ -559,29 +559,37 @@ struct StreamRW
     virtual ~StreamRW()
     {
     }
-    virtual Reader & reader() = 0;
-    virtual Writer & writer() = 0;
+    Reader & reader()
+    {
+        return *preader();
+    }
+    Writer & writer()
+    {
+        return *pwriter();
+    }
+    virtual shared_ptr<Reader> preader() = 0;
+    virtual shared_ptr<Writer> pwriter() = 0;
 };
 
 class StreamRWWrapper final : public StreamRW
 {
 private:
-    shared_ptr<Reader> preader;
-    shared_ptr<Writer> pwriter;
+    shared_ptr<Reader> preaderInternal;
+    shared_ptr<Writer> pwriterInternal;
 public:
-    StreamRWWrapper(shared_ptr<Reader> preader, shared_ptr<Writer> pwriter)
-        : preader(preader), pwriter(pwriter)
+    StreamRWWrapper(shared_ptr<Reader> preaderInternal, shared_ptr<Writer> pwriterInternal)
+        : preaderInternal(preaderInternal), pwriterInternal(pwriterInternal)
     {
     }
 
-    virtual Reader & reader() override
+    virtual shared_ptr<Reader> preader() override
     {
-        return *preader;
+        return preaderInternal;
     }
 
-    virtual Writer & writer() override
+    virtual shared_ptr<Writer> pwriter() override
     {
-        return *pwriter;
+        return pwriterInternal;
     }
 };
 

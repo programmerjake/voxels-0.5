@@ -4,6 +4,7 @@
 #include "network_protocol.h"
 #include "platform.h"
 #include "builtin_blocks.h"
+#include "compressed_stream.h"
 #include <thread>
 #include <list>
 
@@ -158,7 +159,7 @@ void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                         }
                     }
                 }
-                //cout << "Server : Got Chunk Request : " << origin.x << ", " << origin.y << ", " << origin.z << ", " << (int)origin.d << endl;
+                cout << "Server : Got Chunk Request : " << origin.x << ", " << origin.y << ", " << origin.z << ", " << (int)origin.d << endl;
                 break;
             }
             default:
@@ -378,6 +379,7 @@ void runServer(StreamServer &server)
         while(true)
         {
             shared_ptr<StreamRW> stream = server.accept();
+            stream = shared_ptr<StreamRW>(new StreamRWWrapper(shared_ptr<Reader>(new ExpandReader(stream->preader())), shared_ptr<Writer>(new CompressWriter(stream->pwriter()))));
             lock_guard<recursive_mutex> lockIt(world->lock);
             shared_ptr<Client> pclient = make_shared<Client>();
             clients->push_back(pclient);

@@ -1,32 +1,51 @@
-#include <zlib.h>
 #include "compressed_stream.h"
+#include "util.h"
+#include <iostream>
+#include <cstdlib>
+#include <thread>
 
+#if 0 // use demo code
 namespace
 {
-inline z_streamp getZStream(void * v)
+class DumpWriter final : public Writer
 {
-    return (z_streamp)v;
-}
-}
-
-InflateReader::InflateReader(shared_ptr<Reader> reader)
-    : reader(reader)
-{
-    state = (void *)new z_stream;
-    getZStream(state)->zalloc = Z_NULL;
-    getZStream(state)->zfree = Z_NULL;
-    getZStream(state)->opaque = Z_NULL;
-    int retval = deflateInit(getZStream(state), Z_DEFAULT_COMPRESSION);
-    if(retval != Z_OK)
+public:
+    virtual void writeByte(uint8_t v) override
     {
-        delete getZStream(state);
-        switch(retval)
-        {
-        case Z_VERSION_ERROR:
-            throw runtime_error("zlib version doesn't match compiled version");
-        default:
-            throw runtime_error("unknown zlib error");
-        }
+        cout << hex << (unsigned)(v >> 4) << (unsigned)(v & 0xF) << endl << dec;
     }
+};
 
+void dumpRead(shared_ptr<Reader> preader)
+{
+    ExpandReader reader(preader);
+    try
+    {
+        while(true)
+            cout << (char)reader.readByte() << endl;
+    }
+    catch(EOFException & e)
+    {
+    }
 }
+
+initializer init1([]()
+{
+    cout << "test compression :\n";
+    thread readerThread;
+    {
+        StreamPipe pipe;
+        readerThread = thread(dumpRead, pipe.preader());
+        CompressWriter w(pipe.pwriter());
+        for(const char * str = "abcdefghij012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123abcdefg";*str;str++)
+        {
+            w.writeByte(*str);
+        }
+        w.flush();
+    }
+    readerThread.join();
+    exit(0);
+});
+}
+#endif // use demo code
+
