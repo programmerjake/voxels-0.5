@@ -68,6 +68,7 @@ public:
         clientsUpdates.clear();
         return std::move(retval);
     }
+    void merge(shared_ptr<World> world);
 };
 
 class BlockIterator final
@@ -368,6 +369,31 @@ inline BlockIterator::BlockIterator(shared_ptr<World> w, PositionI pos)
 {
     ChunkPosition cPos(pos);
     chunk = world()->getChunk(cPos);
+}
+
+inline void World::merge(shared_ptr<World> world)
+{
+    lock_guard<recursive_mutex> lockIt(lock);
+    lock_guard<recursive_mutex> lockOther(world->lock);
+    clientsUpdates.merge(world->clientsUpdates);
+    for(shared_ptr<Chunk> chunk : world->chunksList)
+    {
+        BlockIterator bi = get((PositionI)chunk->pos);
+        BlockIterator bi2 = world->get((PositionI)chunk->pos);
+        for(int x = 0; x < ChunkSize; x++)
+        {
+            for(int y = 0; y < ChunkHeight; y++)
+            {
+                for(int z = 0; z < ChunkSize; z++)
+                {
+                    bi = (PositionI)chunk->pos + VectorI(x, y, z);
+                    bi2 = (PositionI)chunk->pos + VectorI(x, y, z);
+                    if(bi2.get().good())
+                        bi.set(bi2.get());
+                }
+            }
+        }
+    }
 }
 
 #endif // WORLD_H_INCLUDED

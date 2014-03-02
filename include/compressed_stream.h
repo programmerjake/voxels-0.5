@@ -57,12 +57,11 @@ struct LZ77CodeType final
             throw LZ77FormatException();
         }
 
-        //cout << "Read code : \'" << retval.nextByte << "\'\nlength : " << retval.length << "\noffset : " << retval.offset << endl;
-
         return retval;
     }
     void write(Writer &writer)
     {
+        //cout << "Write code : 0x" << hex << (unsigned)nextByte << dec << " : length : " << length << " : offset : " << offset << endl;
         writer.writeByte(nextByte);
         uint16_t v = (offset & maxOffset) | (length << offsetBits);
         writer.writeU16(v);
@@ -74,7 +73,7 @@ class ExpandReader final : public Reader
 private:
     shared_ptr<Reader> reader;
     static constexpr size_t bufferSize = LZ77CodeType::maxOffset + 1;
-    deque<uint8_t> buffer;
+    circularDeque<uint8_t, bufferSize + 2> buffer;
     LZ77CodeType currentCode;
 public:
     ExpandReader(shared_ptr<Reader> reader)
@@ -146,40 +145,85 @@ private:
         }
     };
 
+    size_t location;
+    size_t getActualLocation(size_t l)
+    {
+        return location - l;
+    }
+
     shared_ptr<Writer> writer;
-    deque<uint_fast8_t> currentInput;
-    deque<uint_fast8_t> buffer;
+    circularDeque<uint_fast8_t, bufferSize + 1> currentInput;
+    circularDeque<uint_fast8_t, bufferSize + 2> buffer;
+    list<size_t> nodes[uint8_max + 1];
 
     void addByte(uint_fast8_t v)
     {
+        nodes[v].push_front(++location);
         buffer.push_front(v);
         if(buffer.size() > bufferSize)
+        {
             buffer.pop_back();
+            for(list<size_t> & nodeList : nodes)
+            {
+                for(auto i = nodeList.begin(); i != nodeList.end();)
+                {
+                    if(getActualLocation(*i) >= buffer.size())
+                        i = nodeList.erase(i);
+                    else
+                        i++;
+                }
+            }
+        }
     }
+
+    /*void dumpLocation(size_t l)
+    {
+        cout << l << " : ";
+        l = getActualLocation(l);
+        if(l >= buffer.size())
+            cout << "\"\"" << endl;
+        else
+        {
+            cout << "\"";
+            auto iter = buffer.cbegin() + l;
+            for(int i = 0; i < 5 && i <= l; i++, iter--)
+            {
+                cout << (char)*iter;
+            }
+            cout << "\"" << endl;
+        }
+    }*/
 
     Match getBiggestMatch()
     {
         Match retval;
-        size_t curPosition = 0;
-        for(auto i = buffer.cbegin(); i != buffer.cend(); i++, curPosition++)
+        auto ii = currentInput.cbegin();
+        if(ii == currentInput.cend())
+            return Match();
+        const list<size_t> & curNodes = nodes[*ii++];
+        if(curNodes.empty())
+            return Match();
+        auto startII = ii;
+        for(size_t startPos : curNodes)
         {
-            size_t curLength = 0;
-            auto ii = currentInput.cbegin();
-            for(size_t j = 0; j <= curPosition && ii != currentInput.cend(); j++, curLength++)
+            size_t matchLength = 1;
+            size_t node = startPos;
+            for(ii = startII; ii != currentInput.cend(); matchLength++, ii++, node++)
             {
-                if(i[-j] != *ii++)
-                {
+                size_t pos = getActualLocation(node + 1);
+                if(pos >= buffer.size())
                     break;
-                }
+                if(buffer.cbegin()[pos] != *ii)
+                    break;
             }
-            if(curLength >= LZ77CodeType::maxLength)
-                return Match(curPosition, LZ77CodeType::maxLength);
-            if(curLength > retval.length)
+            if(matchLength > retval.length)
             {
-                retval.location = curPosition;
-                retval.length = curLength;
+                retval.length = matchLength;
+                retval.location = getActualLocation(startPos);
             }
         }
+        if(retval.length > LZ77CodeType::maxLength + 1)
+            retval.length = LZ77CodeType::maxLength + 1;
         return retval;
     }
 
@@ -225,12 +269,12 @@ public:
     }
     virtual ~CompressWriter()
     {
-        flush();
     }
     virtual void flush() override
     {
         while(!currentInput.empty())
             writeCode();
+        writer->flush();
     }
     virtual void writeByte(uint8_t v) override
     {

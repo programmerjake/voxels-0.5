@@ -209,7 +209,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
     {
         while(!terminated)
         {
-            vector<shared_ptr<RenderObject>> objects;
+            list<shared_ptr<RenderObject>> objects;
             client.lock();
             //PositionF curClientPosition = clientPosition;
             updateList = clientUpdateList;
@@ -250,7 +250,8 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                 }
                 writer.flush();
             }
-            writer.flush();
+            else
+                writer.flush();
         }
     }
     catch(exception &e)
@@ -284,7 +285,7 @@ struct Periodic
     }
 };
 
-const int worldSize = 10;
+const int worldSize = 20;
 
 void generateInitialWorld(shared_ptr<World> world)
 {
@@ -301,9 +302,13 @@ void generateInitialWorld(shared_ptr<World> world)
 
             for(; bi.position().z <= worldSize; bi += BlockFace::PZ)
             {
-                if(absSquared((VectorI)bi.position() - VectorI(0, WorldHeight / 2, 0)) < worldSize * worldSize)
+                if(absSquared((VectorI)bi.position() - VectorI(0, WorldHeight / 2, 0)) < worldSize * worldSize / 25)
                 {
                     bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.air")));
+                }
+                else if(absSquared((VectorI)bi.position() - VectorI(0, WorldHeight / 2, 0)) < worldSize * worldSize)
+                {
+                    bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.glass")));
                 }
                 else
                 {
@@ -338,19 +343,26 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
             if(frame % 1 == 0)
             {
                 lock_guard<recursive_mutex> lockIt(world->lock);
-                for(int i = 0; i < 100; i++)
+                for(int i = 0; i < 1; i++)
                 {
-                    PositionI pos = PositionI(rand() % 65 - 32, rand() % 65 - 32 + WorldHeight / 2, rand() % 65 - 32, Dimension::Overworld);
-                    if(pos != PositionI(0, WorldHeight / 2, 0, Dimension::Overworld))
+                    PositionI pos = PositionI(rand() % 33 - 16, rand() % 33 - 16 + WorldHeight / 2, rand() % 33 - 16, Dimension::Overworld);
+                    if(absSquared(pos - PositionI(0, WorldHeight / 2, 0, Dimension::Overworld)) > 5)
                     {
                         BlockIterator bi = world->get(pos);
-                        if(rand() % 2)
+                        switch(rand() % 4)
                         {
+                        case 0:
                             bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.air")));
-                        }
-                        else
-                        {
+                            break;
+                        case 1:
                             bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.stone")));
+                            break;
+                        case 2:
+                            bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.glass")));
+                            break;
+                        default:
+                            bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.bedrock")));
+                            break;
                         }
                     }
                 }

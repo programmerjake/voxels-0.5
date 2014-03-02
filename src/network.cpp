@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <signal.h>
+#include <netinet/tcp.h>
 
 using namespace std;
 
@@ -44,7 +45,8 @@ NetworkConnection::NetworkConnection(wstring url, uint16_t port)
         {
             continue;
         }
-
+        int flag = 1;
+        setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (const void *)&flag, sizeof(flag));
         if(-1 != connect(fd, addr->ai_addr, addr->ai_addrlen))
         {
             break;
@@ -146,6 +148,9 @@ shared_ptr<StreamRW> NetworkServer::accept()
         msg += strerror(errno);
         throw NetworkException(msg);
     }
+
+    int flag = 1;
+    setsockopt(fd2, IPPROTO_TCP, TCP_NODELAY, (const void *)&flag, sizeof(flag));
 
     shared_ptr<Reader> reader = shared_ptr<Reader>(new FileReader(fdopen(dup(fd2), "r")));
     shared_ptr<Writer> writer = shared_ptr<Writer>(new FileWriter(fdopen(fd2, "w")));

@@ -19,14 +19,18 @@ public:
 void dumpRead(shared_ptr<Reader> preader)
 {
     ExpandReader reader(preader);
+
     try
     {
         while(true)
-            cout << (char)reader.readByte() << endl;
+        {
+            cout << (char)reader.readByte();
+        }
     }
-    catch(EOFException & e)
+    catch(EOFException &e)
     {
     }
+    cout << endl;
 }
 
 initializer init1([]()
@@ -37,10 +41,18 @@ initializer init1([]()
         StreamPipe pipe;
         readerThread = thread(dumpRead, pipe.preader());
         CompressWriter w(pipe.pwriter());
-        for(const char * str = "abcdefghij012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123abcdefg";*str;str++)
+
+        for(int i = 0; i < 65536; i++)
         {
-            w.writeByte(*str);
+            for(const char *str =
+                        "abcdefghij012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123abcdefg\n";
+                    *str; str++)
+            {
+                w.writeByte(*str);
+            }
+            w.flush();
         }
+
         w.flush();
     }
     readerThread.join();

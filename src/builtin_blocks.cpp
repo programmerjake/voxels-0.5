@@ -1,5 +1,6 @@
 #include "builtin_blocks.h"
 #include "texture_atlas.h"
+#include "generate.h"
 #include "util.h"
 
 void initBuiltinBlocks()
@@ -7,6 +8,7 @@ void initBuiltinBlocks()
     BlockDescriptor::initBlock(StoneBlock::ptr = shared_ptr<BlockDescriptor>(new StoneBlock));
     BlockDescriptor::initBlock(BedrockBlock::ptr = shared_ptr<BlockDescriptor>(new BedrockBlock));
     BlockDescriptor::initBlock(AirBlock::ptr = shared_ptr<BlockDescriptor>(new AirBlock));
+    BlockDescriptor::initBlock(GlassBlock::ptr = shared_ptr<BlockDescriptor>(new GlassBlock));
 }
 
 namespace
@@ -34,4 +36,26 @@ shared_ptr<RenderObjectBlockMesh> AirBlock::makeBlockMesh()
             false, false, false, false, false, RenderLayer::Opaque);
 }
 
-shared_ptr<BlockDescriptor> StoneBlock::ptr, BedrockBlock::ptr, AirBlock::ptr;
+shared_ptr<RenderObjectBlockMesh> GlassBlock::makeBlockMesh()
+{
+    RenderObjectBlockClass glassClass = getRenderObjectBlockClass();
+    //cout << "Glass Class : " << airClass << endl;
+    return make_shared<RenderObjectBlockMesh>(glassClass,
+            LightProperties(LightPropertiesType::Transparent, 0), Mesh(new Mesh_t),
+            Generate::unitBox(TextureAtlas::Glass.td(), TextureDescriptor(), TextureDescriptor(),
+                              TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
+            Generate::unitBox(TextureDescriptor(), TextureAtlas::Glass.td(), TextureDescriptor(),
+                              TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
+            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureAtlas::Glass.td(),
+                              TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
+            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(),
+                              TextureAtlas::Glass.td(), TextureDescriptor(), TextureDescriptor()),
+            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(),
+                              TextureDescriptor(), TextureAtlas::Glass.td(), TextureDescriptor()),
+            Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(),
+                              TextureDescriptor(), TextureDescriptor(), TextureAtlas::Glass.td()),
+            false, false, false, false, false, false, RenderLayer::Opaque
+                                             );
+}
+
+shared_ptr<BlockDescriptor> StoneBlock::ptr, BedrockBlock::ptr, AirBlock::ptr, GlassBlock::ptr;

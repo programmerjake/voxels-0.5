@@ -63,4 +63,37 @@ public:
     static shared_ptr<BlockDescriptor> ptr;
 };
 
+class GlassBlock final : public BlockDescriptor
+{
+    friend void initBuiltinBlocks();
+protected:
+    GlassBlock()
+        : BlockDescriptor(L"builtin.glass")
+    {
+    }
+    virtual BlockData loadInternal(GameLoadStream &) const override
+    {
+        return BlockData(ptr);
+    }
+    virtual void storeInternal(BlockData, GameStoreStream &) const override
+    {
+    }
+    virtual shared_ptr<RenderObjectBlockMesh> getBlockMesh(BlockIterator) const override
+    {
+        if(blockMesh)
+        {
+            return blockMesh;
+        }
+        return blockMesh = makeBlockMesh();
+    }
+    virtual void onMove(BlockIterator) const override
+    {
+    }
+private:
+    mutable shared_ptr<RenderObjectBlockMesh> blockMesh;
+    static shared_ptr<RenderObjectBlockMesh> makeBlockMesh();
+public:
+    static shared_ptr<BlockDescriptor> ptr;
+};
+
 #endif // BUILTIN_BLOCKS_H_INCLUDED

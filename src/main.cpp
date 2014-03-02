@@ -109,7 +109,9 @@ int myMain(vector<wstring> args)
     {
         if(isServer)
         {
+            cout << "Voxels " << wcsrtombs(GameVersion::VERSION) << " (c) 2014 Jacob R. Lifshay" << endl;
             NetworkServer server(GameVersion::port);
+            cout << "Connected to port " << GameVersion::port << endl;
             runServer(server);
             return 0;
         }

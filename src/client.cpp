@@ -30,6 +30,7 @@ struct ClientState
     bool done;
     bool paused;
     UpdateList neededChunkList;
+    bool forwardDown, backwardDown, leftDown, rightDown, jumpDown, sneakDown;
     ClientState()
         : lock(client.getLock())
     {
@@ -58,6 +59,8 @@ void clientProcessWriter(Writer *pwriter, ClientState * state)
         {
             PositionF pos = state->pos;
             VectorF velocity = state->velocity;
+            if(state->paused)
+                velocity = VectorF(0);
             UpdateList neededChunkList = state->neededChunkList;
             state->neededChunkList.clear();
             state->lock.unlock();
@@ -243,6 +246,33 @@ void meshMakerThread(Mesh meshes[], ClientState * state)
     state->lock.unlock();
 }
 
+void updateVelocity(ClientState * state)
+{
+    lock_guard<recursive_mutex> lockIt(state->lock);
+    state->velocity = VectorF(0, state->velocity.y, 0);
+    const float speed = 2;
+    VectorF forwardVector = Matrix::rotateY(state->theta).invert().apply(VectorF(0, 0, -1)) * speed;
+    VectorF leftVector = Matrix::rotateY(state->theta).invert().apply(VectorF(-1, 0, 0)) * speed;
+    if(state->backwardDown)
+    {
+        state->velocity -= forwardVector;
+    }
+    if(state->forwardDown)
+    {
+        state->velocity += forwardVector;
+    }
+    if(state->leftDown)
+    {
+        state->velocity += leftVector;
+    }
+    if(state->rightDown)
+    {
+        state->velocity -= leftVector;
+    }
+    if(!state->paused)
+        state->pos += Display::frameDeltaTime() * state->velocity;
+}
+
 class ClientEventHandler final : public EventHandler
 {
     ClientState * clientState;
@@ -253,17 +283,14 @@ public:
     }
     virtual bool handleMouseUp(MouseUpEvent &) override
     {
-        //cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Up    : " << event.button << endl;
         return true;
     }
     virtual bool handleMouseDown(MouseDownEvent &) override
     {
-        //cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Down  : " << event.button << endl;
         return true;
     }
     virtual bool handleMouseMove(MouseMoveEvent &event) override
     {
-        //cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Move\n";
         lock_guard<recursive_mutex> lockIt(clientState->lock);
         if(clientState->paused)
             return true;
@@ -279,32 +306,64 @@ public:
     }
     virtual bool handleMouseScroll(MouseScrollEvent &) override
     {
-        //cout << "Mouse (" << event.x << ", " << event.y << ") (" << event.deltaX << ", " << event.deltaY << ") : Scroll : (" << event.scrollX << ", " << event.scrollY << ")\n";
         return true;
     }
-    virtual bool handleKeyUp(KeyUpEvent &) override
+    virtual bool handleKeyUp(KeyUpEvent & event) override
     {
-        //cout << "Key Up  : " << event.key << " : " << event.mods << endl;
-        return true;
+        lock_guard<recursive_mutex> lockIt(clientState->lock);
+        if(clientState->paused)
+            return false;
+        if(event.key == KeyboardKey::KeyboardKey_W)
+        {
+            clientState->forwardDown = false;
+        }
+        if(event.key == KeyboardKey::KeyboardKey_A)
+        {
+            clientState->leftDown = false;
+        }
+        if(event.key == KeyboardKey::KeyboardKey_D)
+        {
+            clientState->rightDown = false;
+        }
+        if(event.key == KeyboardKey::KeyboardKey_S)
+        {
+            clientState->backwardDown = false;
+        }
+        return false;
     }
     virtual bool handleKeyDown(KeyDownEvent &event) override
     {
-        //cout << "Key Down : " << event.key << " : " << event.mods << (event.isRepetition ? " : Repeated\n" : " : First\n");
-        if(event.key == KeyboardKey::KeyboardKey_P)
+        lock_guard<recursive_mutex> lockIt(clientState->lock);
+        if(event.key == KeyboardKey::KeyboardKey_P && !event.isRepetition)
         {
-            lock_guard<recursive_mutex> lockIt(clientState->lock);
             clientState->paused = !clientState->paused;
+        }
+        if(clientState->paused)
+            return false;
+        if(event.key == KeyboardKey::KeyboardKey_W)
+        {
+            clientState->forwardDown = true;
+        }
+        if(event.key == KeyboardKey::KeyboardKey_A)
+        {
+            clientState->leftDown = true;
+        }
+        if(event.key == KeyboardKey::KeyboardKey_D)
+        {
+            clientState->rightDown = true;
+        }
+        if(event.key == KeyboardKey::KeyboardKey_S)
+        {
+            clientState->backwardDown = true;
         }
         return false;
     }
     virtual bool handleKeyPress(KeyPressEvent &) override
     {
-        //cout << "Key : \'" << wcsrtombs(wstring(L"") + event.character) << "\'\n";
         return true;
     }
     virtual bool handleQuit(QuitEvent &) override
     {
-        //cout << "Quit\n";
         return false; // so that the program will actually quit
     }
 };
@@ -315,8 +374,10 @@ using namespace ClientImplementation;
 void clientProcess(StreamRW & streamRW)
 {
     startGraphics();
-    shared_ptr<Reader> preader = shared_ptr<Reader>(new ExpandReader(streamRW.preader()));
-    shared_ptr<Writer> pwriter = shared_ptr<Writer>(new CompressWriter(streamRW.pwriter()));
+    shared_ptr<Reader> preader = streamRW.preader();
+    shared_ptr<Writer> pwriter = streamRW.pwriter();
+    preader = shared_ptr<Reader>(new ExpandReader(preader));
+    pwriter = shared_ptr<Writer>(new CompressWriter(pwriter));
     Reader &reader = *preader;
     Writer &writer = *pwriter;
     ClientState clientState;
@@ -340,6 +401,7 @@ void clientProcess(StreamRW & streamRW)
         glClearColor(0, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         clientState.lock.lock();
+        updateVelocity(&clientState);
         Matrix tform = Matrix::translate(-(VectorF)clientState.pos)
                         .concat(Matrix::rotateY(clientState.theta))
                         .concat(Matrix::rotateX(-clientState.phi));

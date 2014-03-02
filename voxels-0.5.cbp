@@ -11,6 +11,7 @@
 				<Option object_output="obj/Debug/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
+				<Option parameters="--client localhost" />
 				<Compiler>
 					<Add option="-g" />
 					<Add option="-fno-inline" />
@@ -43,7 +44,6 @@
 			<Add option="-std=c++11 -fexceptions `sdl-config --cflags`" />
 			<Add option="-D__cplusplus=201103L" />
 			<Add directory="/usr/include/SDL" />
-			<Add directory="/home/lifsja/boost_1_55_0" />
 		</Compiler>
 		<Linker>
 			<Add option="`sdl-config --libs`" />
@@ -83,6 +83,7 @@
 		<Unit filename="include/util.h" />
 		<Unit filename="include/vector.h" />
 		<Unit filename="include/world.h" />
+		<Unit filename="include/world_generator.h" />
 		<Unit filename="src/block.cpp" />
 		<Unit filename="src/builtin_blocks.cpp" />
 		<Unit filename="src/client.cpp" />
@@ -107,6 +108,7 @@
 		<Unit filename="src/util.cpp" />
 		<Unit filename="src/vector.cpp" />
 		<Unit filename="src/world.cpp" />
+		<Unit filename="src/world_generator.cpp" />
 		<Extensions>
 			<code_completion />
 			<debugger />

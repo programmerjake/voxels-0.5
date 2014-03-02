@@ -26,6 +26,7 @@ public:
 struct BlockDescriptor;
 
 typedef shared_ptr<const BlockDescriptor> BlockDescriptorPtr;
+typedef vector<BlockDescriptorPtr>::const_iterator BlockDescriptorPtrIterator;
 
 #include "light.h"
 
@@ -75,9 +76,32 @@ public:
     const wstring name;
     static BlockDescriptorPtr getBlock(wstring name)
     {
+        if(blocks == nullptr) // so that we don't have problems with static initialization order
+        {
+            blocks = new map<wstring, BlockDescriptorPtr>;
+            blocksList = new vector<BlockDescriptorPtr>;
+        }
         if(blocks->find(name) == blocks->end())
             return nullptr;
         return blocks->at(name);
+    }
+    static BlockDescriptorPtrIterator blocksBegin()
+    {
+        if(blocks == nullptr) // so that we don't have problems with static initialization order
+        {
+            blocks = new map<wstring, BlockDescriptorPtr>;
+            blocksList = new vector<BlockDescriptorPtr>;
+        }
+        return blocksList->cbegin();
+    }
+    static BlockDescriptorPtrIterator blocksEnd()
+    {
+        if(blocks == nullptr) // so that we don't have problems with static initialization order
+        {
+            blocks = new map<wstring, BlockDescriptorPtr>;
+            blocksList = new vector<BlockDescriptorPtr>;
+        }
+        return blocksList->cend();
     }
     virtual ~BlockDescriptor()
     {
@@ -103,5 +127,33 @@ public:
         data.desc->storeInternal(data, gss);
     }
 };
+
+struct BlockDescriptors_t final
+{
+    BlockDescriptorPtr get(wstring name) const
+    {
+        return BlockDescriptor::getBlock(name);
+    }
+    BlockDescriptorPtrIterator begin() const
+    {
+        return BlockDescriptor::blocksBegin();
+    }
+    BlockDescriptorPtrIterator end() const
+    {
+        return BlockDescriptor::blocksEnd();
+    }
+};
+
+extern const BlockDescriptors_t BlockDescriptors;
+
+inline BlockDescriptorPtrIterator begin(const BlockDescriptors_t &)
+{
+    return BlockDescriptor::blocksBegin();
+}
+
+inline BlockDescriptorPtrIterator end(const BlockDescriptors_t &)
+{
+    return BlockDescriptor::blocksEnd();
+}
 
 #endif // BLOCK_H_INCLUDED

@@ -106,6 +106,14 @@ struct PositionI : public VectorI
         *(VectorI *)this *= rt;
         return *this;
     }
+    friend VectorI operator +(const PositionI & l, const PositionI & r)
+    {
+        return (VectorI)l + (VectorI)r;
+    }
+    friend VectorI operator -(const PositionI & l, const PositionI & r)
+    {
+        return (VectorI)l - (VectorI)r;
+    }
 };
 
 namespace std
@@ -260,6 +268,30 @@ struct PositionF : public VectorF
     {
         *(VectorF *)this /= rt;
         return *this;
+    }
+    friend VectorF operator +(const PositionF & l, const PositionF & r)
+    {
+        return (VectorF)l + (VectorF)r;
+    }
+    friend VectorF operator -(const PositionF & l, const PositionF & r)
+    {
+        return (VectorF)l - (VectorF)r;
+    }
+    friend VectorF operator +(const PositionI & l, const PositionF & r)
+    {
+        return (VectorI)l + (VectorF)r;
+    }
+    friend VectorF operator -(const PositionI & l, const PositionF & r)
+    {
+        return (VectorI)l - (VectorF)r;
+    }
+    friend VectorF operator +(const PositionF & l, const PositionI & r)
+    {
+        return (VectorF)l + (VectorI)r;
+    }
+    friend VectorF operator -(const PositionF & l, const PositionI & r)
+    {
+        return (VectorF)l - (VectorI)r;
     }
 };
 
