@@ -376,8 +376,8 @@ struct VectorF
         return VectorF(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
     }
 
-    template<typename RE = default_random_engine>
-    static VectorF random(RE & re = defaultRandom)
+    template<typename RE>
+    static VectorF random(RE & re)
     {
         VectorF retval;
         do

@@ -64,8 +64,6 @@ inline const T interpolate(const float t, const T a, const T b)
     return a + t * (b - a);
 }
 
-extern default_random_engine defaultRandom;
-
 class initializer
 {
 private:
@@ -157,6 +155,13 @@ public:
         if(value.exchange(v) != v)
             cond.notify_all();
         return *this;
+    }
+    bool exchange(bool v)
+    {
+        bool retval = value.exchange(v);
+        if(retval != v)
+            cond.notify_all();
+        return retval;
     }
     operator bool()
     {
@@ -648,5 +653,20 @@ public:
         other = move(temp);
     }
 };
+
+uint32_t makeSeed();
+
+inline uint32_t makeSeed(wstring str)
+{
+    if(str == L"")
+        return makeSeed();
+    uint32_t retval = 0;
+    for(wchar_t ch : str)
+    {
+        retval *= 9;
+        retval += ch;
+    }
+    return retval;
+}
 
 #endif // UTIL_H

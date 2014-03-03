@@ -34,7 +34,7 @@ struct ClientState
     ClientState()
         : lock(client.getLock())
     {
-        pos = PositionF(0.5, WorldHeight / 2 + 0.5, 0.5, Dimension::Overworld);
+        pos = PositionF(0.5, AverageGroundHeight + 5.5, 0.5, Dimension::Overworld);
         velocity = VectorF(0);
         theta = phi = dtheta = dphi = 0;
         renderDistance = 30;
@@ -376,8 +376,8 @@ void clientProcess(StreamRW & streamRW)
     startGraphics();
     shared_ptr<Reader> preader = streamRW.preader();
     shared_ptr<Writer> pwriter = streamRW.pwriter();
-    preader = shared_ptr<Reader>(new ExpandReader(preader));
-    pwriter = shared_ptr<Writer>(new CompressWriter(pwriter));
+    //preader = shared_ptr<Reader>(new ExpandReader(preader));
+    //pwriter = shared_ptr<Writer>(new CompressWriter(pwriter));
     Reader &reader = *preader;
     Writer &writer = *pwriter;
     ClientState clientState;

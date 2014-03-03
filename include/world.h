@@ -9,8 +9,12 @@
 using namespace std;
 
 const int WorldHeight = ChunkHeight;
+const int AverageGroundHeight = 64;
 
 class BlockIterator;
+class World;
+
+#include "world_generator.h"
 
 class World final : public enable_shared_from_this<World>
 {
@@ -20,6 +24,8 @@ class World final : public enable_shared_from_this<World>
     const World &operator =(const World &) = delete;
 public:
     recursive_mutex lock;
+    WorldRandom random;
+    const WorldGenerator generator;
 private:
     list<shared_ptr<Chunk>> chunksList;
     unordered_map<ChunkPosition, shared_ptr<Chunk>> chunksMap;
@@ -44,13 +50,16 @@ private:
         return c;
     }
     UpdateList clientsUpdates;
-    World()
+    World(uint32_t seed, const WorldGenerator & generator)
+        : lock(), random(seed, lock), generator(generator)
     {
     }
 public:
-    static shared_ptr<World> make()
+    UpdateList generatedChunks;
+    UpdateList needGenerateChunks;
+    static shared_ptr<World> make(uint32_t seed = makeSeed(), const WorldGenerator & generator = WorldGenerator::makeDefault())
     {
-        return shared_ptr<World>(new World);
+        return shared_ptr<World>(new World(seed, generator));
     }
     ~World()
     {
@@ -69,6 +78,11 @@ public:
         return std::move(retval);
     }
     void merge(shared_ptr<World> world);
+    shared_ptr<World> makeWorldForGenerate()
+    {
+        lock_guard<recursive_mutex> lockIt(lock);
+        return make(random.seed, generator);
+    }
 };
 
 class BlockIterator final
@@ -123,6 +137,10 @@ public:
 
         lock_guard<recursive_mutex> lock(world()->lock);
         VectorI rPos = (VectorI)pos - (VectorI)(PositionI)chunk->pos;
+        if(!chunk->blocks[rPos.x][rPos.y][rPos.z].good())
+        {
+            world()->needGenerateChunks.add(PositionI(pos.x & WorldGeneratorPart::generateChunkSizeFloorMask.x, pos.y & WorldGeneratorPart::generateChunkSizeFloorMask.y, pos.z & WorldGeneratorPart::generateChunkSizeFloorMask.z, pos.d));
+        }
         return chunk->blocks[rPos.x][rPos.y][rPos.z];
     }
     void set(BlockData newBlock)

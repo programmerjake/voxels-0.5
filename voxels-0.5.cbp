@@ -11,7 +11,7 @@
 				<Option object_output="obj/Debug/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option parameters="--client localhost" />
+				<Option parameters="--server" />
 				<Compiler>
 					<Add option="-g" />
 					<Add option="-fno-inline" />
@@ -51,6 +51,7 @@
 			<Add library="SDL_image" />
 			<Add library="png" />
 		</Linker>
+		<Unit filename="include/biome_server.h" />
 		<Unit filename="include/block.h" />
 		<Unit filename="include/block_face.h" />
 		<Unit filename="include/builtin_blocks.h" />

@@ -67,7 +67,7 @@ inline PositionF &getClientPosition(Client &client)
 
     if(id == Client::NullId)
     {
-        retval = make_shared<PositionF>(PositionF(0.5, WorldHeight / 2 + 0.5, 0.5, Dimension::Overworld));
+        retval = make_shared<PositionF>(PositionF(0.5, AverageGroundHeight + 0.5, 0.5, Dimension::Overworld));
         id = client.makeId(retval, Client::DataType::PositionF);
         return *retval;
     }
@@ -77,7 +77,7 @@ inline PositionF &getClientPosition(Client &client)
 
     if(retval == nullptr)
     {
-        retval = make_shared<PositionF>(PositionF(0.5, WorldHeight / 2 + 0.5, 0.5, Dimension::Overworld));
+        retval = make_shared<PositionF>(PositionF(0.5, AverageGroundHeight + 0.5, 0.5, Dimension::Overworld));
         client.setPtr(retval, id, Client::DataType::PositionF);
     }
 
@@ -137,7 +137,7 @@ void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                 LockedClient lockIt(client);
                 getClientPosition(client) = pos;
                 getClientVelocity(client) = velocity;
-                break;
+                continue;
             }
             case NetworkProtocol::NetworkEvent::RequestChunk:
             {
@@ -160,11 +160,12 @@ void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                     }
                 }
                 cout << "Server : Got Chunk Request : " << origin.x << ", " << origin.y << ", " << origin.z << ", " << (int)origin.d << endl;
-                break;
+                continue;
             }
-            default:
-                throw runtime_error("Network Event not implemented");
+            case NetworkProtocol::NetworkEvent::Last:
+                assert(false);
             }
+            throw runtime_error("Network Event not implemented");
         }
     }
     catch(exception &e)
@@ -242,6 +243,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
 
             if(!objects.empty())
             {
+                cout << "Server : writing " << objects.size() << " render objects\n";
                 NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdateRenderObjects);
                 writer.writeU64(objects.size());
                 for(shared_ptr<RenderObject> object : objects)
@@ -285,43 +287,82 @@ struct Periodic
     }
 };
 
-const int worldSize = 20;
+struct ChunkGenerator
+{
+private:
+    PositionI chunkOrigin;
+    shared_ptr<World> world;
+    void run()
+    {
+        shared_ptr<World> world2 = world->makeWorldForGenerate();
+        lock_guard<recursive_mutex> lockIt(world2->lock);
+        world2->generator.run(world2, chunkOrigin);
+        lock_guard<recursive_mutex> lockIt2(world->lock);
+        world->merge(world2);
+        world->generatedChunks.add(chunkOrigin);
+        generated = true;
+    }
+    thread theThread;
+    recursive_mutex lock;
+    bool needJoin;
+public:
+    flag generated;
+    bool start(PositionI pos)
+    {
+        lock_guard<recursive_mutex> lockIt(lock);
+        if(!generated.exchange(false))
+            return false;
+        if(needJoin)
+            theThread.join();
+        needJoin = true;
+        chunkOrigin = pos;
+        theThread = thread([](ChunkGenerator * v){v->run();}, this);
+        return true;
+    }
+    ChunkGenerator(shared_ptr<World> world)
+        : world(world), needJoin(false), generated(true)
+    {
+    }
+    ~ChunkGenerator()
+    {
+        lock_guard<recursive_mutex> lockIt(lock);
+        if(needJoin)
+            theThread.detach();
+    }
+    bool inUse()
+    {
+        return !generated;
+    }
+};
 
 void generateInitialWorld(shared_ptr<World> world)
 {
-    lock_guard<recursive_mutex> lockIt(world->lock);
-    BlockIterator biX = world->get(PositionI(-worldSize, WorldHeight / 2 - worldSize, -worldSize, Dimension::Overworld));
-
-    for(; biX.position().x <= worldSize; biX += BlockFace::PX)
+    vector<shared_ptr<ChunkGenerator>> generators;
+    const int generateSize = 32;
+    PositionI pos(0, 0, 0, Dimension::Overworld);
+    for(pos.x = -generateSize & WorldGeneratorPart::generateChunkSizeFloorMask.x; pos.x <= (generateSize & WorldGeneratorPart::generateChunkSizeFloorMask.x); pos.x += WorldGeneratorPart::generateChunkSize.x)
     {
-        BlockIterator biY = biX;
-
-        for(; biY.position().y <= worldSize + WorldHeight / 2; biY += BlockFace::PY)
+        for(pos.y = 0; pos.y < ((WorldHeight + WorldGeneratorPart::generateChunkSize.y - 1) & WorldGeneratorPart::generateChunkSizeFloorMask.x); pos.y += WorldGeneratorPart::generateChunkSize.y)
         {
-            BlockIterator bi = biY;
-
-            for(; bi.position().z <= worldSize; bi += BlockFace::PZ)
+            for(pos.z = -generateSize & WorldGeneratorPart::generateChunkSizeFloorMask.z; pos.z <= (generateSize & WorldGeneratorPart::generateChunkSizeFloorMask.z); pos.z += WorldGeneratorPart::generateChunkSize.z)
             {
-                if(absSquared((VectorI)bi.position() - VectorI(0, WorldHeight / 2, 0)) < worldSize * worldSize / 25)
-                {
-                    bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.air")));
-                }
-                else if(absSquared((VectorI)bi.position() - VectorI(0, WorldHeight / 2, 0)) < worldSize * worldSize)
-                {
-                    bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.glass")));
-                }
-                else
-                {
-                    bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.stone")));
-                }
+                shared_ptr<ChunkGenerator> generator = make_shared<ChunkGenerator>(world);
+                bool successful = generator->start(pos);
+                assert(successful);
+                generators.push_back(generator);
             }
         }
+    }
+    for(shared_ptr<ChunkGenerator> generator : generators)
+    {
+        generator->generated.wait(true);
     }
     cout << "Server : world Generated\n";
 }
 
 void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared_ptr<World> world)
 {
+    array<shared_ptr<ChunkGenerator>, GenerateThreadCount> generators;
     try
     {
         Periodic periodic;
@@ -345,8 +386,8 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                 lock_guard<recursive_mutex> lockIt(world->lock);
                 for(int i = 0; i < 1; i++)
                 {
-                    PositionI pos = PositionI(rand() % 33 - 16, rand() % 33 - 16 + WorldHeight / 2, rand() % 33 - 16, Dimension::Overworld);
-                    if(absSquared(pos - PositionI(0, WorldHeight / 2, 0, Dimension::Overworld)) > 5)
+                    PositionI pos = PositionI(rand() % 33 - 16, rand() % 33 - 16 + AverageGroundHeight, rand() % 33 - 16, Dimension::Overworld);
+                    if(absSquared(pos - PositionI(0, AverageGroundHeight, 0, Dimension::Overworld)) > 5)
                     {
                         BlockIterator bi = world->get(pos);
                         switch(rand() % 4)
@@ -391,7 +432,7 @@ void runServer(StreamServer &server)
         while(true)
         {
             shared_ptr<StreamRW> stream = server.accept();
-            stream = shared_ptr<StreamRW>(new StreamRWWrapper(shared_ptr<Reader>(new ExpandReader(stream->preader())), shared_ptr<Writer>(new CompressWriter(stream->pwriter()))));
+            //stream = shared_ptr<StreamRW>(new StreamRWWrapper(shared_ptr<Reader>(new ExpandReader(stream->preader())), shared_ptr<Writer>(new CompressWriter(stream->pwriter()))));
             lock_guard<recursive_mutex> lockIt(world->lock);
             shared_ptr<Client> pclient = make_shared<Client>();
             clients->push_back(pclient);

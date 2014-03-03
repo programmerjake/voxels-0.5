@@ -16,5 +16,12 @@
  *
  */
 #include "util.h"
+#include <chrono>
 
-default_random_engine defaultRandom;
+using namespace std;
+
+uint32_t makeSeed()
+{
+    uint64_t v = chrono::system_clock::now().time_since_epoch().count();
+    return (uint32_t)v ^ (uint32_t)(v >> 32);
+}
