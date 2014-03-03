@@ -19,6 +19,7 @@
 #include "png_decoder.h"
 #include "platform.h"
 #include <cstring>
+#include <iostream>
 
 Image::Image(wstring resourceName)
 {
@@ -224,6 +225,7 @@ void Image::write(Writer &writer, Client &client) const
         Client::writeId(writer, id);
         return;
     }
+    cout << "Server : writing image\n";
     id = client.makeId(data, Client::DataType::Image);
     client.unlock();
     Client::writeId(writer, id);
@@ -268,6 +270,7 @@ Image Image::read(Reader &reader, Client &client)
         DUMP_V(Image::read, "read old image");
         return retval;
     }
+    cout << "Client : reading image\n";
     DUMP_V(Image::read, "reading new image");
     uint32_t w, h;
     w = reader.readU32();

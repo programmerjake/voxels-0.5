@@ -296,6 +296,7 @@ private:
     {
         shared_ptr<World> world2 = world->makeWorldForGenerate();
         lock_guard<recursive_mutex> lockIt(world2->lock);
+        //world2->random.dump();
         world2->generator.run(world2, chunkOrigin);
         lock_guard<recursive_mutex> lockIt2(world->lock);
         world->merge(world2);
@@ -381,6 +382,7 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                     cul.merge(updateList);
                 }
             }
+#if 0
             if(frame % 1 == 0)
             {
                 lock_guard<recursive_mutex> lockIt(world->lock);
@@ -408,6 +410,7 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                     }
                 }
             }
+#endif
             periodic.runAtFPS(20);
             frame++;
         }

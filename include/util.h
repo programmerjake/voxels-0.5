@@ -50,12 +50,12 @@ inline const T limit(const T v, const T minV, const T maxV)
 
 inline int ifloor(float v)
 {
-    return static_cast<int>(floor(v));
+    return floor(v);
 }
 
 inline int iceil(float v)
 {
-    return static_cast<int>(ceil(v));
+    return ceil(v);
 }
 
 template <typename T>

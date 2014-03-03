@@ -153,7 +153,7 @@ struct PositionF : public VectorF
     }
     explicit operator PositionI() const
     {
-        return PositionI(VectorI(x, y, z), d);
+        return PositionI(VectorF(x, y, z), d);
     }
     explicit operator VectorF() const
     {

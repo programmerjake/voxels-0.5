@@ -24,7 +24,7 @@ public:
         {
             for(rpos.z = 0; rpos.z < generateChunkSize.z; rpos.z++)
             {
-                float value = world->random.getFBM2D(PositionF(rpos.x + chunkOrigin.x, 0, rpos.z + chunkOrigin.z, chunkOrigin.d) * 0.05f, VectorF(2), 0.3f, 10,
+                float value = world->random.getFBM2D(PositionF(rpos.x + chunkOrigin.x, 0, rpos.z + chunkOrigin.z, chunkOrigin.d) * 0.05f, VectorF(2), 0.4f, 3,
                                             WorldRandom::RandomClassGround);
                 for(rpos.y = 0; rpos.y < generateChunkSize.y; rpos.y++)
                 {

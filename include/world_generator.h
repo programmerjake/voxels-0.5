@@ -11,6 +11,8 @@
 #include <cmath>
 #include <mutex>
 
+//#define WORLD_RANDOM_USE_CACHING
+
 using namespace std;
 
 class WorldRandom final
@@ -23,9 +25,11 @@ public:
     const uint_fast32_t seed;
 private:
     recursive_mutex & lock;
-    vector<unordered_map<PositionI, uint_fast32_t>> values;
+#ifdef WORLD_RANDOM_USE_CACHING
+    vector<unordered_map<PositionI, uint32_t>> values;
+#endif
     static atomic_uint nextRandomClass;
-    uint_fast32_t internalRandom(PositionI pos, RandomClass rc) const
+    uint32_t internalRandom(PositionI pos, RandomClass rc) const
     {
         uint64_t v = pos.x;
         v *= 65537;
@@ -36,11 +40,12 @@ private:
         v += rc;
         v *= 65537;
         v += seed;
-        for(int i = 0; i < 7; i++)
+        v ^= 0x123456789ABCDEF;
+        for(int i = 0; i < 3; i++)
         {
             v = 1 + v * 6364136223846793005;
         }
-        return (uint_fast32_t)(v >> 32);
+        return (uint32_t)(v >> 32);
     }
 public:
     static RandomClass getNewRandomClass()
@@ -51,19 +56,23 @@ public:
         : seed(seed), lock(lock)
     {
     }
-    uint_fast32_t getRandomU32(PositionI pos, RandomClass rc)
+    uint32_t getRandomU32(PositionI pos, RandomClass rc)
     {
+#ifdef WORLD_RANDOM_USE_CACHING
         lock_guard<recursive_mutex> lockIt(lock);
         assert(rc != RandomClassNull && rc < nextRandomClass);
         if(values.size() < rc)
             values.resize(rc);
-        unordered_map<PositionI, uint_fast32_t> & valuesMap = values[rc - 1];
+        unordered_map<PositionI, uint32_t> & valuesMap = values[rc - 1];
         auto iter = valuesMap.find(pos);
         if(iter != valuesMap.end())
             return get<1>(*iter);
         return valuesMap[pos] = internalRandom(pos, rc);
+#else
+        return internalRandom(pos, rc);
+#endif
     }
-    int_fast32_t getRandomS32(PositionI pos, RandomClass rc)
+    int32_t getRandomS32(PositionI pos, RandomClass rc)
     {
         return getRandomU32(pos, rc);
     }
@@ -73,7 +82,9 @@ public:
     }
     float getRandomFloat(PositionF pos, RandomClass rc)
     {
+#ifdef WORLD_RANDOM_USE_CACHING
         lock_guard<recursive_mutex> lockIt(lock);
+#endif
         PositionI nxnynz(pos);
         float tx = pos.x - floor(pos.x);
         float ty = pos.y - floor(pos.y);
@@ -96,7 +107,9 @@ public:
     }
     float getRandomFloat2D(PositionF pos, RandomClass rc)
     {
+#ifdef WORLD_RANDOM_USE_CACHING
         lock_guard<recursive_mutex> lockIt(lock);
+#endif
         PositionI nxnz(pos);
         float tx = pos.x - floor(pos.x);
         float tz = pos.z - floor(pos.z);
@@ -110,7 +123,9 @@ public:
     }
     float getFBM(PositionF pos, VectorF scale, float factor, int octaves, RandomClass rc)
     {
+#ifdef WORLD_RANDOM_USE_CACHING
         lock_guard<recursive_mutex> lockIt(lock);
+#endif
         float retval = 0, currentFactor = 1;
         for(int i = 0; i < octaves; i++)
         {
@@ -123,7 +138,9 @@ public:
     float getFBM2D(PositionF pos, VectorF scale, float factor, int octaves, RandomClass rc)
     {
         scale.y = 1;
+#ifdef WORLD_RANDOM_USE_CACHING
         lock_guard<recursive_mutex> lockIt(lock);
+#endif
         float retval = 0, currentFactor = 1;
         for(int i = 0; i < octaves; i++)
         {
@@ -132,6 +149,10 @@ public:
             pos *= scale;
         }
         return retval;
+    }
+    void dump()
+    {
+        cout << "RandomWorld : seed = " << seed << endl;
     }
 };
 
