@@ -147,6 +147,11 @@ void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                 origin.z = reader.readS32();
                 origin.d = reader.readDimension();
                 int size = reader.readU32();
+                {
+                    lock_guard<recursive_mutex> lockIt(world->lock);
+                    ChunkPosition cPos(origin);
+                    world->addGenerateChunk((PositionI)cPos);
+                }
                 LockedClient lockIt(client);
                 UpdateList & updateList = getClientUpdateList(client);
                 for(int x = 0; x < size; x++)
@@ -301,6 +306,7 @@ private:
         lock_guard<recursive_mutex> lockIt2(world->lock);
         world->merge(world2);
         world->generatedChunks.add(chunkOrigin);
+        world->generatingChunks.remove(chunkOrigin);
         generated = true;
     }
     thread theThread;
@@ -378,6 +384,7 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
 
                 for(shared_ptr<Client> pclient : *clients)
                 {
+                    LockedClient lockClient(*pclient);
                     UpdateList &cul = getClientUpdateList(*pclient);
                     cul.merge(updateList);
                 }
@@ -411,6 +418,23 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                 }
             }
 #endif
+            for(shared_ptr<ChunkGenerator> & generator : generators)
+            {
+                if(generator != nullptr && generator->inUse())
+                    continue;
+                lock_guard<recursive_mutex> lockIt(world->lock);
+                if(generator == nullptr)
+                    generator = make_shared<ChunkGenerator>(world);
+                UpdateList & needGeneratedChunks = world->needGenerateChunks;
+                UpdateList & generatingChunks = world->generatingChunks;
+                if(needGeneratedChunks.empty())
+                    break;
+                PositionI pos = needGeneratedChunks.updatesList.front();
+                needGeneratedChunks.remove(pos);
+                generatingChunks.add(pos);
+                bool retval = generator->start(pos);
+                assert(retval);
+            }
             periodic.runAtFPS(20);
             frame++;
         }

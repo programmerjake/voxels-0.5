@@ -56,7 +56,17 @@ private:
     }
 public:
     UpdateList generatedChunks;
+    UpdateList generatingChunks;
     UpdateList needGenerateChunks;
+    void addGenerateChunk(PositionI pos)
+    {
+        lock_guard<recursive_mutex> lockIt(lock);
+        if(generatedChunks.updatesSet.find(pos) != generatedChunks.updatesSet.end())
+            return;
+        if(generatingChunks.updatesSet.find(pos) != generatingChunks.updatesSet.end())
+            return;
+        needGenerateChunks.add(pos);
+    }
     static shared_ptr<World> make(uint32_t seed = makeSeed(), const WorldGenerator & generator = WorldGenerator::makeDefault())
     {
         return shared_ptr<World>(new World(seed, generator));
@@ -137,10 +147,6 @@ public:
 
         lock_guard<recursive_mutex> lock(world()->lock);
         VectorI rPos = (VectorI)pos - (VectorI)(PositionI)chunk->pos;
-        if(!chunk->blocks[rPos.x][rPos.y][rPos.z].good())
-        {
-            world()->needGenerateChunks.add(PositionI(pos.x & WorldGeneratorPart::generateChunkSizeFloorMask.x, pos.y & WorldGeneratorPart::generateChunkSizeFloorMask.y, pos.z & WorldGeneratorPart::generateChunkSizeFloorMask.z, pos.d));
-        }
         return chunk->blocks[rPos.x][rPos.y][rPos.z];
     }
     void set(BlockData newBlock)

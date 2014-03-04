@@ -298,7 +298,7 @@ struct PositionF : public VectorF
 struct UpdateList // in here because of include issues : should be in util.h
 {
     unordered_set<PositionI> updatesSet;
-    vector<PositionI> updatesList;
+    list<PositionI> updatesList;
     void add(PositionI pos)
     {
         if(get<1>(updatesSet.insert(pos)))
@@ -317,6 +317,26 @@ struct UpdateList // in here because of include issues : should be in util.h
         {
             add(pos);
         }
+    }
+    void remove(PositionI pos)
+    {
+        if(updatesSet.erase(pos) > 0)
+        {
+            for(auto i = updatesList.begin(); i != updatesList.end();)
+            {
+                if(*i == pos)
+                {
+                    i = updatesList.erase(i);
+                    break;
+                }
+                else
+                    i++;
+            }
+        }
+    }
+    bool empty() const
+    {
+        return updatesList.empty();
     }
 };
 

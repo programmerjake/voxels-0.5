@@ -250,7 +250,7 @@ void updateVelocity(ClientState * state)
 {
     lock_guard<recursive_mutex> lockIt(state->lock);
     state->velocity = VectorF(0, state->velocity.y, 0);
-    const float speed = 2;
+    const float speed = 5;
     VectorF forwardVector = Matrix::rotateY(state->theta).invert().apply(VectorF(0, 0, -1)) * speed;
     VectorF leftVector = Matrix::rotateY(state->theta).invert().apply(VectorF(-1, 0, 0)) * speed;
     if(state->backwardDown)
