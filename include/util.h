@@ -59,6 +59,16 @@ inline int iceil(float v)
 }
 
 template <typename T>
+inline int sgn(T v)
+{
+    if(v < 0)
+        return -1;
+    if(v > 0)
+        return 1;
+    return 0;
+}
+
+template <typename T>
 inline const T interpolate(const float t, const T a, const T b)
 {
     return a + t * (b - a);

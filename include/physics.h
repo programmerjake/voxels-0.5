@@ -3,6 +3,7 @@
 
 #include "position.h"
 #include "util.h"
+#include "ray_casting.h"
 #include <memory>
 
 using namespace std;
@@ -56,7 +57,7 @@ public:
         : d(dimension), props(properties)
     {
     }
-    virtual PhysicsCollision collide(shared_ptr<const PhysicsObject> pother) const = 0;
+    virtual PhysicsCollision collide(shared_ptr<const PhysicsObject> pother, float maxTime) const = 0;
     enum final Type
     {
         Box
@@ -70,11 +71,12 @@ private:
     VectorF center, extents;
     VectorF velocity;
 public:
-    PhysicsBox(VectorF center, VectorF extents, Dimension dimension, PhysicsProperties properties)
+    PhysicsBox(VectorF center, VectorF extents/** size is 2 * extents */, Dimension dimension, PhysicsProperties properties)
         : PhysicsObject(dimension, properties), center(center), extents(extents)
     {
+        assert(extents.x > eps && extents.y > eps && extents.z > eps);
     }
-    virtual PhysicsCollision collide(shared_ptr<const PhysicsObject> pother) const override
+    virtual PhysicsCollision collide(shared_ptr<const PhysicsObject> pother, float maxTime) const override
     {
         if(movable == false)
             return PhysicsCollision();
@@ -93,19 +95,78 @@ public:
             VectorF otherMax = other.center + other.extents;
             if(min.x < otherMax.x && min.y < otherMax.y && min.z < otherMax.z && max.x > otherMin.x && max.y > otherMin.y && max.z > otherMin.z) // intersects now
             {
-                VectorF newVelocity = VectorF(0);
-                VectorF newPosition;
-                if(other.movable)
+                VectorF newVelocity = (velocity * properties().mass + other.velocity * other.properties().mass) / (properties().mass + other.properties().mass);
+                VectorF deltaCenter = center - other.center;
+                VectorF deltaFixedPosition;
+                if(deltaCenter.x > 0)
                 {
-                    newVelocity = (velocity * mass + other.velocity * other.mass) / (mass + other.mass);
-                    VectorF newPosition
+                    deltaFixedPosition.x = otherMax.x - min.x;
                 }
                 else
                 {
-                    #error finish fn and converting to use PhysicsProperties
+                    deltaFixedPosition.x = otherMin.x - max.x;
                 }
+                if(deltaCenter.y > 0)
+                {
+                    deltaFixedPosition.y = otherMax.y - min.y;
+                }
+                else
+                {
+                    deltaFixedPosition.y = otherMin.y - max.y;
+                }
+                if(deltaCenter.z > 0)
+                {
+                    deltaFixedPosition.z = otherMax.z - min.z;
+                }
+                else
+                {
+                    deltaFixedPosition.z = otherMin.z - max.z;
+                }
+                VectorF fixedPosition = center;
+                if(abs(deltaCenter.x) > abs(deltaCenter.y))
+                {
+                    if(abs(deltaCenter.x) > abs(deltaCenter.z))
+                    {
+                        fixedPosition.x += deltaFixedPosition.x;
+                    }
+                    else
+                    {
+                        fixedPosition.z += deltaFixedPosition.z;
+                    }
+                }
+                else if(abs(deltaCenter.y) > abs(deltaCenter.z))
+                {
+                    fixedPosition.y += deltaFixedPosition.y;
+                }
+                else
+                {
+                    fixedPosition.z += deltaFixedPosition.z;
+                }
+                VectorF newPosition = (center * properties().mass + fixedPosition * other.properties().mass) / (properties().mass + other.properties().mass);
+                return PhysicsCollision(newPosition, newVelocity, 0);
             }
-            float xn =
+            VectorF deltaCenter = center - other.center;
+            Ray ray(velocity - other.velocity, PositionF(center, dimension()));
+            if(!ray.good())
+                return PhysicsCollision();
+            BoxRayCollision brc = rayHitBox(other.center - extents - other.extents, other.center + extents + other.extents, ray);
+            if(!brc.good())
+                return PhysicsCollision();
+            float collisionTime = brc.t;
+            VectorF collisionNormal = VectorF(dx(brc.enterFace), dy(brc.enterFace), dz(brc.enterFace));
+            if(collisionTime > maxTime)
+                return PhysicsCollision();
+            VectorF nonReflectedVelocity = (velocity * properties().mass + other.velocity * other.properties().mass) / (properties().mass + other.properties().mass);
+            VectorF reflectedVelocity = (velocity * (properties().mass - other.properties().mass) + (other.properties().mass + other.properties().mass) * other.velocity) / (properties().mass + other.properties().mass);
+            VectorF partiallyReflectedVelocity = nonReflectedVelocity + properties().bounciness * other.properties().bounciness * (reflectedVelocity - nonReflectedVelocity);
+            float reflectedDot = dot(partiallyReflectedVelocity, collisionNormal);
+            VectorF frictionlessVelocity = velocity;
+            VectorF stuckVelocity = nonReflectedVelocity;
+            VectorF newVelocity = stuckVelocity + properties().friction * other.properties().friction * (frictionlessVelocity - stuckVelocity);
+            newVelocity -= collisionNormal * dot(newVelocity, collisionNormal);
+            newVelocity += collisionNormal * reflectedDot;
+            VectorF newPosition = velocity * collisionTime + center;
+            return PhysicsCollision(newPosition, newVelocity, collisionTime);
         }
         }
         assert(false);
