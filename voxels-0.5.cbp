@@ -70,6 +70,7 @@
 		<Unit filename="include/mesh.h" />
 		<Unit filename="include/network.h" />
 		<Unit filename="include/network_protocol.h" />
+		<Unit filename="include/physics.h" />
 		<Unit filename="include/platform.h" />
 		<Unit filename="include/png_decoder.h" />
 		<Unit filename="include/position.h" />
