@@ -324,7 +324,8 @@ public:
     WoodPressurePlateFace,
     WoodPressurePlateSide,
     WoodShovel,
-    Wool;
+    Wool,
+    Selection;
 };
 
 #endif // TEXTURE_ATLAS_H_INCLUDED

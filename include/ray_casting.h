@@ -93,6 +93,23 @@ inline BoxRayCollision rayHitBox(VectorF min, VectorF max, Ray ray)
         retval.t = t.z;
         retval.enterFace = (ray.direction.z > 0) ? BlockFace::NZ : BlockFace::PZ;
     }
+    else if(ray.position.x > min.x && ray.position.x < max.x && ray.position.y > min.y && ray.position.y < max.y && ray.position.z > min.z && ray.position.z < max.z) // inside box
+    {
+        t = (collidePlane - (VectorF)ray.position) / ray.direction;
+        retval.t = eps;
+        if(t.x > t.z && t.x > t.y)
+        {
+            retval.enterFace = (ray.direction.x > 0) ? BlockFace::NX : BlockFace::PX;
+        }
+        else if(t.y > t.z)
+        {
+            retval.enterFace = (ray.direction.y > 0) ? BlockFace::NY : BlockFace::PY;
+        }
+        else
+        {
+            retval.enterFace = (ray.direction.z > 0) ? BlockFace::NZ : BlockFace::PZ;
+        }
+    }
     else
         return BoxRayCollision();
     collidePlane = min;

@@ -30,7 +30,7 @@ shared_ptr<RenderObjectBlockMesh> AirBlock::makeBlockMesh()
 {
     RenderObjectBlockClass airClass = getRenderObjectBlockClass();
     //cout << "Air Class : " << airClass << endl;
-    return make_shared<RenderObjectBlockMesh>(airClass,
+    return make_shared<RenderObjectBlockMesh>(airClass, VectorF(0), VectorF(0),
             LightProperties(LightPropertiesType::Transparent, 0), Mesh(new Mesh_t), Mesh(new Mesh_t),
             Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), false,
             false, false, false, false, false, RenderLayer::Opaque);
@@ -40,7 +40,7 @@ shared_ptr<RenderObjectBlockMesh> GlassBlock::makeBlockMesh()
 {
     RenderObjectBlockClass glassClass = getRenderObjectBlockClass();
     //cout << "Glass Class : " << airClass << endl;
-    return make_shared<RenderObjectBlockMesh>(glassClass,
+    return make_shared<RenderObjectBlockMesh>(glassClass, VectorF(0), VectorF(1),
             LightProperties(LightPropertiesType::Transparent, 0), Mesh(new Mesh_t),
             Generate::unitBox(TextureAtlas::Glass.td(), TextureDescriptor(), TextureDescriptor(),
                               TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),

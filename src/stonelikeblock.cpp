@@ -25,7 +25,7 @@ shared_ptr<RenderObjectBlockMesh> StoneLikeBlock::getBlockMesh(BlockIterator ) c
 
 shared_ptr<RenderObjectBlockMesh> StoneLikeBlock::internalMakeBlockMesh() const
 {
-    return make_shared<RenderObjectBlockMesh>(getStoneClass(), LightProperties(LightPropertiesType::Opaque, 0), Mesh(new Mesh_t),
+    return make_shared<RenderObjectBlockMesh>(getStoneClass(), VectorF(0), VectorF(1), LightProperties(LightPropertiesType::Opaque, 0), Mesh(new Mesh_t),
                 Generate::unitBox(getFaceTexture(BlockFace::NX), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
                 Generate::unitBox(TextureDescriptor(), getFaceTexture(BlockFace::PX), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),
                 Generate::unitBox(TextureDescriptor(), TextureDescriptor(), getFaceTexture(BlockFace::NY), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()),

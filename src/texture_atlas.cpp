@@ -301,4 +301,5 @@ TextureAtlas::ActivatorRailOff(0, 0, 16, 16),
              TextureAtlas::WoodPressurePlateFace(256, 112, 16, 16),
              TextureAtlas::WoodPressurePlateSide(272, 82, 16, 2),
              TextureAtlas::WoodShovel(272, 112, 16, 16),
-             TextureAtlas::Wool(288, 112, 16, 16);
+             TextureAtlas::Wool(288, 112, 16, 16),
+             TextureAtlas::Selection(288, 224, 32, 32);

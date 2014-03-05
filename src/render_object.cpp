@@ -40,7 +40,14 @@ shared_ptr<RenderObjectBlockMesh> RenderObjectBlockMesh::read(Reader &reader, Cl
     bool pyBlocked = blockedMask & (1 << (int)BlockFace::PY);
     bool nzBlocked = blockedMask & (1 << (int)BlockFace::NZ);
     bool pzBlocked = blockedMask & (1 << (int)BlockFace::PZ);
-    retval = shared_ptr<RenderObjectBlockMesh>(new RenderObjectBlockMesh(blockClass, lightProperties, center, nx, px, ny, py, nz, pz, nxBlocked, pxBlocked, nyBlocked, pyBlocked, nzBlocked, pzBlocked, rl));
+    VectorF hitBoxMin, hitBoxMax;
+    hitBoxMin.x = reader.readLimitedF32(0, 1);
+    hitBoxMin.y = reader.readLimitedF32(0, 1);
+    hitBoxMin.z = reader.readLimitedF32(0, 1);
+    hitBoxMax.x = reader.readLimitedF32(0, 1);
+    hitBoxMax.y = reader.readLimitedF32(0, 1);
+    hitBoxMax.z = reader.readLimitedF32(0, 1);
+    retval = shared_ptr<RenderObjectBlockMesh>(new RenderObjectBlockMesh(blockClass, hitBoxMin, hitBoxMax, lightProperties, center, nx, px, ny, py, nz, pz, nxBlocked, pxBlocked, nyBlocked, pyBlocked, nzBlocked, pzBlocked, rl));
     client.setPtr(retval, id, Client::DataType::RenderObjectBlockMesh);
     DUMP_V(RenderObjectBlockMesh::read, "read new block");
     return retval;
@@ -114,6 +121,12 @@ void RenderObjectBlockMesh::write(Writer &writer, Client &client)
         blockedMask |= 1 << (int)BlockFace::PZ;
     }
     writer.writeU8(blockedMask);
+    writer.writeF32(hitBoxMin.x);
+    writer.writeF32(hitBoxMin.y);
+    writer.writeF32(hitBoxMin.z);
+    writer.writeF32(hitBoxMax.x);
+    writer.writeF32(hitBoxMax.y);
+    writer.writeF32(hitBoxMax.z);
 }
 
 shared_ptr<RenderObject> RenderObject::read(Reader &reader, Client &client)

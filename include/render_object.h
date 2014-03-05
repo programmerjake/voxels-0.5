@@ -52,7 +52,7 @@ public:
     static shared_ptr<RenderObject> read(Reader &reader, Client &client);
     virtual bool operator ==(const RenderObject &rt) const = 0;
     virtual void render(Mesh dest, RenderLayer rl, Dimension d, Client &client) = 0;
-    virtual bool rayHits(Ray ray) = 0;
+    virtual BoxRayCollision rayHits(Ray ray) = 0;
 };
 
 #if 0 //TODO(jacob#):finish
@@ -72,7 +72,7 @@ class RenderObjectEntity final : public RenderObject
 class RenderObjectBlock;
 class RenderObjectBlockMesh;
 
-struct RenderObjectWorld final
+struct RenderObjectWorld final : public enable_shared_from_this<RenderObjectWorld>
 {
     Client & client;
     UpdateList lightingUpdates;
@@ -370,6 +370,7 @@ struct RenderObjectWorld final
         client.setPtr(retval, worldId, Client::DataType::RenderObjectWorld);
         return retval;
     }
+    BlockIterator getFirstHitBlock(Ray ray, float maxT);
 };
 
 typedef uint16_t RenderObjectBlockClass;
@@ -414,15 +415,17 @@ public:
         RenderObjectWorld::BlockIterator bi(world, pos);
         render(dest, rl, bi);
     }
-    RenderObjectBlockMesh(RenderObjectBlockClass blockClass, LightProperties lightProperties, Mesh center, Mesh nx, Mesh px, Mesh ny, Mesh py, Mesh nz, Mesh pz, bool nxBlocked, bool pxBlocked, bool nyBlocked, bool pyBlocked, bool nzBlocked, bool pzBlocked, RenderLayer rl)
-        : blockClass(blockClass), center(center), nx(nx), px(px), ny(ny), py(py), nz(nz), pz(pz), nxBlocked(nxBlocked), pxBlocked(pxBlocked), nyBlocked(nyBlocked), pyBlocked(pyBlocked), nzBlocked(nzBlocked), pzBlocked(pzBlocked), lightProperties(lightProperties), rl(rl)
+    RenderObjectBlockMesh(RenderObjectBlockClass blockClass, VectorF hitBoxMin, hitBoxMax, LightProperties lightProperties, Mesh center, Mesh nx, Mesh px, Mesh ny, Mesh py, Mesh nz, Mesh pz, bool nxBlocked, bool pxBlocked, bool nyBlocked, bool pyBlocked, bool nzBlocked, bool pzBlocked, RenderLayer rl)
+        : blockClass(blockClass), center(center), nx(nx), px(px), ny(ny), py(py), nz(nz), pz(pz), hitBoxMin(hitBoxMin), hitBoxMax(hitBoxMax), nxBlocked(nxBlocked), pxBlocked(pxBlocked), nyBlocked(nyBlocked), pyBlocked(pyBlocked), nzBlocked(nzBlocked), pzBlocked(pzBlocked), lightProperties(lightProperties), rl(rl)
     {
     }
     static shared_ptr<RenderObjectBlockMesh> read(Reader &reader, Client &client);
     void write(Writer &writer, Client &client);
-    bool rayHits(Ray ray, PositionI pos)
+    BoxRayCollision rayHits(Ray ray, PositionI pos)
     {
-        assert(false);//#error finish
+        if(ray.position.d != pos.d || hitBoxMin == hitBoxMax)
+            return BoxRayCollision();
+        return rayHitBox(hitBoxMin + (VectorI)pos, hitBoxMax + (VectorI)pos, ray);
     }
 };
 
@@ -476,10 +479,10 @@ public:
         RenderObjectWorld::BlockIterator bi(world, pos);
         bi.setMesh(block);
     }
-    virtual bool rayHits(Ray ray) override
+    virtual BoxRayCollision rayHits(Ray ray) override
     {
         if(ray.position.d != pos.d)
-            return false;
+            return BoxRayCollision();
         return block->rayHits(ray, pos);
     }
 };
@@ -511,6 +514,13 @@ inline void RenderObjectBlockMesh::render(Mesh dest, RenderLayer rl, RenderObjec
     if(pzMesh != nullptr && !pzMesh->nzBlocked && pzMesh->blockClass != blockClass)
         dest->add(transform(tform, pz));
     dest->add(transform(tform, center));
+}
+
+inline shared_ptr<PositionI> RenderObjectWorld::getFirstHitBlock(Ray ray, float maxT)
+{
+    PositionI retval = (PositionI)ray.position;
+    BlockIterator bi(shared_from_this(), retval);
+
 }
 
 #endif // RENDER_OBJECT_H_INCLUDED

@@ -371,7 +371,9 @@ public:
 
 Mesh makeSelectBoxMesh()
 {
-    Mesh retval = Generate::unitBox(TextureAtlas::)
+    Mesh retval = Generate::unitBox(TextureAtlas::Selection.td(), TextureAtlas::Selection.td(), TextureAtlas::Selection.td(), TextureAtlas::Selection.td(), TextureAtlas::Selection.td(), TextureAtlas::Selection.td());
+    retval.add(invert(retval));
+    return retval;
 }
 }
 
