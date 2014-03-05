@@ -6,6 +6,7 @@
 #include "text.h"
 #include "world.h"
 #include "compressed_stream.h"
+#include "texture_atlas.h"
 #include <thread>
 #include <iostream>
 #include <sstream>
@@ -367,6 +368,11 @@ public:
         return false; // so that the program will actually quit
     }
 };
+
+Mesh makeSelectBoxMesh()
+{
+    Mesh retval = Generate::unitBox(TextureAtlas::)
+}
 }
 
 using namespace ClientImplementation;
@@ -374,6 +380,7 @@ using namespace ClientImplementation;
 void clientProcess(StreamRW & streamRW)
 {
     startGraphics();
+    Mesh selectBoxMesh = makeSelectBoxMesh();
     shared_ptr<Reader> preader = streamRW.preader();
     shared_ptr<Writer> pwriter = streamRW.pwriter();
     //preader = shared_ptr<Reader>(new ExpandReader(preader));
