@@ -60,6 +60,7 @@
 		<Unit filename="include/color.h" />
 		<Unit filename="include/compressed_stream.h" />
 		<Unit filename="include/dimension.h" />
+		<Unit filename="include/entity.h" />
 		<Unit filename="include/event.h" />
 		<Unit filename="include/game_stream.h" />
 		<Unit filename="include/game_version.h" />

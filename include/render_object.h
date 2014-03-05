@@ -8,6 +8,7 @@
 #include "client.h"
 #include "block_face.h"
 #include "light.h"
+#include "ray_casting.h"
 #include <atomic>
 #include <unordered_map>
 #include <unordered_set>
@@ -51,6 +52,19 @@ public:
     static shared_ptr<RenderObject> read(Reader &reader, Client &client);
     virtual bool operator ==(const RenderObject &rt) const = 0;
     virtual void render(Mesh dest, RenderLayer rl, Dimension d, Client &client) = 0;
+    virtual bool rayHits(Ray ray) = 0;
+};
+
+class RenderObjectEntityMesh final : public enable_shared_from_this<RenderObjectEntityMesh>
+{
+private:
+    Mesh mesh;
+    shared_ptr<RenderObjectWorld> world;
+};
+
+class RenderObjectEntity final : public RenderObject
+{
+
 };
 
 class RenderObjectBlock;
@@ -403,6 +417,10 @@ public:
     }
     static shared_ptr<RenderObjectBlockMesh> read(Reader &reader, Client &client);
     void write(Writer &writer, Client &client);
+    bool rayHits(Ray ray, PositionI pos)
+    {
+    #error finish
+    }
 };
 
 class RenderObjectBlock final : public RenderObject
@@ -454,6 +472,12 @@ public:
         shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
         RenderObjectWorld::BlockIterator bi(world, pos);
         bi.setMesh(block);
+    }
+    virtual bool rayHits(Ray ray) override
+    {
+        if(ray.position.d != pos.d)
+            return false;
+        return block->rayHits(ray, pos);
     }
 };
 
