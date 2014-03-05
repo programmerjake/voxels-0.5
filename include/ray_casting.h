@@ -10,7 +10,7 @@ struct Ray final
     VectorF direction;
     PositionF position;
     Ray()
-        : direction(0), position(0)
+        : direction(0), position(VectorF(0), Dimension::Overworld)
     {
     }
     Ray(VectorF direction, PositionF position)
@@ -33,11 +33,11 @@ struct BoxRayCollision final
         return t >= eps;
     }
     BoxRayCollision()
-        : t(-1), face(BlockFace::NX)
+        : t(-1), enterFace(BlockFace::NX), exitFace(BlockFace::PX)
     {
     }
-    BoxRayCollision(float t, BlockFace face)
-        : t(t), face(face)
+    BoxRayCollision(float t, BlockFace enterFace, BlockFace exitFace)
+        : t(t), enterFace(enterFace), exitFace(exitFace)
     {
     }
 };
@@ -61,19 +61,19 @@ inline BoxRayCollision rayHitBox(VectorF min, VectorF max, Ray ray)
     VectorF t = (collidePlane - (VectorF)ray.position) / ray.direction;
     if(t.x >= eps)
     {
-        Vector p = ray.direction * t.x + (VectorF)ray.position;
+        VectorF p = ray.direction * t.x + (VectorF)ray.position;
         if(p.y < min.y || p.y > max.y || p.z < min.z || p.z > max.z)
             t.x = -1;
     }
     if(t.y >= eps)
     {
-        Vector p = ray.direction * t.y + (VectorF)ray.position;
+        VectorF p = ray.direction * t.y + (VectorF)ray.position;
         if(p.x < min.x || p.x > max.x || p.z < min.z || p.z > max.z)
             t.y = -1;
     }
     if(t.z >= eps)
     {
-        Vector p = ray.direction * t.z + (VectorF)ray.position;
+        VectorF p = ray.direction * t.z + (VectorF)ray.position;
         if(p.x < min.x || p.x > max.x || p.y < min.y || p.y > max.y)
             t.z = -1;
     }
@@ -102,7 +102,7 @@ inline BoxRayCollision rayHitBox(VectorF min, VectorF max, Ray ray)
         collidePlane.y = max.y;
     if(ray.direction.z > 0)
         collidePlane.z = max.z;
-    VectorF t = (collidePlane - (VectorF)ray.position) / ray.direction;
+    t = (collidePlane - (VectorF)ray.position) / ray.direction;
     if(t.x < t.y && t.x < t.z)
     {
         retval.exitFace = (ray.direction.x > 0) ? BlockFace::PX : BlockFace::NX;

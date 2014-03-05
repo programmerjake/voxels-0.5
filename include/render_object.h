@@ -55,6 +55,7 @@ public:
     virtual bool rayHits(Ray ray) = 0;
 };
 
+#if 0 //TODO(jacob#):finish
 class RenderObjectEntityMesh final : public enable_shared_from_this<RenderObjectEntityMesh>
 {
 private:
@@ -66,6 +67,7 @@ class RenderObjectEntity final : public RenderObject
 {
 
 };
+#endif
 
 class RenderObjectBlock;
 class RenderObjectBlockMesh;
@@ -395,6 +397,7 @@ public:
 private:
     Mesh center, nx, px, ny, py, nz, pz;
     shared_ptr<RenderObjectWorld> world;
+    VectorF hitBoxMin, hitBoxMax;
 public:
     const bool nxBlocked, pxBlocked, nyBlocked, pyBlocked, nzBlocked, pzBlocked;
     const LightProperties lightProperties;
@@ -419,7 +422,7 @@ public:
     void write(Writer &writer, Client &client);
     bool rayHits(Ray ray, PositionI pos)
     {
-    #error finish
+        assert(false);//#error finish
     }
 };
 

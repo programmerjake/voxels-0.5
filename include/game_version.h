@@ -10,6 +10,7 @@ namespace GameVersion
 {
     extern const wstring VERSION;
     extern const uint32_t FILE_VERSION;
+    constexpr uint32_t NETWORK_VERSION = 0;
     constexpr uint16_t port = 12345;
 #ifdef DEBUG_VERSION
     const bool DEBUG = true;

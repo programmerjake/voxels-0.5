@@ -45,8 +45,6 @@ NetworkConnection::NetworkConnection(wstring url, uint16_t port)
         {
             continue;
         }
-        int flag = 1;
-        setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (const void *)&flag, sizeof(flag));
         if(-1 != connect(fd, addr->ai_addr, addr->ai_addrlen))
         {
             break;
@@ -63,6 +61,9 @@ NetworkConnection::NetworkConnection(wstring url, uint16_t port)
         freeaddrinfo(addrList);
         throw NetworkException(msg);
     }
+
+    int flag = 1;
+    setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (const void *)&flag, sizeof(flag));
 
     freeaddrinfo(addrList);
     readerInternal = unique_ptr<Reader>(new FileReader(fdopen(dup(fd), "r")));

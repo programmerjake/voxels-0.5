@@ -37,7 +37,7 @@ struct ClientState
         pos = PositionF(0.5, AverageGroundHeight + 5.5, 0.5, Dimension::Overworld);
         velocity = VectorF(0);
         theta = phi = dtheta = dphi = 0;
-        renderDistance = 30;
+        renderDistance = 60;
         needMeshes = true;
         done = false;
         paused = GameVersion::DEBUG;
