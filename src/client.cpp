@@ -17,6 +17,8 @@ using namespace std;
 
 atomic_uint_fast64_t Client::nextId(1);
 
+const float clientReachDistance = 6.0f; //FIXME(jacob#): replace with actual calculation
+
 struct ClientState
 {
     float theta, phi;
@@ -369,11 +371,11 @@ public:
     }
 };
 
-Mesh makeSelectBoxMesh()
+TransformedMesh makeSelectBoxMesh()
 {
     Mesh retval = Generate::unitBox(TextureAtlas::Selection.td(), TextureAtlas::Selection.td(), TextureAtlas::Selection.td(), TextureAtlas::Selection.td(), TextureAtlas::Selection.td(), TextureAtlas::Selection.td());
-    retval.add(invert(retval));
-    return retval;
+    retval->add(invert(retval));
+    return transform(Matrix::translate(VectorF(-0.5f)).concat(Matrix::scale(1.05)).concat(Matrix::translate(VectorF(0.5f))), retval);
 }
 }
 
@@ -382,7 +384,7 @@ using namespace ClientImplementation;
 void clientProcess(StreamRW & streamRW)
 {
     startGraphics();
-    Mesh selectBoxMesh = makeSelectBoxMesh();
+    TransformedMesh selectBoxMesh = makeSelectBoxMesh();
     shared_ptr<Reader> preader = streamRW.preader();
     shared_ptr<Writer> pwriter = streamRW.pwriter();
     //preader = shared_ptr<Reader>(new ExpandReader(preader));
@@ -419,6 +421,7 @@ void clientProcess(StreamRW & streamRW)
         {
             tempMeshes[(int)rl] = meshes[(int)rl];
         }
+        shared_ptr<PositionI> rayHitPos = RenderObjectWorld::getWorld(clientState.client)->getFirstHitBlock(Ray(tform.invert().applyToNormal(VectorF(0, 0, -1)), clientState.pos), clientReachDistance);
         clientState.lock.unlock();
         int polyCount = 0;
         for(RenderLayer rl = (RenderLayer)0; rl < RenderLayer::Last; rl = (RenderLayer)((int)rl + 1))
@@ -428,6 +431,10 @@ void clientProcess(StreamRW & streamRW)
             polyCount += mesh->size();
             renderLayerSetup(rl);
             r << transform(tform, mesh);
+            if(rl == RenderLayer::Opaque && rayHitPos != nullptr)
+            {
+                r << transform(Matrix::translate((VectorI)*rayHitPos).concat(tform), selectBoxMesh);
+            }
         }
         renderLayerSetup(RenderLayer::Last);
         Display::initOverlay();

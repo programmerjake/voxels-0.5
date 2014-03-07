@@ -370,7 +370,7 @@ struct RenderObjectWorld final : public enable_shared_from_this<RenderObjectWorl
         client.setPtr(retval, worldId, Client::DataType::RenderObjectWorld);
         return retval;
     }
-    BlockIterator getFirstHitBlock(Ray ray, float maxT);
+    shared_ptr<PositionI> getFirstHitBlock(Ray ray, float maxT);
 };
 
 typedef uint16_t RenderObjectBlockClass;
@@ -415,7 +415,7 @@ public:
         RenderObjectWorld::BlockIterator bi(world, pos);
         render(dest, rl, bi);
     }
-    RenderObjectBlockMesh(RenderObjectBlockClass blockClass, VectorF hitBoxMin, hitBoxMax, LightProperties lightProperties, Mesh center, Mesh nx, Mesh px, Mesh ny, Mesh py, Mesh nz, Mesh pz, bool nxBlocked, bool pxBlocked, bool nyBlocked, bool pyBlocked, bool nzBlocked, bool pzBlocked, RenderLayer rl)
+    RenderObjectBlockMesh(RenderObjectBlockClass blockClass, VectorF hitBoxMin, VectorF hitBoxMax, LightProperties lightProperties, Mesh center, Mesh nx, Mesh px, Mesh ny, Mesh py, Mesh nz, Mesh pz, bool nxBlocked, bool pxBlocked, bool nyBlocked, bool pyBlocked, bool nzBlocked, bool pzBlocked, RenderLayer rl)
         : blockClass(blockClass), center(center), nx(nx), px(px), ny(ny), py(py), nz(nz), pz(pz), hitBoxMin(hitBoxMin), hitBoxMax(hitBoxMax), nxBlocked(nxBlocked), pxBlocked(pxBlocked), nyBlocked(nyBlocked), pyBlocked(pyBlocked), nzBlocked(nzBlocked), pzBlocked(pzBlocked), lightProperties(lightProperties), rl(rl)
     {
     }
@@ -423,7 +423,7 @@ public:
     void write(Writer &writer, Client &client);
     BoxRayCollision rayHits(Ray ray, PositionI pos)
     {
-        if(ray.position.d != pos.d || hitBoxMin == hitBoxMax)
+        if(ray.position.d != pos.d || hitBoxMin.x >= hitBoxMax.x || hitBoxMin.y >= hitBoxMax.y || hitBoxMin.z >= hitBoxMax.z)
             return BoxRayCollision();
         return rayHitBox(hitBoxMin + (VectorI)pos, hitBoxMax + (VectorI)pos, ray);
     }
@@ -520,7 +520,130 @@ inline shared_ptr<PositionI> RenderObjectWorld::getFirstHitBlock(Ray ray, float 
 {
     PositionI retval = (PositionI)ray.position;
     BlockIterator bi(shared_from_this(), retval);
-
+    if(bi.getMesh() != nullptr)
+    {
+        BoxRayCollision brc = bi.getMesh()->rayHits(ray, retval);
+        if(brc.good() && brc.t <= maxT)
+        {
+            return make_shared<PositionI>(retval);
+        }
+    }
+    else
+        return nullptr;
+    bool useX = (abs(ray.direction.x) >= eps);
+    bool useY = (abs(ray.direction.y) >= eps);
+    bool useZ = (abs(ray.direction.z) >= eps);
+    assert(useX || useY || useZ);
+    VectorF invDir = VectorF(0);
+    VectorF next, step;
+    PositionF currentPos = ray.position;
+    VectorI dest, delta;
+    if(useX)
+    {
+        invDir.x = 1 / ray.direction.x;
+        step.x = abs(invDir.x);
+        int target;
+        if(ray.direction.x < 0)
+        {
+            target = iceil(currentPos.x) - 1;
+            delta.x = -1;
+        }
+        else
+        {
+            delta.x = 1;
+            target = ifloor(currentPos.x) + 1;
+        }
+        dest.x = target;
+        if(ray.direction.x < 0)
+            dest.x--;
+        next.x = (target - ray.position.x) * invDir.x;
+    }
+    if(useY)
+    {
+        invDir.y = 1 / ray.direction.y;
+        step.y = fabs(invDir.y);
+        int target;
+        if(ray.direction.y < 0)
+        {
+            target = iceil(currentPos.y) - 1;
+            delta.y = -1;
+        }
+        else
+        {
+            delta.y = 1;
+            target = ifloor(currentPos.y) + 1;
+        }
+        dest.y = target;
+        if(ray.direction.y < 0)
+            dest.y--;
+        next.y = (target - ray.position.y) * invDir.y;
+    }
+    if(useZ)
+    {
+        invDir.z = 1 / ray.direction.z;
+        step.z = fabs(invDir.z);
+        int target;
+        if(ray.direction.z < 0)
+        {
+            target = iceil(currentPos.z) - 1;
+            delta.z = -1;
+        }
+        else
+        {
+            delta.z = 1;
+            target = ifloor(currentPos.z) + 1;
+        }
+        dest.z = target;
+        if(ray.direction.z < 0)
+            dest.z--;
+        next.z = (target - ray.position.z) * invDir.z;
+    }
+    while(true)
+    {
+        float t;
+        if(useX && (!useY || next.x < next.y) && (!useZ || next.x < next.z))
+        {
+            t = next.x;
+            next.x += step.x;
+            if(delta.x > 0)
+                bi.movePX();
+            else
+                bi.moveNX();
+            dest.x += delta.x;
+        }
+        else if(useY && (!useZ || next.y < next.z))
+        {
+            t = next.y;
+            next.y += step.y;
+            if(delta.y > 0)
+                bi.movePY();
+            else
+                bi.moveNY();
+            dest.y += delta.y;
+        }
+        else // if(useZ) // useZ must be true
+        {
+            t = next.z;
+            next.z += step.z;
+            if(delta.z > 0)
+                bi.movePZ();
+            else
+                bi.moveNZ();
+            dest.z += delta.z;
+        }
+        if(t > maxT)
+            return nullptr;
+        if(bi.getMesh() != nullptr)
+        {
+            BoxRayCollision brc = bi.getMesh()->rayHits(ray, retval);
+            if(brc.good() && brc.t <= maxT)
+            {
+                return make_shared<PositionI>(bi.getPosition());
+            }
+        }
+        else
+            return nullptr;
+    }
 }
 
 #endif // RENDER_OBJECT_H_INCLUDED

@@ -19,7 +19,7 @@ struct Ray final
     }
     bool good() const
     {
-        return abs(direction.x) >= eps && abs(direction.y) >= 0 && abs(direction.z) >= 0;
+        return abs(direction.x) >= eps || abs(direction.y) >= eps || abs(direction.z) >= eps;
     }
 };
 
