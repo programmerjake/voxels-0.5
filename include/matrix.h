@@ -142,7 +142,7 @@ public:
             {
             case 0:
                 this->x30 = value;
-                return
+                return;
             case 1:
                 this->x31 = value;
                 return;
@@ -441,6 +441,32 @@ public:
 inline VectorF transform(const Matrix & m, VectorF v)
 {
     return m.apply(v);
+}
+
+inline bool operator ==(const Matrix & a, const Matrix & b)
+{
+    for(int y = 0; y < 4; y++)
+    {
+        for(int x = 0; x < 4; x++)
+        {
+            if(a.get(x, y) != b.get(x, y))
+                return false;
+        }
+    }
+    return true;
+}
+
+inline bool operator !=(const Matrix & a, const Matrix & b)
+{
+    for(int y = 0; y < 4; y++)
+    {
+        for(int x = 0; x < 4; x++)
+        {
+            if(a.get(x, y) != b.get(x, y))
+                return true;
+        }
+    }
+    return false;
 }
 
 #endif // MATRIX_H

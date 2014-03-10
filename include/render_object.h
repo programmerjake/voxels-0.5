@@ -55,6 +55,7 @@ public:
     virtual BoxRayCollision rayHits(Ray ray) = 0;
 };
 
+#if 0 //TODO(jacob#): finish entities
 class RenderObjectTransformScript final : public enable_shared_from_this<RenderObjectTransformScript>
 {
 private:
@@ -72,6 +73,7 @@ class RenderObjectEntity final : public RenderObject
 {
 
 };
+#endif
 
 class RenderObjectBlock;
 class RenderObjectBlockMesh;
