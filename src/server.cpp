@@ -345,7 +345,7 @@ public:
 void generateInitialWorld(shared_ptr<World> world)
 {
     vector<shared_ptr<ChunkGenerator>> generators;
-    const int generateSize = 32;
+    const int generateSize = 16;
     PositionI pos(0, 0, 0, Dimension::Overworld);
     for(pos.x = -generateSize & WorldGeneratorPart::generateChunkSizeFloorMask.x; pos.x <= (generateSize & WorldGeneratorPart::generateChunkSizeFloorMask.x); pos.x += WorldGeneratorPart::generateChunkSize.x)
     {

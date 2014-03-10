@@ -77,6 +77,7 @@
 		<Unit filename="include/ray_casting.h" />
 		<Unit filename="include/render_layer.h" />
 		<Unit filename="include/render_object.h" />
+		<Unit filename="include/script.h" />
 		<Unit filename="include/server.h" />
 		<Unit filename="include/stonelikeblock.h" />
 		<Unit filename="include/stream.h" />
@@ -103,6 +104,7 @@
 		</Unit>
 		<Unit filename="src/png_decoder.cpp" />
 		<Unit filename="src/render_object.cpp" />
+		<Unit filename="src/script.cpp" />
 		<Unit filename="src/server.cpp" />
 		<Unit filename="src/stonelikeblock.cpp" />
 		<Unit filename="src/stream.cpp" />

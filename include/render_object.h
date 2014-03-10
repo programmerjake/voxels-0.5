@@ -55,11 +55,16 @@ public:
     virtual BoxRayCollision rayHits(Ray ray) = 0;
 };
 
-#if 0 //TODO(jacob#):finish
+class RenderObjectTransformScript final : public enable_shared_from_this<RenderObjectTransformScript>
+{
+private:
+
+};
+
 class RenderObjectEntityMesh final : public enable_shared_from_this<RenderObjectEntityMesh>
 {
 private:
-    Mesh mesh;
+    vector<Mesh> meshs;
     shared_ptr<RenderObjectWorld> world;
 };
 
@@ -67,7 +72,6 @@ class RenderObjectEntity final : public RenderObject
 {
 
 };
-#endif
 
 class RenderObjectBlock;
 class RenderObjectBlockMesh;

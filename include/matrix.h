@@ -88,6 +88,75 @@ public:
         }
     }
 
+    void set(const int x, const int y, float value)
+    {
+        switch(x)
+        {
+        case 0:
+            switch(y)
+            {
+            case 0:
+                this->x00 = value;
+                return;
+            case 1:
+                this->x01 = value;
+                return;
+            case 2:
+                this->x02 = value;
+                return;
+            default:
+                return;
+            }
+        case 1:
+            switch(y)
+            {
+            case 0:
+                this->x10 = value;
+                return;
+            case 1:
+                this->x11 = value;
+                return;
+            case 2:
+                this->x12 = value;
+                return;
+            default:
+                return;
+            }
+        case 2:
+            switch(y)
+            {
+            case 0:
+                this->x20 = value;
+                return;
+            case 1:
+                this->x21 = value;
+                return;
+            case 2:
+                this->x22 = value;
+                return;
+            default:
+                return;
+            }
+        case 3:
+            switch(y)
+            {
+            case 0:
+                this->x30 = value;
+                return
+            case 1:
+                this->x31 = value;
+                return;
+            case 2:
+                this->x32 = value;
+                return;
+            default:
+                return;
+            }
+        default:
+            return;
+        }
+    }
+
     Matrix(float x00,
            float x10,
            float x20,
