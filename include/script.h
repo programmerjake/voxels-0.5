@@ -327,11 +327,11 @@ public:
                 return L"[]";
             }
             wostringstream os;
-            wchar_t ch = L'[';
+            const wchar_t * str = L"[";
             for(shared_ptr<Data> e : value)
             {
-                os << ch << (wstring)*e;
-                ch = L' ';
+                os << str << (wstring)*e;
+                ch = L", ";
             }
             os << L"]";
             return os.str();
@@ -394,11 +394,11 @@ public:
                 return L"{}";
             }
             wostringstream os;
-            wchar_t ch = L'{';
+            const wchar_t * str = L"{";
             for(pair<wstring, shared_ptr<Data>> e : value)
             {
-                os << ch << L"\"" << get<0>(e) << L"\" = " << (wstring)*get<1>(e);
-                ch = L' ';
+                os << str << L"\"" << get<0>(e) << L"\" = " << (wstring)*get<1>(e);
+                str = L", ";
             }
             os << L"}";
             return os.str();
@@ -460,6 +460,8 @@ public:
             CastToVector,
             CastToMatrix,
             CastToList,
+            CastToObject,
+            CastToBoolean,
             LoadGlobals,
             ReadIndex,
             AssignIndex,
@@ -799,6 +801,46 @@ public:
             return evaluate(state.nodes[args[0]]->evaluate(state, stackDepth + 1));
         }
     };
+    struct NodeCastToObject final : public NodeConstArgCount<1, NodeCastToObject>
+    {
+        virtual Type type() const override
+        {
+            return Type::CastToObject;
+        }
+        static shared_ptr<Data> evaluate(shared_ptr<Data> retval)
+        {
+            if(retval->type() == Data::Type::Object)
+            {
+                return retval;
+            }
+            throw ScriptException(make_shared<DataString>(L"type cast error : can't cast " + retval->typeString() + L" to object"));
+        }
+        virtual shared_ptr<Data> evaluate(State &state, unsigned stackDepth) const override
+        {
+            checkStackDepth(stackDepth);
+            return evaluate(state.nodes[args[0]]->evaluate(state, stackDepth + 1));
+        }
+    };
+    struct NodeCastToBoolean final : public NodeConstArgCount<1, NodeCastToBoolean>
+    {
+        virtual Type type() const override
+        {
+            return Type::CastToBoolean;
+        }
+        static shared_ptr<Data> evaluate(shared_ptr<Data> retval)
+        {
+            if(retval->type() == Data::Type::Boolean)
+            {
+                return retval;
+            }
+            throw ScriptException(make_shared<DataString>(L"type cast error : can't cast " + retval->typeString() + L" to boolean"));
+        }
+        virtual shared_ptr<Data> evaluate(State &state, unsigned stackDepth) const override
+        {
+            checkStackDepth(stackDepth);
+            return evaluate(state.nodes[args[0]]->evaluate(state, stackDepth + 1));
+        }
+    };
     struct NodeReadIndex final : public NodeConstArgCount<2, NodeReadIndex>
     {
         virtual Type type() const override
@@ -903,6 +945,29 @@ public:
                         throw ScriptException(L"variable doesn't exist : " + value);
                     }
                     return get<1>(*i);
+                }
+                throw ScriptException(L"illegal type for index");
+            }
+            if(arg1->type() == Data::Type::String)
+            {
+                wstring str = dynamic_cast<DataString *>(arg1.get())->value;
+                if(arg2->type() == Data::Type::Integer)
+                {
+                    int32_t value = dynamic_cast<DataInteger *>(arg2.get())->value;
+                    if(value < 0 || (size_t)value >= str.size())
+                    {
+                        throw ScriptException(L"index out of range");
+                    }
+                    return str.substr(value, 1);
+                }
+                if(arg2->type() == Data::Type::String)
+                {
+                    wstring value = dynamic_cast<DataString *>(arg2.get())->value;
+                    if(value == L"length")
+                    {
+                        return shared_ptr<Data>(new DataInteger(str.size()));
+                    }
+                    throw ScriptException(L"variable doesn't exist : " + value);
                 }
                 throw ScriptException(L"illegal type for index");
             }
@@ -1030,6 +1095,25 @@ public:
                 {
                     wstring value = dynamic_cast<DataString *>(arg2.get())->value;
                     return map[value] = arg3->dup();
+                }
+                throw ScriptException(L"illegal type for index");
+            }
+            if(arg1->type() == Data::Type::String)
+            {
+                wstring & str = dynamic_cast<DataString *>(arg1.get())->value;
+                if(arg2->type() == Data::Type::Integer)
+                {
+                    int32_t value = dynamic_cast<DataInteger *>(arg2.get())->value;
+                    if(value < 0 || (size_t)value >= str.size())
+                    {
+                        throw ScriptException(L"index out of range");
+                    }
+                    str = str.substr(0, value) + (wstring)*arg3 + str.substr(value + 1);
+                }
+                if(arg2->type() == Data::Type::String)
+                {
+                    wstring value = dynamic_cast<DataString *>(arg2.get())->value;
+                    throw ScriptException(L"can't write to " + value);
                 }
                 throw ScriptException(L"illegal type for index");
             }
@@ -2937,7 +3021,7 @@ public:
             }
             else
             {
-                throw ScriptException(make_shared<DataString>(L"invalid type for makeRotate : " + arg1->typeString()));
+                throw ScriptException(make_shared<DataString>(L"invalid type for make_rotate : " + arg1->typeString()));
             }
             float v2;
             if(arg2->type() == Data::Type::Float)
@@ -2950,11 +3034,11 @@ public:
             }
             else
             {
-                throw ScriptException(make_shared<DataString>(L"invalid type for atan2 : " + arg2->typeString()));
+                throw ScriptException(make_shared<DataString>(L"invalid type for make_rotate : " + arg2->typeString()));
             }
             if(v1 == VectorF(0))
             {
-                throw ScriptException(L"makeRotate called with <0, 0, 0>");
+                throw ScriptException(L"make_rotate called with <0, 0, 0>");
             }
             return shared_ptr<Data>(new DataMatrix(Matrix::rotate(v1, v2)));
         }
@@ -2983,7 +3067,7 @@ public:
             }
             else
             {
-                throw ScriptException(make_shared<DataString>(L"invalid type for makeRotateX : " + retval->typeString()));
+                throw ScriptException(make_shared<DataString>(L"invalid type for make_rotatex : " + retval->typeString()));
             }
             return shared_ptr<Data>(new DataMatrix(Matrix::rotateX(value)));
         }
@@ -3012,7 +3096,7 @@ public:
             }
             else
             {
-                throw ScriptException(make_shared<DataString>(L"invalid type for makeRotateY : " + retval->typeString()));
+                throw ScriptException(make_shared<DataString>(L"invalid type for make_rotatey : " + retval->typeString()));
             }
             return shared_ptr<Data>(new DataMatrix(Matrix::rotateY(value)));
         }
@@ -3041,7 +3125,7 @@ public:
             }
             else
             {
-                throw ScriptException(make_shared<DataString>(L"invalid type for makeRotateZ : " + retval->typeString()));
+                throw ScriptException(make_shared<DataString>(L"invalid type for make_rotatez : " + retval->typeString()));
             }
             return shared_ptr<Data>(new DataMatrix(Matrix::rotateZ(value)));
         }
@@ -3074,7 +3158,7 @@ public:
             }
             else
             {
-                throw ScriptException(make_shared<DataString>(L"invalid type for makeScale : " + retval->typeString()));
+                throw ScriptException(make_shared<DataString>(L"invalid type for make_scale : " + retval->typeString()));
             }
             return shared_ptr<Data>(new DataMatrix(Matrix::scale(value)));
         }
@@ -3099,7 +3183,7 @@ public:
             }
             else
             {
-                throw ScriptException(make_shared<DataString>(L"invalid type for makeTranslate : " + retval->typeString()));
+                throw ScriptException(make_shared<DataString>(L"invalid type for make_translate : " + retval->typeString()));
             }
             return shared_ptr<Data>(new DataMatrix(Matrix::scale(value)));
         }
@@ -3119,8 +3203,7 @@ public:
         }
         virtual shared_ptr<Data> evaluate(State &state, unsigned stackDepth) const override
         {
-            assert(!nodes.empty());
-            shared_ptr<Data> retval;
+            shared_ptr<Data> retval = shared_ptr<Data>(new DataInteger(0));
             for(uint32_t n : nodes)
             {
                 retval = state.nodes[n]->evaluate(state, stackDepth + 1);
@@ -3196,7 +3279,7 @@ public:
     shared_ptr<Data> evaluate() const
     {
         State state(nodes);
-        return nodes.front()->evaluate(state);
+        return nodes.back()->evaluate(state);
     }
     Matrix evaluateAsMatrix() const
     {
@@ -3303,6 +3386,10 @@ inline shared_ptr<Script::Node> Script::Node::read(Reader &reader, uint32_t node
         return NodeCastToMatrix::read(reader, nodeCount);
     case Type::CastToList:
         return NodeCastToList::read(reader, nodeCount);
+    case Type::CastToObject:
+        return NodeCastToObject::read(reader, nodeCount);
+    case Type::CastToBoolean:
+        return NodeCastToBoolean::read(reader, nodeCount);
     case Type::LoadGlobals:
         return NodeLoadGlobals::read(reader, nodeCount);
     case Type::ReadIndex:
