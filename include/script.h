@@ -331,7 +331,7 @@ public:
             for(shared_ptr<Data> e : value)
             {
                 os << str << (wstring)*e;
-                ch = L", ";
+                str = L", ";
             }
             os << L"]";
             return os.str();
@@ -620,7 +620,30 @@ public:
             return state.variables;
         }
     };
-    struct NodeCastToString final : public NodeConstArgCount<1, NodeCastToString>
+    struct NodeCast : public Node
+    {
+        uint32_t args[1];
+        friend class Node;
+    protected:
+        static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount, shared_ptr<NodeCast> retval)
+        {
+            for(uint32_t &v : retval->args)
+            {
+                v = reader.readLimitedU32(0, nodeCount - 1);
+            }
+            return static_pointer_cast<Node>(retval);
+        }
+    public:
+        virtual void write(Writer &writer) const override
+        {
+            writeType(writer, type());
+            for(uint32_t v : args)
+            {
+                writer.writeU32(v);
+            }
+        }
+    };
+    struct NodeCastToString final : public NodeCast
     {
         virtual Type type() const override
         {
@@ -632,8 +655,14 @@ public:
             shared_ptr<Data> retval = state.nodes[args[0]]->evaluate(state, stackDepth + 1);
             return make_shared<DataString>((wstring) * retval);
         }
+        friend class Node;
+    protected:
+        static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+        {
+            return NodeCast::read(reader, nodeCount, make_shared<NodeCastToString>());
+        }
     };
-    struct NodeCastToInteger final : public NodeConstArgCount<1, NodeCastToInteger>
+    struct NodeCastToInteger final : public NodeCast
     {
         virtual Type type() const override
         {
@@ -656,8 +685,14 @@ public:
             checkStackDepth(stackDepth);
             return evaluate(state.nodes[args[0]]->evaluate(state, stackDepth + 1));
         }
+        friend class Node;
+    protected:
+        static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+        {
+            return NodeCast::read(reader, nodeCount, make_shared<NodeCastToInteger>());
+        }
     };
-    struct NodeCastToFloat final : public NodeConstArgCount<1, NodeCastToFloat>
+    struct NodeCastToFloat final : public NodeCast
     {
         virtual Type type() const override
         {
@@ -680,8 +715,14 @@ public:
             checkStackDepth(stackDepth);
             return evaluate(state.nodes[args[0]]->evaluate(state, stackDepth + 1));
         }
+        friend class Node;
+    protected:
+        static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+        {
+            return NodeCast::read(reader, nodeCount, make_shared<NodeCastToFloat>());
+        }
     };
-    struct NodeCastToVector final : public NodeConstArgCount<1, NodeCastToVector>
+    struct NodeCastToVector final : public NodeCast
     {
         virtual Type type() const override
         {
@@ -721,8 +762,14 @@ public:
             checkStackDepth(stackDepth);
             return evaluate(state.nodes[args[0]]->evaluate(state, stackDepth + 1));
         }
+        friend class Node;
+    protected:
+        static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+        {
+            return NodeCast::read(reader, nodeCount, make_shared<NodeCastToVector>());
+        }
     };
-    struct NodeCastToMatrix final : public NodeConstArgCount<1, NodeCastToMatrix>
+    struct NodeCastToMatrix final : public NodeCast
     {
         virtual Type type() const override
         {
@@ -758,8 +805,14 @@ public:
             checkStackDepth(stackDepth);
             return evaluate(state.nodes[args[0]]->evaluate(state, stackDepth + 1));
         }
+        friend class Node;
+    protected:
+        static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+        {
+            return NodeCast::read(reader, nodeCount, make_shared<NodeCastToMatrix>());
+        }
     };
-    struct NodeCastToList final : public NodeConstArgCount<1, NodeCastToList>
+    struct NodeCastToList final : public NodeCast
     {
         virtual Type type() const override
         {
@@ -800,8 +853,14 @@ public:
             checkStackDepth(stackDepth);
             return evaluate(state.nodes[args[0]]->evaluate(state, stackDepth + 1));
         }
+        friend class Node;
+    protected:
+        static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+        {
+            return NodeCast::read(reader, nodeCount, make_shared<NodeCastToList>());
+        }
     };
-    struct NodeCastToObject final : public NodeConstArgCount<1, NodeCastToObject>
+    struct NodeCastToObject final : public NodeCast
     {
         virtual Type type() const override
         {
@@ -820,8 +879,14 @@ public:
             checkStackDepth(stackDepth);
             return evaluate(state.nodes[args[0]]->evaluate(state, stackDepth + 1));
         }
+        friend class Node;
+    protected:
+        static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+        {
+            return NodeCast::read(reader, nodeCount, make_shared<NodeCastToObject>());
+        }
     };
-    struct NodeCastToBoolean final : public NodeConstArgCount<1, NodeCastToBoolean>
+    struct NodeCastToBoolean final : public NodeCast
     {
         virtual Type type() const override
         {
@@ -840,6 +905,12 @@ public:
             checkStackDepth(stackDepth);
             return evaluate(state.nodes[args[0]]->evaluate(state, stackDepth + 1));
         }
+        friend class Node;
+    protected:
+        static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+        {
+            return NodeCast::read(reader, nodeCount, make_shared<NodeCastToBoolean>());
+        }
     };
     struct NodeReadIndex final : public NodeConstArgCount<2, NodeReadIndex>
     {
@@ -849,6 +920,14 @@ public:
         }
         static shared_ptr<Data> evaluate(shared_ptr<Data> arg1, shared_ptr<Data> arg2)
         {
+            if(arg2->type() == Data::Type::String)
+            {
+                wstring value = dynamic_cast<DataString *>(arg2.get())->value;
+                if(value == L"dup")
+                {
+                    return arg1->dup();
+                }
+            }
             if(arg1->type() == Data::Type::Vector)
             {
                 if(arg2->type() == Data::Type::Integer)
@@ -958,7 +1037,7 @@ public:
                     {
                         throw ScriptException(L"index out of range");
                     }
-                    return str.substr(value, 1);
+                    return shared_ptr<Data>(new DataString(str.substr(value, 1)));
                 }
                 if(arg2->type() == Data::Type::String)
                 {

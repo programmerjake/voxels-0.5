@@ -2,6 +2,8 @@
 #include "util.h"
 #include <cwctype>
 #include <sstream>
+#include <cstdlib>
+#include <iostream>
 
 using namespace std;
 
@@ -67,6 +69,7 @@ struct Parser
         And,
         Or,
         Xor,
+        Not,
         Abs,
         Cast,
         Boolean,
@@ -123,8 +126,11 @@ struct Parser
         Tilde,
         Pi,
     };
-    TokenType tokenType = Comma;
+    TokenType tokenType = TokenType::Comma;
     wstring tokenText = L"";
+    bool hasPutbackToken = false;
+    TokenType lastToken;
+    wstring lastTokenText;
     int tokLine, tokCol;
     unordered_map<wstring, TokenType> wordTokens;
 
@@ -137,6 +143,7 @@ struct Parser
         wordTokens[L"and"] = TokenType::And;
         wordTokens[L"or"] = TokenType::Or;
         wordTokens[L"xor"] = TokenType::Xor;
+        wordTokens[L"not"] = TokenType::Not;
         wordTokens[L"abs"] = TokenType::Abs;
         wordTokens[L"cast"] = TokenType::Cast;
         wordTokens[L"boolean"] = TokenType::Boolean;
@@ -197,7 +204,11 @@ struct Parser
                             getChar();
                     }
                     if(curChar == WEOF)
-                        errorFn((wostringstream() << L"expected : */ : opening /* on line " << startLine << L" col " << startCol).str());
+                    {
+                        wostringstream os;
+                        os << L"expected : */ : opening /* on line " << startLine << L" col " << startCol;
+                        errorFn(os.str());
+                    }
                     getChar();
                 }
                 else
@@ -213,6 +224,13 @@ struct Parser
 
     void getToken()
     {
+        if(hasPutbackToken)
+        {
+            hasPutbackToken = false;
+            tokenType = lastToken;
+            tokenText = lastTokenText;
+            return;
+        }
         tokenType = TokenType::EndOfFile;
         tokenText = L"";
         skipWhitespace();
@@ -244,7 +262,7 @@ struct Parser
                     getChar();
                 }
                 if(!iswdigit(curChar))
-                    errorFn("floating point exponent missing digits");
+                    errorFn(L"floating point exponent missing digits");
                 while(iswdigit(curChar))
                 {
                     tokenText += curChar;
@@ -289,7 +307,7 @@ struct Parser
                     getChar();
                 }
                 if(!iswdigit(curChar))
-                    errorFn("floating point exponent missing digits");
+                    errorFn(L"floating point exponent missing digits");
                 while(iswdigit(curChar))
                 {
                     tokenText += curChar;
@@ -403,7 +421,6 @@ struct Parser
                             getChar();
                         }
                         tokenText += v;
-                        getChar();
                         break;
                     }
                     case L'u':
@@ -428,7 +445,6 @@ struct Parser
                         if(v >= 0x110000)
                             errorFn(L"code point out of range");
                         tokenText += v;
-                        getChar();
                         break;
                     }
                     case L'U':
@@ -453,7 +469,6 @@ struct Parser
                         if(v >= 0x110000)
                             errorFn(L"code point out of range");
                         tokenText += (wchar_t)v;
-                        getChar();
                         break;
                     }
                     default:
@@ -609,11 +624,20 @@ struct Parser
                 getChar();
             }
             else
-                errorFn("missing = in !=");
+                errorFn(L"missing = in !=");
             break;
         default:
-            errorFn("illegal character");
+            errorFn(L"illegal character");
         }
+    }
+
+    void putBackToken(TokenType tt, wstring ts)
+    {
+        hasPutbackToken = true;
+        lastToken = tokenType;
+        lastTokenText = tokenText;
+        tokenType = tt;
+        tokenText = ts;
     }
 
     uint32_t insertNode(shared_ptr<Script::Node> node)
@@ -622,8 +646,6 @@ struct Parser
         script->nodes.push_back(node);
         return retval;
     }
-
-    uint32_t parseExpression(TokenType ignoreType);
 
     uint32_t parseTopLevel()
     {
@@ -697,7 +719,7 @@ struct Parser
         case TokenType::LBrace:
         {
             getToken();
-            shared_ptr<Script::NodeListLiteral> listNode = make_shared<Script::NodeListLiteral>();
+            shared_ptr<Script::NodeBlock> listNode = make_shared<Script::NodeBlock>();
             while(tokenType == TokenType::Semicolon)
                 getToken();
             if(tokenType == TokenType::RBrace)
@@ -752,9 +774,671 @@ struct Parser
             getToken();
             return insertNode(shared_ptr<Script::Node>(new Script::NodeConst(shared_ptr<Script::Data>(new Script::DataFloat(M_PI)))));
         }
+        case TokenType::Sin:
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t expr = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            shared_ptr<Script::NodeSin> node = make_shared<Script::NodeSin>();
+            node->args[0] = expr;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        case TokenType::Cos:
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t expr = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            shared_ptr<Script::NodeCos> node = make_shared<Script::NodeCos>();
+            node->args[0] = expr;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        case TokenType::Tan:
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t expr = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            shared_ptr<Script::NodeTan> node = make_shared<Script::NodeTan>();
+            node->args[0] = expr;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        case TokenType::ASin:
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t expr = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            shared_ptr<Script::NodeASin> node = make_shared<Script::NodeASin>();
+            node->args[0] = expr;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        case TokenType::ACos:
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t expr = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            shared_ptr<Script::NodeACos> node = make_shared<Script::NodeACos>();
+            node->args[0] = expr;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        case TokenType::ATan:
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t expr = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            shared_ptr<Script::NodeATan> node = make_shared<Script::NodeATan>();
+            node->args[0] = expr;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        case TokenType::Exp:
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t expr = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            shared_ptr<Script::NodeExp> node = make_shared<Script::NodeExp>();
+            node->args[0] = expr;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        case TokenType::Log:
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t expr = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            shared_ptr<Script::NodeLog> node = make_shared<Script::NodeLog>();
+            node->args[0] = expr;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        case TokenType::Sqrt:
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t expr = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            shared_ptr<Script::NodeSqrt> node = make_shared<Script::NodeSqrt>();
+            node->args[0] = expr;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        case TokenType::MakeRotateX:
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t expr = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            shared_ptr<Script::NodeMakeRotateX> node = make_shared<Script::NodeMakeRotateX>();
+            node->args[0] = expr;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        case TokenType::MakeRotateY:
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t expr = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            shared_ptr<Script::NodeMakeRotateY> node = make_shared<Script::NodeMakeRotateY>();
+            node->args[0] = expr;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        case TokenType::MakeRotateZ:
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t expr = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            shared_ptr<Script::NodeMakeRotateZ> node = make_shared<Script::NodeMakeRotateZ>();
+            node->args[0] = expr;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        case TokenType::MakeScale:
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t expr = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            shared_ptr<Script::NodeMakeScale> node = make_shared<Script::NodeMakeScale>();
+            node->args[0] = expr;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        case TokenType::MakeTranslate:
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t expr = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            shared_ptr<Script::NodeMakeTranslate> node = make_shared<Script::NodeMakeTranslate>();
+            node->args[0] = expr;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        case TokenType::Abs:
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t expr = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            shared_ptr<Script::NodeAbs> node = make_shared<Script::NodeAbs>();
+            node->args[0] = expr;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        case TokenType::ATan2:
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t expr1 = parseExpression(TokenType::Comma);
+            if(tokenType != TokenType::Comma)
+                errorFn(L"expected : ,");
+            getToken();
+            uint32_t expr2 = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            shared_ptr<Script::NodeATan2> node = make_shared<Script::NodeATan2>();
+            node->args[0] = expr1;
+            node->args[1] = expr2;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        case TokenType::MakeRotate:
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t expr1 = parseExpression(TokenType::Comma);
+            if(tokenType != TokenType::Comma)
+                errorFn(L"expected : ,");
+            getToken();
+            uint32_t expr2 = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            shared_ptr<Script::NodeMakeRotate> node = make_shared<Script::NodeMakeRotate>();
+            node->args[0] = expr1;
+            node->args[1] = expr2;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
         default:
             errorFn(L"unexpected token");
         }
+        assert(false);
+        return 0;
+    }
+
+    uint32_t parseElementAccess()
+    {
+        uint32_t retval = parseTopLevel();
+        while(tokenType == TokenType::LBracket || tokenType == TokenType::Period)
+        {
+            if(tokenType == TokenType::LBracket)
+            {
+                getToken();
+                uint32_t arg = parseExpression(TokenType::RBracket);
+                if(tokenType != TokenType::RBracket)
+                    errorFn(L"expected : ]");
+                getToken();
+                shared_ptr<Script::NodeReadIndex> readIndexNode = make_shared<Script::NodeReadIndex>();
+                readIndexNode->args[0] = retval;
+                readIndexNode->args[1] = arg;
+                retval = insertNode(static_pointer_cast<Script::Node>(readIndexNode));
+            }
+            else if(tokenType == TokenType::Period)
+            {
+                getToken();
+                if(tokenType != TokenType::Id)
+                {
+                    errorFn(L"expected : name");
+                }
+                uint32_t name = insertNode(shared_ptr<Script::Node>(new Script::NodeConst(shared_ptr<Script::Data>(new Script::DataString(tokenText)))));
+                getToken();
+                shared_ptr<Script::NodeReadIndex> readIndexNode = make_shared<Script::NodeReadIndex>();
+                readIndexNode->args[0] = retval;
+                readIndexNode->args[1] = name;
+                retval = insertNode(static_pointer_cast<Script::Node>(readIndexNode));
+            }
+            else
+                assert(false);
+        }
+        return retval;
+    }
+
+    uint32_t parseCasts()
+    {
+        if(tokenType == TokenType::Cast)
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            shared_ptr<Script::NodeCast> cast;
+            switch(tokenType)
+            {
+            case TokenType::Boolean:
+                cast = static_pointer_cast<Script::NodeCast>(make_shared<Script::NodeCastToBoolean>());
+                break;
+            case TokenType::Float:
+                cast = static_pointer_cast<Script::NodeCast>(make_shared<Script::NodeCastToFloat>());
+                break;
+            case TokenType::Integer:
+                cast = static_pointer_cast<Script::NodeCast>(make_shared<Script::NodeCastToInteger>());
+                break;
+            case TokenType::List:
+                cast = static_pointer_cast<Script::NodeCast>(make_shared<Script::NodeCastToList>());
+                break;
+            case TokenType::Matrix:
+                cast = static_pointer_cast<Script::NodeCast>(make_shared<Script::NodeCastToMatrix>());
+                break;
+            case TokenType::Object:
+                cast = static_pointer_cast<Script::NodeCast>(make_shared<Script::NodeCastToObject>());
+                break;
+            case TokenType::String:
+                cast = static_pointer_cast<Script::NodeCast>(make_shared<Script::NodeCastToString>());
+                break;
+            case TokenType::Vector:
+                cast = static_pointer_cast<Script::NodeCast>(make_shared<Script::NodeCastToVector>());
+                break;
+            default:
+                errorFn(L"expected : type");
+            }
+            getToken();
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            uint32_t v = parseNeg(TokenType::Pow);
+            cast->args[0] = v;
+            return insertNode(static_pointer_cast<Script::Node>(cast));
+        }
+        return parseElementAccess();
+    }
+
+    uint32_t parsePow(TokenType ignoreType)
+    {
+        uint32_t retval = parseElementAccess();
+        if(tokenType == TokenType::Pow && ignoreType != tokenType)
+        {
+            getToken();
+            shared_ptr<Script::NodePow> node = make_shared<Script::NodePow>();
+            uint32_t arg = parseNeg(ignoreType);
+            node->args[0] = retval;
+            node->args[1] = arg;
+            retval = insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        return retval;
+    }
+
+    uint32_t parseNeg(TokenType ignoreType)
+    {
+        if(tokenType == TokenType::Minus)
+        {
+            getToken();
+            shared_ptr<Script::NodeNeg> node = make_shared<Script::NodeNeg>();
+            node->args[0] = parsePow(ignoreType);
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        return parsePow(ignoreType);
+    }
+
+    uint32_t parseFactor(TokenType ignoreType)
+    {
+        uint32_t retval = parseNeg(ignoreType);
+        while(tokenType != ignoreType)
+        {
+            if(tokenType == TokenType::DotProd)
+            {
+                auto node = make_shared<Script::NodeDot>();
+                node->args[0] = retval;
+                getToken();
+                node->args[1] = parseNeg(ignoreType);
+                retval = insertNode(static_pointer_cast<Script::Node>(node));
+            }
+            else if(tokenType == TokenType::Star)
+            {
+                auto node = make_shared<Script::NodeMul>();
+                node->args[0] = retval;
+                getToken();
+                node->args[1] = parseNeg(ignoreType);
+                retval = insertNode(static_pointer_cast<Script::Node>(node));
+            }
+            else if(tokenType == TokenType::Percent)
+            {
+                auto node = make_shared<Script::NodeMod>();
+                node->args[0] = retval;
+                getToken();
+                node->args[1] = parseNeg(ignoreType);
+                retval = insertNode(static_pointer_cast<Script::Node>(node));
+            }
+            else if(tokenType == TokenType::FSlash)
+            {
+                auto node = make_shared<Script::NodeDiv>();
+                node->args[0] = retval;
+                getToken();
+                node->args[1] = parseNeg(ignoreType);
+                retval = insertNode(static_pointer_cast<Script::Node>(node));
+            }
+            else
+                break;
+        }
+        return retval;
+    }
+
+    uint32_t parseCross(TokenType ignoreType)
+    {
+        uint32_t retval = parseFactor(ignoreType);
+        while(tokenType != ignoreType)
+        {
+            if(tokenType == TokenType::CrossProd)
+            {
+                auto node = make_shared<Script::NodeCross>();
+                node->args[0] = retval;
+                getToken();
+                node->args[1] = parseFactor(ignoreType);
+                retval = insertNode(static_pointer_cast<Script::Node>(node));
+            }
+            else
+                break;
+        }
+        return retval;
+    }
+
+    uint32_t parseTerm(TokenType ignoreType)
+    {
+        uint32_t retval = parseCross(ignoreType);
+        while(tokenType != ignoreType)
+        {
+            if(tokenType == TokenType::Plus)
+            {
+                auto node = make_shared<Script::NodeAdd>();
+                node->args[0] = retval;
+                getToken();
+                node->args[1] = parseCross(ignoreType);
+                retval = insertNode(static_pointer_cast<Script::Node>(node));
+            }
+            else if(tokenType == TokenType::Minus)
+            {
+                auto node = make_shared<Script::NodeSub>();
+                node->args[0] = retval;
+                getToken();
+                node->args[1] = parseCross(ignoreType);
+                retval = insertNode(static_pointer_cast<Script::Node>(node));
+            }
+            else
+                break;
+        }
+        return retval;
+    }
+
+    uint32_t parseConcat(TokenType ignoreType)
+    {
+        uint32_t retval = parseTerm(ignoreType);
+        while(tokenType != ignoreType)
+        {
+            if(tokenType == TokenType::Tilde)
+            {
+                auto node = make_shared<Script::NodeConcat>();
+                node->args[0] = retval;
+                getToken();
+                node->args[1] = parseTerm(ignoreType);
+                retval = insertNode(static_pointer_cast<Script::Node>(node));
+            }
+            else
+                break;
+        }
+        return retval;
+    }
+
+    uint32_t parseCompare(TokenType ignoreType)
+    {
+        uint32_t retval = parseConcat(ignoreType);
+        while(tokenType != ignoreType)
+        {
+            if(tokenType == TokenType::Equal)
+            {
+                auto node = make_shared<Script::NodeEqual>();
+                node->args[0] = retval;
+                getToken();
+                node->args[1] = parseConcat(ignoreType);
+                retval = insertNode(static_pointer_cast<Script::Node>(node));
+            }
+            else if(tokenType == TokenType::NotEqual)
+            {
+                auto node = make_shared<Script::NodeNotEqual>();
+                node->args[0] = retval;
+                getToken();
+                node->args[1] = parseConcat(ignoreType);
+                retval = insertNode(static_pointer_cast<Script::Node>(node));
+            }
+            else if(tokenType == TokenType::LAngle)
+            {
+                auto node = make_shared<Script::NodeLessThan>();
+                node->args[0] = retval;
+                getToken();
+                node->args[1] = parseConcat(ignoreType);
+                retval = insertNode(static_pointer_cast<Script::Node>(node));
+            }
+            else if(tokenType == TokenType::RAngle)
+            {
+                auto node = make_shared<Script::NodeGreaterThan>();
+                node->args[0] = retval;
+                getToken();
+                node->args[1] = parseConcat(ignoreType);
+                retval = insertNode(static_pointer_cast<Script::Node>(node));
+            }
+            else if(tokenType == TokenType::GreaterEqual)
+            {
+                auto node = make_shared<Script::NodeGreaterEqual>();
+                node->args[0] = retval;
+                getToken();
+                node->args[1] = parseConcat(ignoreType);
+                retval = insertNode(static_pointer_cast<Script::Node>(node));
+            }
+            else if(tokenType == TokenType::LessEqual)
+            {
+                auto node = make_shared<Script::NodeLessEqual>();
+                node->args[0] = retval;
+                getToken();
+                node->args[1] = parseConcat(ignoreType);
+                retval = insertNode(static_pointer_cast<Script::Node>(node));
+            }
+            else
+                break;
+        }
+        return retval;
+    }
+
+    uint32_t parseNot(TokenType ignoreType)
+    {
+        if(tokenType == TokenType::Not)
+        {
+            getToken();
+            auto node = make_shared<Script::NodeNot>();
+            node->args[0] = parseCompare(ignoreType);
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+        return parseCompare(ignoreType);
+    }
+
+    uint32_t parseAnd(TokenType ignoreType)
+    {
+        uint32_t retval = parseNot(ignoreType);
+        while(tokenType != ignoreType)
+        {
+            if(tokenType == TokenType::And)
+            {
+                auto node = make_shared<Script::NodeAnd>();
+                node->args[0] = retval;
+                getToken();
+                node->args[1] = parseNot(ignoreType);
+                retval = insertNode(static_pointer_cast<Script::Node>(node));
+            }
+            else
+                break;
+        }
+        return retval;
+    }
+
+    uint32_t parseXor(TokenType ignoreType)
+    {
+        uint32_t retval = parseAnd(ignoreType);
+        while(tokenType != ignoreType)
+        {
+            if(tokenType == TokenType::Xor)
+            {
+                auto node = make_shared<Script::NodeXor>();
+                node->args[0] = retval;
+                getToken();
+                node->args[1] = parseAnd(ignoreType);
+                retval = insertNode(static_pointer_cast<Script::Node>(node));
+            }
+            else
+                break;
+        }
+        return retval;
+    }
+
+    uint32_t parseOr(TokenType ignoreType)
+    {
+        uint32_t retval = parseXor(ignoreType);
+        while(tokenType != ignoreType)
+        {
+            if(tokenType == TokenType::Or)
+            {
+                auto node = make_shared<Script::NodeOr>();
+                node->args[0] = retval;
+                getToken();
+                node->args[1] = parseXor(ignoreType);
+                retval = insertNode(static_pointer_cast<Script::Node>(node));
+            }
+            else
+                break;
+        }
+        return retval;
+    }
+
+    uint32_t parseConditional(TokenType ignoreType)
+    {
+        if(tokenType == TokenType::If)
+        {
+            auto cond = make_shared<Script::NodeConditional>();
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            cond->args[0] = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected : )");
+            getToken();
+            cond->args[1] = parseAssign(ignoreType);
+            bool gotSemicolon = false;
+            if(tokenType == TokenType::Semicolon)
+            {
+                gotSemicolon = true;
+                getToken();
+            }
+            if(tokenType == TokenType::Else)
+            {
+                getToken();
+                cond->args[2] = parseAssign(ignoreType);
+            }
+            else
+            {
+                cond->args[2] = insertNode(shared_ptr<Script::Node>(new Script::NodeBlock));
+                if(gotSemicolon)
+                {
+                    putBackToken(TokenType::Semicolon, L";");
+                }
+            }
+            return insertNode(static_pointer_cast<Script::Node>(cond));
+        }
+        return parseOr(ignoreType);
+    }
+
+    uint32_t parseAssign(TokenType ignoreType)
+    {
+        uint32_t retval = parseConditional(ignoreType);
+        if(tokenType == ignoreType)
+            return retval;
+        if(tokenType == TokenType::Assign)
+        {
+            shared_ptr<Script::Node> & node = script->nodes[retval];
+            if(node->type() != Script::Node::Type::ReadIndex)
+                errorFn(L"can't assign to non-variable");
+            shared_ptr<Script::NodeAssignIndex> newNode = make_shared<Script::NodeAssignIndex>();
+            newNode->args[0] = dynamic_cast<Script::NodeReadIndex *>(node.get())->args[0];
+            newNode->args[1] = dynamic_cast<Script::NodeReadIndex *>(node.get())->args[1];
+            node = newNode;
+            getToken();
+            newNode->args[2] = parseAssign(ignoreType);
+        }
+        return retval;
+    }
+
+    uint32_t parseExpression(TokenType ignoreType)
+    {
+        return parseAssign(ignoreType);
     }
 
     shared_ptr<Script> run()
@@ -775,3 +1459,33 @@ shared_ptr<Script> Script::parse(wstring code)
     Parser parser(code);
     return parser.run();
 }
+
+#if 1 // Test Script
+
+namespace
+{
+initializer init([]()
+{
+    cout << "Enter Code (enter an eof to quit):\n";
+    wstring scriptCode = L"";
+    while(true)
+    {
+        wint_t ch = wcin.get();
+        if(ch == WEOF)
+            break;
+        scriptCode += ch;
+    }
+    try
+    {
+        shared_ptr<Script> script = Script::parse(scriptCode);
+        wcout << (wstring)*script->evaluate() << endl << L"No Errors." << endl;
+    }
+    catch(exception & e)
+    {
+        cout << e.what();
+    }
+    exit(0);
+});
+}
+
+#endif // Test Script
