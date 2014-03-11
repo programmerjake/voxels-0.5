@@ -505,6 +505,7 @@ public:
             MakeTranslate,
             Block,
             ListLiteral,
+            NewObject,
             Last
         };
 
@@ -2007,6 +2008,19 @@ public:
             {
                 return shared_ptr<Data>(new DataString((wstring)*arg1 + (wstring)*arg2));
             }
+            if(arg1->type() == Data::Type::List || arg2->type() == Data::Type::List)
+            {
+                shared_ptr<DataList> list = make_shared<DataList>();
+                for(shared_ptr<Data> v : dynamic_cast<DataList *>(arg1.get())->value)
+                {
+                    list->value.push_back(v->dup());
+                }
+                for(shared_ptr<Data> v : dynamic_cast<DataList *>(arg2.get())->value)
+                {
+                    list->value.push_back(v->dup());
+                }
+                return static_pointer_cast<Data>(list);
+            }
             throwError();
             return nullptr;
         }
@@ -3264,7 +3278,7 @@ public:
             {
                 throw ScriptException(make_shared<DataString>(L"invalid type for make_translate : " + retval->typeString()));
             }
-            return shared_ptr<Data>(new DataMatrix(Matrix::scale(value)));
+            return shared_ptr<Data>(new DataMatrix(Matrix::translate(value)));
         }
         virtual shared_ptr<Data> evaluate(State &state, unsigned stackDepth) const override
         {
@@ -3322,7 +3336,6 @@ public:
         }
         virtual shared_ptr<Data> evaluate(State &state, unsigned stackDepth) const override
         {
-            assert(!nodes.empty());
             shared_ptr<DataList> retval = make_shared<DataList>();
             for(uint32_t n : nodes)
             {
@@ -3351,6 +3364,29 @@ public:
                 retval->nodes.push_back(reader.readLimitedU32(0, nodeCount - 1));
             }
             return static_pointer_cast<Node>(retval);
+        }
+    };
+    struct NodeNewObject final : public Node
+    {
+        friend class Node;
+        virtual Type type() const override
+        {
+            return Type::NewObject;
+        }
+    protected:
+        static shared_ptr<Node> read(Reader &, uint32_t)
+        {
+            return make_shared<NodeNewObject>();
+        }
+    public:
+        virtual void write(Writer &writer) const override
+        {
+            writeType(writer, type());
+        }
+        virtual shared_ptr<Data> evaluate(State &, unsigned stackDepth) const override
+        {
+            checkStackDepth(stackDepth);
+            return shared_ptr<Data>(new DataObject);
         }
     };
 
@@ -3555,6 +3591,8 @@ inline shared_ptr<Script::Node> Script::Node::read(Reader &reader, uint32_t node
         return NodeBlock::read(reader, nodeCount);
     case Type::ListLiteral:
         return NodeListLiteral::read(reader, nodeCount);
+    case Type::NewObject:
+        return NodeNewObject::read(reader, nodeCount);
     }
     assert(false);
 }
