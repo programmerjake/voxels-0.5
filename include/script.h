@@ -173,7 +173,7 @@ public:
         virtual explicit operator wstring() const override
         {
             wostringstream os;
-            os << value;
+            os << value << L"f";
             return os.str();
         }
     };
@@ -509,6 +509,9 @@ public:
             DoWhile,
             RemoveTranslate,
             Invert,
+            Ceil,
+            Floor,
+            For,
             Last
         };
 
@@ -803,7 +806,7 @@ public:
                 {
                     for(int x = 0; x < 4; x++, i++)
                     {
-                        v.set(x, y, dynamic_pointer_cast<DataFloat>(NodeCastToFloat::evaluate(list->value[0]))->value);
+                        v.set(x, y, dynamic_pointer_cast<DataFloat>(NodeCastToFloat::evaluate(list->value[i]))->value);
                     }
                 }
                 return shared_ptr<Data>(new DataMatrix(v));
@@ -855,6 +858,15 @@ public:
                     }
                 }
                 return static_pointer_cast<Data>(retval2);
+            }
+            if(retval->type() == Data::Type::String)
+            {
+                wstring value = dynamic_pointer_cast<DataString>(retval)->value;
+                shared_ptr<DataList> retval2 = make_shared<DataList>();
+                retval2->value.reserve(value.size());
+                for(size_t i = 0; i < value.size(); i++)
+                    retval2->value.push_back(make_shared<DataString>(wstring(L"") + value[i]));
+                return retval2;
             }
             throw ScriptException(make_shared<DataString>(L"type cast error : can't cast " + retval->typeString() + L" to list"));
         }
@@ -3485,6 +3497,82 @@ public:
             return evaluate(state.nodes[args[0]]->evaluate(state, stackDepth + 1));
         }
     };
+    struct NodeCeil final : public NodeConstArgCount<1, NodeCeil>
+    {
+        virtual Type type() const override
+        {
+            return Type::Ceil;
+        }
+        static shared_ptr<Data> evaluate(shared_ptr<Data> retval)
+        {
+            if(retval->type() == Data::Type::Float)
+            {
+                return shared_ptr<Data>(new DataInteger((int32_t)ceil(dynamic_cast<DataFloat *>(retval.get())->value)));
+            }
+            if(retval->type() == Data::Type::Integer)
+            {
+                return shared_ptr<Data>(new DataInteger(dynamic_cast<DataInteger *>(retval.get())->value));
+            }
+            throw ScriptException(make_shared<DataString>(L"invalid type for ceil : " + retval->typeString()));
+        }
+        virtual shared_ptr<Data> evaluate(State &state, unsigned stackDepth) const override
+        {
+            checkStackDepth(stackDepth);
+            return evaluate(state.nodes[args[0]]->evaluate(state, stackDepth + 1));
+        }
+    };
+    struct NodeFloor final : public NodeConstArgCount<1, NodeCeil>
+    {
+        virtual Type type() const override
+        {
+            return Type::Floor;
+        }
+        static shared_ptr<Data> evaluate(shared_ptr<Data> retval)
+        {
+            if(retval->type() == Data::Type::Float)
+            {
+                return shared_ptr<Data>(new DataInteger((int32_t)ceil(dynamic_cast<DataFloat *>(retval.get())->value)));
+            }
+            if(retval->type() == Data::Type::Integer)
+            {
+                return shared_ptr<Data>(new DataInteger(dynamic_cast<DataInteger *>(retval.get())->value));
+            }
+            throw ScriptException(make_shared<DataString>(L"invalid type for ceil : " + retval->typeString()));
+        }
+        virtual shared_ptr<Data> evaluate(State &state, unsigned stackDepth) const override
+        {
+            checkStackDepth(stackDepth);
+            return evaluate(state.nodes[args[0]]->evaluate(state, stackDepth + 1));
+        }
+    };
+    struct NodeFor final : public NodeConstArgCount<4, NodeFor>
+    {
+        virtual Type type() const override
+        {
+            return Type::For;
+        }
+        virtual shared_ptr<Data> evaluate(State &state, unsigned stackDepth) const override
+        {
+            checkStackDepth(stackDepth);
+            shared_ptr<Data> retval;
+            state.nodes[args[0]]->evaluate(state, stackDepth + 1);
+            while(true)
+            {
+                state.onLoop();
+                shared_ptr<Data> condition = state.nodes[args[1]]->evaluate(state, stackDepth + 1);
+                if(condition->type() != Data::Type::Boolean)
+                {
+                    throw ScriptException(make_shared<DataString>(L"invalid type for conditional : " + condition->typeString()));
+                }
+                if(!dynamic_cast<DataBoolean *>(condition.get())->value)
+                {
+                    return retval;
+                }
+                retval = state.nodes[args[3]]->evaluate(state, stackDepth + 1);
+                state.nodes[args[2]]->evaluate(state, stackDepth + 1);
+            }
+        }
+    };
 
     vector<shared_ptr<Node>> nodes;
     shared_ptr<Data> evaluate() const
@@ -3695,6 +3783,12 @@ inline shared_ptr<Script::Node> Script::Node::read(Reader &reader, uint32_t node
         return NodeRemoveTranslate::read(reader, nodeCount);
     case Type::Invert:
         return NodeInvert::read(reader, nodeCount);
+    case Type::Ceil:
+        return NodeCeil::read(reader, nodeCount);
+    case Type::Floor:
+        return NodeFloor::read(reader, nodeCount);
+    case Type::For:
+        return NodeFor::read(reader, nodeCount);
     }
     assert(false);
 }
