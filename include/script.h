@@ -506,6 +506,9 @@ public:
             Block,
             ListLiteral,
             NewObject,
+            DoWhile,
+            RemoveTranslate,
+            Invert,
             Last
         };
 
@@ -538,6 +541,12 @@ public:
     struct State final
     {
         shared_ptr<DataObject> variables;
+        unsigned loopCount = 0;
+        void onLoop()
+        {
+            if(++loopCount >= 100000)
+                throw ScriptException(L"too many loops");
+        }
         const vector<shared_ptr<Node>> &nodes;
         State(const vector<shared_ptr<Node>> &nodes)
             : variables(make_shared<DataObject>()), nodes(nodes)
@@ -3389,6 +3398,93 @@ public:
             return shared_ptr<Data>(new DataObject);
         }
     };
+    struct NodeDoWhile final : public NodeConstArgCount<2, NodeDoWhile>
+    {
+        virtual Type type() const override
+        {
+            return Type::DoWhile;
+        }
+        virtual shared_ptr<Data> evaluate(State &state, unsigned stackDepth) const override
+        {
+            checkStackDepth(stackDepth);
+            shared_ptr<Data> retval;
+            while(true)
+            {
+                state.onLoop();
+                retval = state.nodes[args[0]]->evaluate(state, stackDepth + 1);
+                shared_ptr<Data> condition = state.nodes[args[1]]->evaluate(state, stackDepth + 1);
+                if(condition->type() != Data::Type::Boolean)
+                {
+                    throw ScriptException(make_shared<DataString>(L"invalid type for conditional : " + condition->typeString()));
+                }
+                if(!dynamic_cast<DataBoolean *>(condition.get())->value)
+                {
+                    return retval;
+                }
+            }
+        }
+    };
+    struct NodeRemoveTranslate final : public NodeConstArgCount<1, NodeRemoveTranslate>
+    {
+        virtual Type type() const override
+        {
+            return Type::RemoveTranslate;
+        }
+        static shared_ptr<Data> evaluate(shared_ptr<Data> retval)
+        {
+            Matrix value;
+            if(retval->type() == Data::Type::Matrix)
+            {
+                value = dynamic_cast<DataMatrix *>(retval.get())->value;
+            }
+            else
+            {
+                throw ScriptException(make_shared<DataString>(L"invalid type for remove_translate : " + retval->typeString()));
+            }
+            value.set(3,0,0);
+            value.set(3,1,0);
+            value.set(3,2,0);
+            return shared_ptr<Data>(new DataMatrix(value));
+        }
+        virtual shared_ptr<Data> evaluate(State &state, unsigned stackDepth) const override
+        {
+            checkStackDepth(stackDepth);
+            return evaluate(state.nodes[args[0]]->evaluate(state, stackDepth + 1));
+        }
+    };
+    struct NodeInvert final : public NodeConstArgCount<1, NodeInvert>
+    {
+        virtual Type type() const override
+        {
+            return Type::Invert;
+        }
+        static shared_ptr<Data> evaluate(shared_ptr<Data> retval)
+        {
+            Matrix value;
+            if(retval->type() == Data::Type::Matrix)
+            {
+                value = dynamic_cast<DataMatrix *>(retval.get())->value;
+            }
+            else
+            {
+                throw ScriptException(make_shared<DataString>(L"invalid type for invert : " + retval->typeString()));
+            }
+            try
+            {
+                value = value.invert();
+            }
+            catch(domain_error &)
+            {
+                throw ScriptException(L"can't invert singular matrix");
+            }
+            return shared_ptr<Data>(new DataMatrix(value));
+        }
+        virtual shared_ptr<Data> evaluate(State &state, unsigned stackDepth) const override
+        {
+            checkStackDepth(stackDepth);
+            return evaluate(state.nodes[args[0]]->evaluate(state, stackDepth + 1));
+        }
+    };
 
     vector<shared_ptr<Node>> nodes;
     shared_ptr<Data> evaluate() const
@@ -3593,6 +3689,12 @@ inline shared_ptr<Script::Node> Script::Node::read(Reader &reader, uint32_t node
         return NodeListLiteral::read(reader, nodeCount);
     case Type::NewObject:
         return NodeNewObject::read(reader, nodeCount);
+    case Type::DoWhile:
+        return NodeDoWhile::read(reader, nodeCount);
+    case Type::RemoveTranslate:
+        return NodeRemoveTranslate::read(reader, nodeCount);
+    case Type::Invert:
+        return NodeInvert::read(reader, nodeCount);
     }
     assert(false);
 }

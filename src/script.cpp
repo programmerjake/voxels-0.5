@@ -137,6 +137,11 @@ struct Parser
         Tilde,
         Pi,
         New,
+        While,
+        For,
+        Do,
+        Invert,
+        RemoveTranslate,
     };
     TokenType tokenType = TokenType::Comma;
     wstring tokenText = L"";
@@ -186,6 +191,11 @@ struct Parser
         wordTokens[L"make_translate"] = TokenType::MakeTranslate;
         wordTokens[L"pi"] = TokenType::Pi;
         wordTokens[L"new"] = TokenType::New;
+        wordTokens[L"while"] = TokenType::While;
+        wordTokens[L"for"] = TokenType::For;
+        wordTokens[L"do"] = TokenType::Do;
+        wordTokens[L"invert"] = TokenType::Invert;
+        wordTokens[L"remove_translate"] = TokenType::RemoveTranslate;
     }
 
     void skipWhitespace()
@@ -1483,6 +1493,52 @@ struct Parser
             getToken();
             return retval;
         }
+        case TokenType::RemoveTranslate:
+        {
+            getToken();
+
+            if(tokenType != TokenType::LParen)
+            {
+                errorFn(L"expected : (");
+            }
+
+            getToken();
+            uint32_t expr = parseExpression(TokenType::RParen);
+
+            if(tokenType != TokenType::RParen)
+            {
+                errorFn(L"expected : )");
+            }
+
+            getToken();
+            auto node = make_shared<Script::NodeRemoveTranslate>();
+            node->args[0] = expr;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+
+        case TokenType::Invert:
+        {
+            getToken();
+
+            if(tokenType != TokenType::LParen)
+            {
+                errorFn(L"expected : (");
+            }
+
+            getToken();
+            uint32_t expr = parseExpression(TokenType::RParen);
+
+            if(tokenType != TokenType::RParen)
+            {
+                errorFn(L"expected : )");
+            }
+
+            getToken();
+            auto node = make_shared<Script::NodeInvert>();
+            node->args[0] = expr;
+            return insertNode(static_pointer_cast<Script::Node>(node));
+        }
+
         default:
             errorFn(L"unexpected token");
         }
@@ -1906,6 +1962,76 @@ struct Parser
         return retval;
     }
 
+    uint32_t parseLoops(TokenType ignoreType)
+    {
+        if(tokenType == TokenType::Do)
+        {
+            auto theLoop = make_shared<Script::NodeDoWhile>();
+            getToken();
+            theLoop->args[0] = parseExpression(TokenType::While);
+            if(tokenType == TokenType::Semicolon)
+                getToken();
+            if(tokenType != TokenType::While)
+                errorFn(L"expected : while");
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            theLoop->args[1] = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected )");
+            getToken();
+            return insertNode(static_pointer_cast<Script::Node>(theLoop));
+        }
+        if(tokenType == TokenType::While)
+        {
+            auto theLoop = make_shared<Script::NodeDoWhile>();
+            auto theCondition = make_shared<Script::NodeConditional>();
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            theLoop->args[1] = theCondition->args[0] = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected )");
+            getToken();
+            theLoop->args[0] = parseExpression(ignoreType);
+            theCondition->args[1] = insertNode(static_pointer_cast<Script::Node>(theLoop));
+            theCondition->args[2] = insertNode(shared_ptr<Script::Node>(new Script::NodeBlock));
+            return insertNode(static_pointer_cast<Script::Node>(theCondition));
+        }
+        /*if(tokenType == TokenType::For)
+        {
+            getToken();
+            if(tokenType != TokenType::LParen)
+                errorFn(L"expected : (");
+            getToken();
+            uint32_t initExpr;
+            if(tokenType != TokenType::Semicolon)
+            {
+                initExpr = parseExpression(TokenType::Semicolon);
+            }
+            else
+            {
+                initExpr = insertNode(shared_ptr<Script::Node>(new Script::NodeBlock));
+            }
+            if(tokenType != TokenType::Semicolon)
+                errorFn(L"expected ;");
+            getToken();
+            auto theLoop = make_shared<Script::NodeDoWhile>();
+            auto theCondition = make_shared<Script::NodeConditional>();
+            theLoop->args[1] = theCondition->args[0] = parseExpression(TokenType::RParen);
+            if(tokenType != TokenType::RParen)
+                errorFn(L"expected )");
+            getToken();
+            theLoop->args[0] = parseExpression(ignoreType);
+            theCondition->args[1] = insertNode(static_pointer_cast<Script::Node>(theLoop));
+            theCondition->args[2] = insertNode(shared_ptr<Script::Node>(new Script::NodeBlock));
+            return insertNode(static_pointer_cast<Script::Node>(theCondition));
+        }*/
+        return parseOr(ignoreType);
+    }
+
     uint32_t parseConditional(TokenType ignoreType)
     {
         if(tokenType == TokenType::If)
@@ -1954,7 +2080,7 @@ struct Parser
             return insertNode(static_pointer_cast<Script::Node>(cond));
         }
 
-        return parseOr(ignoreType);
+        return parseLoops(ignoreType);
     }
 
     uint32_t parseAssign(TokenType ignoreType)
