@@ -561,59 +561,60 @@ class Script final : public enable_shared_from_this<Script>
 {
 public:
     vector<shared_ptr<Scripting::Node>> nodes;
-    shared_ptr<Scripting::Data> evaluate() const
+    shared_ptr<Scripting::Data> evaluate(shared_ptr<Scripting::DataObject> inputObject = make_shared<Scripting::DataObject>()) const
     {
         Scripting::State state(nodes);
+        state.variables->value[L"io"] = inputObject;
         return nodes.back()->evaluate(state);
     }
-    Matrix evaluateAsMatrix() const
+    Matrix evaluateAsMatrix(shared_ptr<Scripting::DataObject> inputObject = make_shared<Scripting::DataObject>()) const
     {
-        shared_ptr<Scripting::Data> retval = evaluate();
+        shared_ptr<Scripting::Data> retval = evaluate(inputObject);
         if(retval->type() != Scripting::Data::Type::Matrix)
         {
             throw Scripting::ScriptException(retval);
         }
         return dynamic_pointer_cast<Scripting::DataMatrix>(retval)->value;
     }
-    VectorF evaluateAsVector() const
+    VectorF evaluateAsVector(shared_ptr<Scripting::DataObject> inputObject = make_shared<Scripting::DataObject>()) const
     {
-        shared_ptr<Scripting::Data> retval = evaluate();
+        shared_ptr<Scripting::Data> retval = evaluate(inputObject);
         if(retval->type() != Scripting::Data::Type::Vector)
         {
             throw Scripting::ScriptException(retval);
         }
         return dynamic_pointer_cast<Scripting::DataVector>(retval)->value;
     }
-    int32_t evaluateAsInteger() const
+    int32_t evaluateAsInteger(shared_ptr<Scripting::DataObject> inputObject = make_shared<Scripting::DataObject>()) const
     {
-        shared_ptr<Scripting::Data> retval = evaluate();
+        shared_ptr<Scripting::Data> retval = evaluate(inputObject);
         if(retval->type() != Scripting::Data::Type::Integer)
         {
             throw Scripting::ScriptException(retval);
         }
         return dynamic_pointer_cast<Scripting::DataInteger>(retval)->value;
     }
-    float evaluateAsFloat() const
+    float evaluateAsFloat(shared_ptr<Scripting::DataObject> inputObject = make_shared<Scripting::DataObject>()) const
     {
-        shared_ptr<Scripting::Data> retval = evaluate();
+        shared_ptr<Scripting::Data> retval = evaluate(inputObject);
         if(retval->type() != Scripting::Data::Type::Float)
         {
             throw Scripting::ScriptException(retval);
         }
         return dynamic_pointer_cast<Scripting::DataFloat>(retval)->value;
     }
-    wstring evaluateAsString() const
+    wstring evaluateAsString(shared_ptr<Scripting::DataObject> inputObject = make_shared<Scripting::DataObject>()) const
     {
-        shared_ptr<Scripting::Data> retval = evaluate();
+        shared_ptr<Scripting::Data> retval = evaluate(inputObject);
         if(retval->type() != Scripting::Data::Type::String)
         {
             throw Scripting::ScriptException(retval);
         }
         return dynamic_pointer_cast<Scripting::DataString>(retval)->value;
     }
-    bool evaluateAsBoolean() const
+    bool evaluateAsBoolean(shared_ptr<Scripting::DataObject> inputObject = make_shared<Scripting::DataObject>()) const
     {
-        shared_ptr<Scripting::Data> retval = evaluate();
+        shared_ptr<Scripting::Data> retval = evaluate(inputObject);
         if(retval->type() != Scripting::Data::Type::Boolean)
         {
             throw Scripting::ScriptException(retval);

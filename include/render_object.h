@@ -9,6 +9,7 @@
 #include "block_face.h"
 #include "light.h"
 #include "ray_casting.h"
+#include "script.h"
 #include <atomic>
 #include <unordered_map>
 #include <unordered_set>
@@ -55,18 +56,14 @@ public:
     virtual BoxRayCollision rayHits(Ray ray) = 0;
 };
 
-#if 0 //TODO(jacob#): finish entities
-class RenderObjectTransformScript final : public enable_shared_from_this<RenderObjectTransformScript>
-{
-private:
-
-};
-
+#if 0 // TODO(jacob#): finish
 class RenderObjectEntityMesh final : public enable_shared_from_this<RenderObjectEntityMesh>
 {
 private:
     vector<Mesh> meshs;
+    vector<shared_ptr<Script>> scripts;
     shared_ptr<RenderObjectWorld> world;
+    #error finish
 };
 
 class RenderObjectEntity final : public RenderObject
