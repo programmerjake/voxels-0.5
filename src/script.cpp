@@ -1,4 +1,5 @@
 #include "script.h"
+#include "script_nodes.h"
 #include "util.h"
 #include <cwctype>
 #include <sstream>
@@ -6,6 +7,7 @@
 #include <iostream>
 
 using namespace std;
+using namespace Scripting;
 
 namespace
 {
@@ -854,7 +856,7 @@ struct Parser
         tokenText = ts;
     }
 
-    uint32_t insertNode(shared_ptr<Script::Node> node)
+    uint32_t insertNode(shared_ptr<Scripting::Node> node)
     {
         uint32_t retval = script->nodes.size();
         script->nodes.push_back(node);
@@ -892,25 +894,25 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeListLiteral> listNode = make_shared<Script::NodeListLiteral>();
+            shared_ptr<Scripting::NodeListLiteral> listNode = make_shared<Scripting::NodeListLiteral>();
             listNode->nodes.push_back(x);
             listNode->nodes.push_back(y);
             listNode->nodes.push_back(z);
-            uint32_t list = insertNode(static_pointer_cast<Script::Node>(listNode));
-            shared_ptr<Script::NodeCastToVector> vectorNode = make_shared<Script::NodeCastToVector>();
+            uint32_t list = insertNode(static_pointer_cast<Scripting::Node>(listNode));
+            shared_ptr<Scripting::NodeCastToVector> vectorNode = make_shared<Scripting::NodeCastToVector>();
             vectorNode->args[0] = list;
-            return insertNode(static_pointer_cast<Script::Node>(vectorNode));
+            return insertNode(static_pointer_cast<Scripting::Node>(vectorNode));
         }
 
         case TokenType::LBracket:
         {
             getToken();
-            shared_ptr<Script::NodeListLiteral> listNode = make_shared<Script::NodeListLiteral>();
+            shared_ptr<Scripting::NodeListLiteral> listNode = make_shared<Scripting::NodeListLiteral>();
 
             if(tokenType == TokenType::RBracket)
             {
                 getToken();
-                return insertNode(static_pointer_cast<Script::Node>(listNode));
+                return insertNode(static_pointer_cast<Scripting::Node>(listNode));
             }
 
             while(true)
@@ -932,7 +934,7 @@ struct Parser
             }
 
             getToken();
-            return insertNode(static_pointer_cast<Script::Node>(listNode));
+            return insertNode(static_pointer_cast<Scripting::Node>(listNode));
         }
 
         case TokenType::LParen:
@@ -951,20 +953,20 @@ struct Parser
 
         case TokenType::Id:
         {
-            uint32_t globals = insertNode(shared_ptr<Script::Node>(new Script::NodeLoadGlobals));
-            uint32_t name = insertNode(shared_ptr<Script::Node>(new Script::NodeConst(shared_ptr<Script::Data>
-                                       (new Script::DataString(tokenText)))));
+            uint32_t globals = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeLoadGlobals));
+            uint32_t name = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeConst(shared_ptr<Scripting::Data>
+                                       (new Scripting::DataString(tokenText)))));
             getToken();
-            shared_ptr<Script::NodeReadIndex> readIndexNode = make_shared<Script::NodeReadIndex>();
+            shared_ptr<Scripting::NodeReadIndex> readIndexNode = make_shared<Scripting::NodeReadIndex>();
             readIndexNode->args[0] = globals;
             readIndexNode->args[1] = name;
-            return insertNode(static_pointer_cast<Script::Node>(readIndexNode));
+            return insertNode(static_pointer_cast<Scripting::Node>(readIndexNode));
         }
 
         case TokenType::LBrace:
         {
             getToken();
-            shared_ptr<Script::NodeBlock> listNode = make_shared<Script::NodeBlock>();
+            shared_ptr<Scripting::NodeBlock> listNode = make_shared<Scripting::NodeBlock>();
 
             while(tokenType == TokenType::Semicolon)
             {
@@ -974,7 +976,7 @@ struct Parser
             if(tokenType == TokenType::RBrace)
             {
                 getToken();
-                return insertNode(static_pointer_cast<Script::Node>(listNode));
+                return insertNode(static_pointer_cast<Scripting::Node>(listNode));
             }
 
             while(true)
@@ -999,13 +1001,13 @@ struct Parser
             }
 
             getToken();
-            return insertNode(static_pointer_cast<Script::Node>(listNode));
+            return insertNode(static_pointer_cast<Scripting::Node>(listNode));
         }
 
         case TokenType::StringLit:
         {
-            uint32_t retval = insertNode(shared_ptr<Script::Node>(new Script::NodeConst(
-                                             shared_ptr<Script::Data>(new Script::DataString(tokenText)))));
+            uint32_t retval = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeConst(
+                                             shared_ptr<Scripting::Data>(new Scripting::DataString(tokenText)))));
             getToken();
             return retval;
         }
@@ -1014,8 +1016,8 @@ struct Parser
         {
             int32_t v;
             wistringstream(tokenText) >> v;
-            uint32_t retval = insertNode(shared_ptr<Script::Node>(new Script::NodeConst(
-                                             shared_ptr<Script::Data>(new Script::DataInteger(v)))));
+            uint32_t retval = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeConst(
+                                             shared_ptr<Scripting::Data>(new Scripting::DataInteger(v)))));
             getToken();
             return retval;
         }
@@ -1024,16 +1026,16 @@ struct Parser
         {
             float v;
             wistringstream(tokenText) >> v;
-            uint32_t retval = insertNode(shared_ptr<Script::Node>(new Script::NodeConst(
-                                             shared_ptr<Script::Data>(new Script::DataFloat(v)))));
+            uint32_t retval = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeConst(
+                                             shared_ptr<Scripting::Data>(new Scripting::DataFloat(v)))));
             getToken();
             return retval;
         }
 
         case TokenType::BooleanLit:
         {
-            uint32_t retval = insertNode(shared_ptr<Script::Node>(new Script::NodeConst(
-                                             shared_ptr<Script::Data>(new Script::DataBoolean(tokenText[0] == L't')))));
+            uint32_t retval = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeConst(
+                                             shared_ptr<Scripting::Data>(new Scripting::DataBoolean(tokenText[0] == L't')))));
             getToken();
             return retval;
         }
@@ -1041,8 +1043,8 @@ struct Parser
         case TokenType::Pi:
         {
             getToken();
-            return insertNode(shared_ptr<Script::Node>(new Script::NodeConst(shared_ptr<Script::Data>
-                              (new Script::DataFloat(M_PI)))));
+            return insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeConst(shared_ptr<Scripting::Data>
+                              (new Scripting::DataFloat(M_PI)))));
         }
 
         case TokenType::Sin:
@@ -1063,9 +1065,9 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeSin> node = make_shared<Script::NodeSin>();
+            shared_ptr<Scripting::NodeSin> node = make_shared<Scripting::NodeSin>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::Cos:
@@ -1086,9 +1088,9 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeCos> node = make_shared<Script::NodeCos>();
+            shared_ptr<Scripting::NodeCos> node = make_shared<Scripting::NodeCos>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::Tan:
@@ -1109,9 +1111,9 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeTan> node = make_shared<Script::NodeTan>();
+            shared_ptr<Scripting::NodeTan> node = make_shared<Scripting::NodeTan>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::ASin:
@@ -1132,9 +1134,9 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeASin> node = make_shared<Script::NodeASin>();
+            shared_ptr<Scripting::NodeASin> node = make_shared<Scripting::NodeASin>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::ACos:
@@ -1155,9 +1157,9 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeACos> node = make_shared<Script::NodeACos>();
+            shared_ptr<Scripting::NodeACos> node = make_shared<Scripting::NodeACos>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::ATan:
@@ -1178,9 +1180,9 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeATan> node = make_shared<Script::NodeATan>();
+            shared_ptr<Scripting::NodeATan> node = make_shared<Scripting::NodeATan>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::Exp:
@@ -1201,9 +1203,9 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeExp> node = make_shared<Script::NodeExp>();
+            shared_ptr<Scripting::NodeExp> node = make_shared<Scripting::NodeExp>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::Log:
@@ -1224,9 +1226,9 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeLog> node = make_shared<Script::NodeLog>();
+            shared_ptr<Scripting::NodeLog> node = make_shared<Scripting::NodeLog>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::Sqrt:
@@ -1247,9 +1249,9 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeSqrt> node = make_shared<Script::NodeSqrt>();
+            shared_ptr<Scripting::NodeSqrt> node = make_shared<Scripting::NodeSqrt>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::MakeRotateX:
@@ -1270,9 +1272,9 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeMakeRotateX> node = make_shared<Script::NodeMakeRotateX>();
+            shared_ptr<Scripting::NodeMakeRotateX> node = make_shared<Scripting::NodeMakeRotateX>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::MakeRotateY:
@@ -1293,9 +1295,9 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeMakeRotateY> node = make_shared<Script::NodeMakeRotateY>();
+            shared_ptr<Scripting::NodeMakeRotateY> node = make_shared<Scripting::NodeMakeRotateY>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::MakeRotateZ:
@@ -1316,9 +1318,9 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeMakeRotateZ> node = make_shared<Script::NodeMakeRotateZ>();
+            shared_ptr<Scripting::NodeMakeRotateZ> node = make_shared<Scripting::NodeMakeRotateZ>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::MakeScale:
@@ -1339,9 +1341,9 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeMakeScale> node = make_shared<Script::NodeMakeScale>();
+            shared_ptr<Scripting::NodeMakeScale> node = make_shared<Scripting::NodeMakeScale>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::MakeTranslate:
@@ -1362,9 +1364,9 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeMakeTranslate> node = make_shared<Script::NodeMakeTranslate>();
+            shared_ptr<Scripting::NodeMakeTranslate> node = make_shared<Scripting::NodeMakeTranslate>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::Abs:
@@ -1385,9 +1387,9 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeAbs> node = make_shared<Script::NodeAbs>();
+            shared_ptr<Scripting::NodeAbs> node = make_shared<Scripting::NodeAbs>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::Ceil:
@@ -1408,9 +1410,9 @@ struct Parser
             }
 
             getToken();
-            auto node = make_shared<Script::NodeCeil>();
+            auto node = make_shared<Scripting::NodeCeil>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::Floor:
@@ -1431,9 +1433,9 @@ struct Parser
             }
 
             getToken();
-            auto node = make_shared<Script::NodeFloor>();
+            auto node = make_shared<Scripting::NodeFloor>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::ATan2:
@@ -1462,10 +1464,10 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeATan2> node = make_shared<Script::NodeATan2>();
+            shared_ptr<Scripting::NodeATan2> node = make_shared<Scripting::NodeATan2>();
             node->args[0] = expr1;
             node->args[1] = expr2;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::MakeRotate:
@@ -1494,10 +1496,10 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeMakeRotate> node = make_shared<Script::NodeMakeRotate>();
+            shared_ptr<Scripting::NodeMakeRotate> node = make_shared<Scripting::NodeMakeRotate>();
             node->args[0] = expr1;
             node->args[1] = expr2;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
         case TokenType::New:
         {
@@ -1506,35 +1508,35 @@ struct Parser
             switch(tokenType)
             {
             case TokenType::Boolean:
-                retval = insertNode(shared_ptr<Script::Node>(new Script::NodeConst(shared_ptr<Script::Data>(new Script::DataBoolean(false)))));
+                retval = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeConst(shared_ptr<Scripting::Data>(new Scripting::DataBoolean(false)))));
                 break;
 
             case TokenType::Float:
-                retval = insertNode(shared_ptr<Script::Node>(new Script::NodeConst(shared_ptr<Script::Data>(new Script::DataFloat(0)))));
+                retval = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeConst(shared_ptr<Scripting::Data>(new Scripting::DataFloat(0)))));
                 break;
 
             case TokenType::Integer:
-                retval = insertNode(shared_ptr<Script::Node>(new Script::NodeConst(shared_ptr<Script::Data>(new Script::DataInteger(0)))));
+                retval = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeConst(shared_ptr<Scripting::Data>(new Scripting::DataInteger(0)))));
                 break;
 
             case TokenType::List:
-                retval = insertNode(shared_ptr<Script::Node>(new Script::NodeListLiteral));
+                retval = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeListLiteral));
                 break;
 
             case TokenType::Matrix:
-                retval = insertNode(shared_ptr<Script::Node>(new Script::NodeConst(shared_ptr<Script::Data>(new Script::DataMatrix(Matrix::identity())))));
+                retval = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeConst(shared_ptr<Scripting::Data>(new Scripting::DataMatrix(Matrix::identity())))));
                 break;
 
             case TokenType::Object:
-                retval = insertNode(shared_ptr<Script::Node>(new Script::NodeNewObject));
+                retval = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeNewObject));
                 break;
 
             case TokenType::String:
-                retval = insertNode(shared_ptr<Script::Node>(new Script::NodeConst(shared_ptr<Script::Data>(new Script::DataString(L"")))));
+                retval = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeConst(shared_ptr<Scripting::Data>(new Scripting::DataString(L"")))));
                 break;
 
             case TokenType::Vector:
-                retval = insertNode(shared_ptr<Script::Node>(new Script::NodeConst(shared_ptr<Script::Data>(new Script::DataVector(VectorF(0))))));
+                retval = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeConst(shared_ptr<Scripting::Data>(new Scripting::DataVector(VectorF(0))))));
                 break;
 
             default:
@@ -1561,9 +1563,9 @@ struct Parser
             }
 
             getToken();
-            auto node = make_shared<Script::NodeRemoveTranslate>();
+            auto node = make_shared<Scripting::NodeRemoveTranslate>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         case TokenType::Invert:
@@ -1584,9 +1586,9 @@ struct Parser
             }
 
             getToken();
-            auto node = make_shared<Script::NodeInvert>();
+            auto node = make_shared<Scripting::NodeInvert>();
             node->args[0] = expr;
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         default:
@@ -1614,10 +1616,10 @@ struct Parser
                 }
 
                 getToken();
-                shared_ptr<Script::NodeReadIndex> readIndexNode = make_shared<Script::NodeReadIndex>();
+                shared_ptr<Scripting::NodeReadIndex> readIndexNode = make_shared<Scripting::NodeReadIndex>();
                 readIndexNode->args[0] = retval;
                 readIndexNode->args[1] = arg;
-                retval = insertNode(static_pointer_cast<Script::Node>(readIndexNode));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(readIndexNode));
             }
             else if(tokenType == TokenType::Period)
             {
@@ -1628,13 +1630,13 @@ struct Parser
                     errorFn(L"expected : name");
                 }
 
-                uint32_t name = insertNode(shared_ptr<Script::Node>(new Script::NodeConst(shared_ptr<Script::Data>
-                                           (new Script::DataString(tokenText)))));
+                uint32_t name = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeConst(shared_ptr<Scripting::Data>
+                                           (new Scripting::DataString(tokenText)))));
                 getToken();
-                shared_ptr<Script::NodeReadIndex> readIndexNode = make_shared<Script::NodeReadIndex>();
+                shared_ptr<Scripting::NodeReadIndex> readIndexNode = make_shared<Scripting::NodeReadIndex>();
                 readIndexNode->args[0] = retval;
                 readIndexNode->args[1] = name;
-                retval = insertNode(static_pointer_cast<Script::Node>(readIndexNode));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(readIndexNode));
             }
             else
             {
@@ -1657,40 +1659,40 @@ struct Parser
             }
 
             getToken();
-            shared_ptr<Script::NodeCast> cast;
+            shared_ptr<Scripting::NodeCast> cast;
 
             switch(tokenType)
             {
             case TokenType::Boolean:
-                cast = static_pointer_cast<Script::NodeCast>(make_shared<Script::NodeCastToBoolean>());
+                cast = static_pointer_cast<Scripting::NodeCast>(make_shared<Scripting::NodeCastToBoolean>());
                 break;
 
             case TokenType::Float:
-                cast = static_pointer_cast<Script::NodeCast>(make_shared<Script::NodeCastToFloat>());
+                cast = static_pointer_cast<Scripting::NodeCast>(make_shared<Scripting::NodeCastToFloat>());
                 break;
 
             case TokenType::Integer:
-                cast = static_pointer_cast<Script::NodeCast>(make_shared<Script::NodeCastToInteger>());
+                cast = static_pointer_cast<Scripting::NodeCast>(make_shared<Scripting::NodeCastToInteger>());
                 break;
 
             case TokenType::List:
-                cast = static_pointer_cast<Script::NodeCast>(make_shared<Script::NodeCastToList>());
+                cast = static_pointer_cast<Scripting::NodeCast>(make_shared<Scripting::NodeCastToList>());
                 break;
 
             case TokenType::Matrix:
-                cast = static_pointer_cast<Script::NodeCast>(make_shared<Script::NodeCastToMatrix>());
+                cast = static_pointer_cast<Scripting::NodeCast>(make_shared<Scripting::NodeCastToMatrix>());
                 break;
 
             case TokenType::Object:
-                cast = static_pointer_cast<Script::NodeCast>(make_shared<Script::NodeCastToObject>());
+                cast = static_pointer_cast<Scripting::NodeCast>(make_shared<Scripting::NodeCastToObject>());
                 break;
 
             case TokenType::String:
-                cast = static_pointer_cast<Script::NodeCast>(make_shared<Script::NodeCastToString>());
+                cast = static_pointer_cast<Scripting::NodeCast>(make_shared<Scripting::NodeCastToString>());
                 break;
 
             case TokenType::Vector:
-                cast = static_pointer_cast<Script::NodeCast>(make_shared<Script::NodeCastToVector>());
+                cast = static_pointer_cast<Scripting::NodeCast>(make_shared<Scripting::NodeCastToVector>());
                 break;
 
             default:
@@ -1707,7 +1709,7 @@ struct Parser
             getToken();
             uint32_t v = parseNeg(TokenType::Pow);
             cast->args[0] = v;
-            return insertNode(static_pointer_cast<Script::Node>(cast));
+            return insertNode(static_pointer_cast<Scripting::Node>(cast));
         }
 
         return parseElementAccess();
@@ -1720,11 +1722,11 @@ struct Parser
         if(tokenType == TokenType::Pow && ignoreType != tokenType)
         {
             getToken();
-            shared_ptr<Script::NodePow> node = make_shared<Script::NodePow>();
+            shared_ptr<Scripting::NodePow> node = make_shared<Scripting::NodePow>();
             uint32_t arg = parseNeg(ignoreType);
             node->args[0] = retval;
             node->args[1] = arg;
-            retval = insertNode(static_pointer_cast<Script::Node>(node));
+            retval = insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         return retval;
@@ -1735,9 +1737,9 @@ struct Parser
         if(tokenType == TokenType::Minus)
         {
             getToken();
-            shared_ptr<Script::NodeNeg> node = make_shared<Script::NodeNeg>();
+            shared_ptr<Scripting::NodeNeg> node = make_shared<Scripting::NodeNeg>();
             node->args[0] = parsePow(ignoreType);
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         return parsePow(ignoreType);
@@ -1751,35 +1753,35 @@ struct Parser
         {
             if(tokenType == TokenType::DotProd)
             {
-                auto node = make_shared<Script::NodeDot>();
+                auto node = make_shared<Scripting::NodeDot>();
                 node->args[0] = retval;
                 getToken();
                 node->args[1] = parseNeg(ignoreType);
-                retval = insertNode(static_pointer_cast<Script::Node>(node));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(node));
             }
             else if(tokenType == TokenType::Star)
             {
-                auto node = make_shared<Script::NodeMul>();
+                auto node = make_shared<Scripting::NodeMul>();
                 node->args[0] = retval;
                 getToken();
                 node->args[1] = parseNeg(ignoreType);
-                retval = insertNode(static_pointer_cast<Script::Node>(node));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(node));
             }
             else if(tokenType == TokenType::Percent)
             {
-                auto node = make_shared<Script::NodeMod>();
+                auto node = make_shared<Scripting::NodeMod>();
                 node->args[0] = retval;
                 getToken();
                 node->args[1] = parseNeg(ignoreType);
-                retval = insertNode(static_pointer_cast<Script::Node>(node));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(node));
             }
             else if(tokenType == TokenType::FSlash)
             {
-                auto node = make_shared<Script::NodeDiv>();
+                auto node = make_shared<Scripting::NodeDiv>();
                 node->args[0] = retval;
                 getToken();
                 node->args[1] = parseNeg(ignoreType);
-                retval = insertNode(static_pointer_cast<Script::Node>(node));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(node));
             }
             else
             {
@@ -1798,11 +1800,11 @@ struct Parser
         {
             if(tokenType == TokenType::CrossProd)
             {
-                auto node = make_shared<Script::NodeCross>();
+                auto node = make_shared<Scripting::NodeCross>();
                 node->args[0] = retval;
                 getToken();
                 node->args[1] = parseFactor(ignoreType);
-                retval = insertNode(static_pointer_cast<Script::Node>(node));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(node));
             }
             else
             {
@@ -1821,19 +1823,19 @@ struct Parser
         {
             if(tokenType == TokenType::Plus)
             {
-                auto node = make_shared<Script::NodeAdd>();
+                auto node = make_shared<Scripting::NodeAdd>();
                 node->args[0] = retval;
                 getToken();
                 node->args[1] = parseCross(ignoreType);
-                retval = insertNode(static_pointer_cast<Script::Node>(node));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(node));
             }
             else if(tokenType == TokenType::Minus)
             {
-                auto node = make_shared<Script::NodeSub>();
+                auto node = make_shared<Scripting::NodeSub>();
                 node->args[0] = retval;
                 getToken();
                 node->args[1] = parseCross(ignoreType);
-                retval = insertNode(static_pointer_cast<Script::Node>(node));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(node));
             }
             else
             {
@@ -1852,11 +1854,11 @@ struct Parser
         {
             if(tokenType == TokenType::Tilde)
             {
-                auto node = make_shared<Script::NodeConcat>();
+                auto node = make_shared<Scripting::NodeConcat>();
                 node->args[0] = retval;
                 getToken();
                 node->args[1] = parseTerm(ignoreType);
-                retval = insertNode(static_pointer_cast<Script::Node>(node));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(node));
             }
             else
             {
@@ -1875,51 +1877,51 @@ struct Parser
         {
             if(tokenType == TokenType::Equal)
             {
-                auto node = make_shared<Script::NodeEqual>();
+                auto node = make_shared<Scripting::NodeEqual>();
                 node->args[0] = retval;
                 getToken();
                 node->args[1] = parseConcat(ignoreType);
-                retval = insertNode(static_pointer_cast<Script::Node>(node));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(node));
             }
             else if(tokenType == TokenType::NotEqual)
             {
-                auto node = make_shared<Script::NodeNotEqual>();
+                auto node = make_shared<Scripting::NodeNotEqual>();
                 node->args[0] = retval;
                 getToken();
                 node->args[1] = parseConcat(ignoreType);
-                retval = insertNode(static_pointer_cast<Script::Node>(node));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(node));
             }
             else if(tokenType == TokenType::LAngle)
             {
-                auto node = make_shared<Script::NodeLessThan>();
+                auto node = make_shared<Scripting::NodeLessThan>();
                 node->args[0] = retval;
                 getToken();
                 node->args[1] = parseConcat(ignoreType);
-                retval = insertNode(static_pointer_cast<Script::Node>(node));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(node));
             }
             else if(tokenType == TokenType::RAngle)
             {
-                auto node = make_shared<Script::NodeGreaterThan>();
+                auto node = make_shared<Scripting::NodeGreaterThan>();
                 node->args[0] = retval;
                 getToken();
                 node->args[1] = parseConcat(ignoreType);
-                retval = insertNode(static_pointer_cast<Script::Node>(node));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(node));
             }
             else if(tokenType == TokenType::GreaterEqual)
             {
-                auto node = make_shared<Script::NodeGreaterEqual>();
+                auto node = make_shared<Scripting::NodeGreaterEqual>();
                 node->args[0] = retval;
                 getToken();
                 node->args[1] = parseConcat(ignoreType);
-                retval = insertNode(static_pointer_cast<Script::Node>(node));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(node));
             }
             else if(tokenType == TokenType::LessEqual)
             {
-                auto node = make_shared<Script::NodeLessEqual>();
+                auto node = make_shared<Scripting::NodeLessEqual>();
                 node->args[0] = retval;
                 getToken();
                 node->args[1] = parseConcat(ignoreType);
-                retval = insertNode(static_pointer_cast<Script::Node>(node));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(node));
             }
             else
             {
@@ -1935,9 +1937,9 @@ struct Parser
         if(tokenType == TokenType::Not)
         {
             getToken();
-            auto node = make_shared<Script::NodeNot>();
+            auto node = make_shared<Scripting::NodeNot>();
             node->args[0] = parseCompare(ignoreType);
-            return insertNode(static_pointer_cast<Script::Node>(node));
+            return insertNode(static_pointer_cast<Scripting::Node>(node));
         }
 
         return parseCompare(ignoreType);
@@ -1951,11 +1953,11 @@ struct Parser
         {
             if(tokenType == TokenType::And)
             {
-                auto node = make_shared<Script::NodeAnd>();
+                auto node = make_shared<Scripting::NodeAnd>();
                 node->args[0] = retval;
                 getToken();
                 node->args[1] = parseNot(ignoreType);
-                retval = insertNode(static_pointer_cast<Script::Node>(node));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(node));
             }
             else
             {
@@ -1974,11 +1976,11 @@ struct Parser
         {
             if(tokenType == TokenType::Xor)
             {
-                auto node = make_shared<Script::NodeXor>();
+                auto node = make_shared<Scripting::NodeXor>();
                 node->args[0] = retval;
                 getToken();
                 node->args[1] = parseAnd(ignoreType);
-                retval = insertNode(static_pointer_cast<Script::Node>(node));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(node));
             }
             else
             {
@@ -1997,11 +1999,11 @@ struct Parser
         {
             if(tokenType == TokenType::Or)
             {
-                auto node = make_shared<Script::NodeOr>();
+                auto node = make_shared<Scripting::NodeOr>();
                 node->args[0] = retval;
                 getToken();
                 node->args[1] = parseXor(ignoreType);
-                retval = insertNode(static_pointer_cast<Script::Node>(node));
+                retval = insertNode(static_pointer_cast<Scripting::Node>(node));
             }
             else
             {
@@ -2016,7 +2018,7 @@ struct Parser
     {
         if(tokenType == TokenType::Do)
         {
-            auto theLoop = make_shared<Script::NodeDoWhile>();
+            auto theLoop = make_shared<Scripting::NodeDoWhile>();
             getToken();
             theLoop->args[0] = parseExpression(TokenType::While);
             if(tokenType == TokenType::Semicolon)
@@ -2031,12 +2033,12 @@ struct Parser
             if(tokenType != TokenType::RParen)
                 errorFn(L"expected )");
             getToken();
-            return insertNode(static_pointer_cast<Script::Node>(theLoop));
+            return insertNode(static_pointer_cast<Scripting::Node>(theLoop));
         }
         if(tokenType == TokenType::While)
         {
-            auto theLoop = make_shared<Script::NodeDoWhile>();
-            auto theCondition = make_shared<Script::NodeConditional>();
+            auto theLoop = make_shared<Scripting::NodeDoWhile>();
+            auto theCondition = make_shared<Scripting::NodeConditional>();
             getToken();
             if(tokenType != TokenType::LParen)
                 errorFn(L"expected : (");
@@ -2046,9 +2048,9 @@ struct Parser
                 errorFn(L"expected )");
             getToken();
             theLoop->args[0] = parseExpression(ignoreType);
-            theCondition->args[1] = insertNode(static_pointer_cast<Script::Node>(theLoop));
-            theCondition->args[2] = insertNode(shared_ptr<Script::Node>(new Script::NodeBlock));
-            return insertNode(static_pointer_cast<Script::Node>(theCondition));
+            theCondition->args[1] = insertNode(static_pointer_cast<Scripting::Node>(theLoop));
+            theCondition->args[2] = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeBlock));
+            return insertNode(static_pointer_cast<Scripting::Node>(theCondition));
         }
         if(tokenType == TokenType::For)
         {
@@ -2056,14 +2058,14 @@ struct Parser
             if(tokenType != TokenType::LParen)
                 errorFn(L"expected : (");
             getToken();
-            auto theLoop = make_shared<Script::NodeFor>();
+            auto theLoop = make_shared<Scripting::NodeFor>();
             if(tokenType != TokenType::Semicolon)
             {
                 theLoop->args[0] = parseExpression(TokenType::Semicolon);
             }
             else
             {
-                theLoop->args[0] = insertNode(shared_ptr<Script::Node>(new Script::NodeBlock));
+                theLoop->args[0] = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeBlock));
             }
             if(tokenType != TokenType::Semicolon)
                 errorFn(L"expected ;");
@@ -2074,7 +2076,7 @@ struct Parser
             }
             else
             {
-                theLoop->args[1] = insertNode(shared_ptr<Script::Node>(new Script::NodeConst(shared_ptr<Script::Data>(new Script::DataBoolean(true)))));
+                theLoop->args[1] = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeConst(shared_ptr<Scripting::Data>(new Scripting::DataBoolean(true)))));
             }
             if(tokenType != TokenType::Semicolon)
                 errorFn(L"expected ;");
@@ -2085,13 +2087,13 @@ struct Parser
             }
             else
             {
-                theLoop->args[2] = insertNode(shared_ptr<Script::Node>(new Script::NodeBlock));
+                theLoop->args[2] = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeBlock));
             }
             if(tokenType != TokenType::RParen)
                 errorFn(L"expected )");
             getToken();
             theLoop->args[3] = parseExpression(ignoreType);
-            return insertNode(static_pointer_cast<Script::Node>(theLoop));
+            return insertNode(static_pointer_cast<Scripting::Node>(theLoop));
         }
         return parseOr(ignoreType);
     }
@@ -2100,7 +2102,7 @@ struct Parser
     {
         if(tokenType == TokenType::If)
         {
-            auto cond = make_shared<Script::NodeConditional>();
+            auto cond = make_shared<Scripting::NodeConditional>();
             getToken();
 
             if(tokenType != TokenType::LParen)
@@ -2133,7 +2135,7 @@ struct Parser
             }
             else
             {
-                cond->args[2] = insertNode(shared_ptr<Script::Node>(new Script::NodeBlock));
+                cond->args[2] = insertNode(shared_ptr<Scripting::Node>(new Scripting::NodeBlock));
 
                 if(gotSemicolon)
                 {
@@ -2141,7 +2143,7 @@ struct Parser
                 }
             }
 
-            return insertNode(static_pointer_cast<Script::Node>(cond));
+            return insertNode(static_pointer_cast<Scripting::Node>(cond));
         }
 
         return parseLoops(ignoreType);
@@ -2158,16 +2160,16 @@ struct Parser
 
         if(tokenType == TokenType::Assign)
         {
-            shared_ptr<Script::Node> &node = script->nodes[retval];
+            shared_ptr<Scripting::Node> &node = script->nodes[retval];
 
-            if(node->type() != Script::Node::Type::ReadIndex)
+            if(node->type() != Scripting::Node::Type::ReadIndex)
             {
                 errorFn(L"can't assign to non-variable");
             }
 
-            shared_ptr<Script::NodeAssignIndex> newNode = make_shared<Script::NodeAssignIndex>();
-            newNode->args[0] = dynamic_cast<Script::NodeReadIndex *>(node.get())->args[0];
-            newNode->args[1] = dynamic_cast<Script::NodeReadIndex *>(node.get())->args[1];
+            shared_ptr<Scripting::NodeAssignIndex> newNode = make_shared<Scripting::NodeAssignIndex>();
+            newNode->args[0] = dynamic_cast<Scripting::NodeReadIndex *>(node.get())->args[0];
+            newNode->args[1] = dynamic_cast<Scripting::NodeReadIndex *>(node.get())->args[1];
             node = newNode;
             getToken();
             newNode->args[2] = parseAssign(ignoreType);
@@ -2188,7 +2190,7 @@ struct Parser
         uint32_t node = parseExpression(TokenType::EndOfFile);
         if(node != script->nodes.size() - 1)
         {
-            auto block = make_shared<Script::NodeBlock>();
+            auto block = make_shared<Scripting::NodeBlock>();
             block->nodes.push_back(node);
             node = insertNode(block);
         }
@@ -2209,7 +2211,137 @@ shared_ptr<Script> Script::parse(wstring code)
     return parser.run();
 }
 
-#if 1 // Test Script
+shared_ptr<Scripting::Node> Scripting::Node::read(Reader &reader, uint32_t nodeCount)
+{
+    Type type = readType(reader);
+    switch(type)
+    {
+    case Type::Last:
+        break;
+    case Type::Const:
+        return NodeConst::read(reader, nodeCount);
+    case Type::CastToString:
+        return NodeCastToString::read(reader, nodeCount);
+    case Type::CastToInteger:
+        return NodeCastToInteger::read(reader, nodeCount);
+    case Type::CastToFloat:
+        return NodeCastToFloat::read(reader, nodeCount);
+    case Type::CastToVector:
+        return NodeCastToVector::read(reader, nodeCount);
+    case Type::CastToMatrix:
+        return NodeCastToMatrix::read(reader, nodeCount);
+    case Type::CastToList:
+        return NodeCastToList::read(reader, nodeCount);
+    case Type::CastToObject:
+        return NodeCastToObject::read(reader, nodeCount);
+    case Type::CastToBoolean:
+        return NodeCastToBoolean::read(reader, nodeCount);
+    case Type::LoadGlobals:
+        return NodeLoadGlobals::read(reader, nodeCount);
+    case Type::ReadIndex:
+        return NodeReadIndex::read(reader, nodeCount);
+    case Type::AssignIndex:
+        return NodeAssignIndex::read(reader, nodeCount);
+    case Type::Add:
+        return NodeAdd::read(reader, nodeCount);
+    case Type::Sub:
+        return NodeSub::read(reader, nodeCount);
+    case Type::Mul:
+        return NodeMul::read(reader, nodeCount);
+    case Type::Div:
+        return NodeDiv::read(reader, nodeCount);
+    case Type::Mod:
+        return NodeMod::read(reader, nodeCount);
+    case Type::Pow:
+        return NodePow::read(reader, nodeCount);
+    case Type::And:
+        return NodeAnd::read(reader, nodeCount);
+    case Type::Or:
+        return NodeOr::read(reader, nodeCount);
+    case Type::Xor:
+        return NodeXor::read(reader, nodeCount);
+    case Type::Concat:
+        return NodeConcat::read(reader, nodeCount);
+    case Type::Dot:
+        return NodeDot::read(reader, nodeCount);
+    case Type::Cross:
+        return NodeCross::read(reader, nodeCount);
+    case Type::Equal:
+        return NodeEqual::read(reader, nodeCount);
+    case Type::NotEqual:
+        return NodeNotEqual::read(reader, nodeCount);
+    case Type::LessThan:
+        return NodeLessThan::read(reader, nodeCount);
+    case Type::GreaterThan:
+        return NodeGreaterThan::read(reader, nodeCount);
+    case Type::LessEqual:
+        return NodeLessEqual::read(reader, nodeCount);
+    case Type::GreaterEqual:
+        return NodeGreaterEqual::read(reader, nodeCount);
+    case Type::Not:
+        return NodeNot::read(reader, nodeCount);
+    case Type::Neg:
+        return NodeNeg::read(reader, nodeCount);
+    case Type::Abs:
+        return NodeAbs::read(reader, nodeCount);
+    case Type::Sin:
+        return NodeSin::read(reader, nodeCount);
+    case Type::Cos:
+        return NodeCos::read(reader, nodeCount);
+    case Type::Tan:
+        return NodeTan::read(reader, nodeCount);
+    case Type::ATan:
+        return NodeATan::read(reader, nodeCount);
+    case Type::ASin:
+        return NodeASin::read(reader, nodeCount);
+    case Type::ACos:
+        return NodeACos::read(reader, nodeCount);
+    case Type::Exp:
+        return NodeExp::read(reader, nodeCount);
+    case Type::Log:
+        return NodeLog::read(reader, nodeCount);
+    case Type::Sqrt:
+        return NodeSqrt::read(reader, nodeCount);
+    case Type::ATan2:
+        return NodeATan2::read(reader, nodeCount);
+    case Type::Conditional:
+        return NodeConditional::read(reader, nodeCount);
+    case Type::MakeRotate:
+        return NodeMakeRotate::read(reader, nodeCount);
+    case Type::MakeRotateX:
+        return NodeMakeRotateX::read(reader, nodeCount);
+    case Type::MakeRotateY:
+        return NodeMakeRotateY::read(reader, nodeCount);
+    case Type::MakeRotateZ:
+        return NodeMakeRotateZ::read(reader, nodeCount);
+    case Type::MakeScale:
+        return NodeMakeScale::read(reader, nodeCount);
+    case Type::MakeTranslate:
+        return NodeMakeTranslate::read(reader, nodeCount);
+    case Type::Block:
+        return NodeBlock::read(reader, nodeCount);
+    case Type::ListLiteral:
+        return NodeListLiteral::read(reader, nodeCount);
+    case Type::NewObject:
+        return NodeNewObject::read(reader, nodeCount);
+    case Type::DoWhile:
+        return NodeDoWhile::read(reader, nodeCount);
+    case Type::RemoveTranslate:
+        return NodeRemoveTranslate::read(reader, nodeCount);
+    case Type::Invert:
+        return NodeInvert::read(reader, nodeCount);
+    case Type::Ceil:
+        return NodeCeil::read(reader, nodeCount);
+    case Type::Floor:
+        return NodeFloor::read(reader, nodeCount);
+    case Type::For:
+        return NodeFor::read(reader, nodeCount);
+    }
+    assert(false);
+}
+
+
+#if 0 // Test Script
 
 namespace
 {

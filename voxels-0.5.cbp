@@ -78,6 +78,7 @@
 		<Unit filename="include/render_layer.h" />
 		<Unit filename="include/render_object.h" />
 		<Unit filename="include/script.h" />
+		<Unit filename="include/script_nodes.h" />
 		<Unit filename="include/server.h" />
 		<Unit filename="include/stonelikeblock.h" />
 		<Unit filename="include/stream.h" />

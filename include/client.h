@@ -22,6 +22,7 @@ public:
         UpdateList,
         VectorF,
         PositionF,
+        Script,
         Last
     };
     typedef uint_fast64_t IdType;
@@ -103,6 +104,85 @@ public:
         idMap[(int)dataType][ptr] = id;
         ptrMap[(int)dataType][id] = ptr;
         unlock();
+    }
+    template <typename T>
+    static shared_ptr<T> defaultInternalReader(Reader & reader, Client & client)
+    {
+        return T::readInternal(reader, client);
+    }
+    template <typename T>
+    inline shared_ptr<T> readObjectNonNull(Reader &reader, DataType dataType, shared_ptr<T> (*internalReader)(Reader&, Client&) = &defaultInternalReader<T>)
+    {
+        IdType id = readIdNonNull(reader);
+        shared_ptr<T> retval = getPtr<T>(id, dataType);
+        if(retval != nullptr)
+            return retval;
+        retval = internalReader(reader, *this);
+        assert(retval != nullptr);
+        setPtr(retval, dataType);
+        return retval;
+    }
+    template <typename T>
+    inline shared_ptr<T> readObject(Reader &reader, DataType dataType, shared_ptr<T> (*internalReader)(Reader&, Client&) = &defaultInternalReader<T>)
+    {
+        IdType id = readId(reader);
+        if(id == NullId)
+            return nullptr;
+        shared_ptr<T> retval = getPtr<T>(id, dataType);
+        if(retval != nullptr)
+            return retval;
+        retval = internalReader(reader, *this);
+        assert(retval != nullptr);
+        setPtr(retval, dataType);
+        return retval;
+    }
+    template <typename T>
+    static void defaultInternalWriter(Reader & reader, Client & client, shared_ptr<T> object)
+    {
+        object->writeInternal(reader, client);
+    }
+    template <typename T>
+    inline void writeObject(Writer &writer, shared_ptr<T> object, DataType dataType, void (*internalWriter)(Writer&,Client&,shared_ptr<T>)=&defaultInternalWriter<T>)
+    {
+        if(object == nullptr)
+        {
+            writeId(writer, NullId);
+            return;
+        }
+        IdType id = getId(object, dataType);
+        if(id != NullId)
+        {
+            writeId(writer, id);
+            return;
+        }
+        id = makeId(object, dataType);
+        writeId(writer, id);
+        internalWriter(writer, *this, object);
+    }
+
+    template <typename T>
+    static shared_ptr<T> defaultMakeObject()
+    {
+        return make_shared<T>();
+    }
+    template <typename T, size_t n>
+    inline T & getPropertyReference(DataType dataType, shared_ptr<T>(*makeObject)() = &defaultMakeObject<T>)
+    {
+        static IdType id = NullId;
+        static mutex idLock;
+        if(id == NullId)
+        {
+            auto lockIt = lock_guard<mutex>(idLock);
+            if(id == NullId)
+                id = getNewId();
+        }
+        auto lockIt = lock_guard<recursive_mutex>(getLock());
+        shared_ptr<T> retval = getPtr<T>(id, dataType);
+        if(retval == nullptr)
+        {
+            setPtr(retval = makeObject(), id, dataType);
+        }
+        return *retval;
     }
 };
 
