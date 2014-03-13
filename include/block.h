@@ -50,7 +50,7 @@ struct BlockData
 #include "game_stream.h"
 #include "util.h"
 
-struct BlockDescriptor : public enable_shared_from_this<BlockDescriptor>
+class BlockDescriptor : public enable_shared_from_this<BlockDescriptor>
 {
 private:
     static map<wstring, BlockDescriptorPtr> *blocks;
