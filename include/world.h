@@ -1,4 +1,5 @@
 #include "block.h"
+#include "entity.h"
 #ifndef WORLD_H_INCLUDED
 #define WORLD_H_INCLUDED
 
@@ -13,6 +14,7 @@ const int AverageGroundHeight = 64;
 
 class BlockIterator;
 class World;
+#warning finish adding entities
 
 #include "world_generator.h"
 

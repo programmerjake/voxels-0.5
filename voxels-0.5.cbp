@@ -93,6 +93,7 @@
 		<Unit filename="src/builtin_blocks.cpp" />
 		<Unit filename="src/client.cpp" />
 		<Unit filename="src/compressed_stream.cpp" />
+		<Unit filename="src/entity.cpp" />
 		<Unit filename="src/game_stream.cpp" />
 		<Unit filename="src/game_version.cpp" />
 		<Unit filename="src/image.cpp" />

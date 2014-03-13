@@ -1,6 +1,7 @@
 #include "block.h"
-#ifndef GAME_LOAD_STREAM_H_INCLUDED
-#define GAME_LOAD_STREAM_H_INCLUDED
+#include "entity.h"
+#ifndef GAME_STREAM_H_INCLUDED
+#define GAME_STREAM_H_INCLUDED
 
 #include "stream.h"
 #include "game_version.h"
@@ -40,6 +41,7 @@ private:
     shared_ptr<Reader> reader;
     uint32_t fileVersionInternal;
     vector<BlockDescriptorPtr> blocks;
+    vector<EntityDescriptorPtr> entities;
 public:
     static_assert(sizeof(uint8_t) == 1, "uint8_t is not a byte");
     static constexpr uint8_t MAGIC_STRING[8] = {'V', 'o', 'x', 'e', 'l', 's', ' ', ' '};
@@ -82,6 +84,7 @@ public:
         return reader->readByte();
     }
     BlockDescriptorPtr readBlockDescriptor();
+    EntityDescriptorPtr readEntityDescriptor();
 };
 
 class GameStoreStream final : public Writer
@@ -90,9 +93,11 @@ private:
     shared_ptr<Writer> writer;
     uint32_t nextBlockIndex;
     map<const wstring, uint32_t> blocks;
+    uint32_t nextEntityIndex;
+    map<const wstring, uint32_t> entities;
 public:
     GameStoreStream(shared_ptr<Writer> writer)
-        : writer(writer), nextBlockIndex(0)
+        : writer(writer), nextBlockIndex(0), nextEntityIndex(0)
     {
         assert(writer);
         writer->writeBytes(GameLoadStream::MAGIC_STRING, sizeof(GameLoadStream::MAGIC_STRING));
@@ -107,6 +112,7 @@ public:
         writer->flush();
     }
     void writeBlockDescriptor(BlockDescriptorPtr bd);
+    void writeEntityDescriptor(EntityDescriptorPtr ed);
 };
 
-#endif // GAME_LOAD_STREAM_H_INCLUDED
+#endif // GAME_STREAM_H_INCLUDED
