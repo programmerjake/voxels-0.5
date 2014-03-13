@@ -42,9 +42,15 @@ template <typename T>
 inline const T limit(const T v, const T minV, const T maxV)
 {
     if(v > maxV)
+    {
         return maxV;
+    }
+
     if(minV > v)
+    {
         return minV;
+    }
+
     return v;
 }
 
@@ -62,9 +68,15 @@ template <typename T>
 inline int sgn(T v)
 {
     if(v < 0)
+    {
         return -1;
+    }
+
     if(v > 0)
+    {
         return 1;
+    }
+
     return 0;
 }
 
@@ -78,8 +90,8 @@ class initializer
 {
 private:
     void (*finalizeFn)();
-    initializer(const initializer & rt) = delete;
-    void operator =(const initializer & rt) = delete;
+    initializer(const initializer &rt) = delete;
+    void operator =(const initializer &rt) = delete;
 public:
     initializer(void (*initFn)(), void (*finalizeFn)() = nullptr)
         : finalizeFn(finalizeFn)
@@ -89,7 +101,9 @@ public:
     ~initializer()
     {
         if(finalizeFn)
+        {
             finalizeFn();
+        }
     }
 };
 
@@ -97,8 +111,8 @@ class finalizer
 {
 private:
     void (*finalizeFn)();
-    finalizer(const finalizer & rt) = delete;
-    void operator =(const finalizer & rt) = delete;
+    finalizer(const finalizer &rt) = delete;
+    void operator =(const finalizer &rt) = delete;
 public:
     finalizer(void (*finalizeFn)())
         : finalizeFn(finalizeFn)
@@ -114,16 +128,18 @@ public:
 inline string wcsrtombs(wstring wstr)
 {
     size_t destLen = wstr.length() * 4 + 1 + 32/*for extra buffer space*/;
-    char * str = new char[destLen];
-    const wchar_t * ptr = wstr.c_str();
+    char *str = new char[destLen];
+    const wchar_t *ptr = wstr.c_str();
     mbstate_t mbstate;
     memset((void *)&mbstate, 0, sizeof(mbstate));
     size_t v = wcsrtombs(str, &ptr, destLen - 1, &mbstate);
-    if(v == (size_t)-1)
+
+    if(v == (size_t) - 1)
     {
         delete []str;
         throw runtime_error("can't convert wide character string to multi-byte string");
     }
+
     str[v] = '\0';
     string retval = str;
     delete []str;
@@ -133,16 +149,18 @@ inline string wcsrtombs(wstring wstr)
 inline wstring mbsrtowcs(string str)
 {
     size_t destLen = str.length() + 1 + 32/* for extra buffer space*/;
-    wchar_t * wstr = new wchar_t[destLen];
-    const char * ptr = str.c_str();
+    wchar_t *wstr = new wchar_t[destLen];
+    const char *ptr = str.c_str();
     mbstate_t mbstate;
     memset((void *)&mbstate, 0, sizeof(mbstate));
     size_t v = mbsrtowcs(wstr, &ptr, destLen - 1, &mbstate);
-    if(v == (size_t)-1)
+
+    if(v == (size_t) - 1)
     {
         delete []wstr;
         throw runtime_error("can't convert multi-byte string to wide character string");
     }
+
     wstr[v] = '\0';
     wstring retval = wstr;
     delete []wstr;
@@ -160,17 +178,24 @@ public:
         : value(value)
     {
     }
-    const flag & operator =(bool v)
+    const flag &operator =(bool v)
     {
         if(value.exchange(v) != v)
+        {
             cond.notify_all();
+        }
+
         return *this;
     }
     bool exchange(bool v)
     {
         bool retval = value.exchange(v);
+
         if(retval != v)
+        {
             cond.notify_all();
+        }
+
         return retval;
     }
     operator bool()
@@ -186,12 +211,17 @@ public:
     void wait(bool v = true) /// waits until value == v
     {
         if(v == value)
+        {
             return;
+        }
+
         lock.lock();
+
         while(v != value)
         {
             cond.wait(lock);
         }
+
         lock.unlock();
     }
     void set()
@@ -229,9 +259,9 @@ public:
         friend class circularDeque;
         friend class const_iterator;
     private:
-        circularDeque * container;
+        circularDeque *container;
         size_t index;
-        iterator(circularDeque * container, size_t index)
+        iterator(circularDeque *container, size_t index)
             : container(container), index(index)
         {
         }
@@ -240,17 +270,24 @@ public:
             : container(nullptr)
         {
         }
-        iterator & operator +=(difference_type n)
+        iterator &operator +=(difference_type n)
         {
             if(-n > (difference_type)index)
+            {
                 n = n % arraySize + arraySize;
+            }
+
             index += n;
             index %= arraySize;
+
             if(index < 0)
+            {
                 index += arraySize;
+            }
+
             return *this;
         }
-        iterator & operator -=(difference_type n)
+        iterator &operator -=(difference_type n)
         {
             return *this += -n;
         }
@@ -266,88 +303,124 @@ public:
         {
             return i -= n;
         }
-        difference_type operator -(const iterator & r) const
+        difference_type operator -(const iterator &r) const
         {
             assert(container == r.container && container != nullptr);
             difference_type loc = index + arraySize - container->frontIndex;
+
             if(loc >= arraySize)
+            {
                 loc -= arraySize;
+            }
+
             if(loc >= arraySize)
+            {
                 loc -= arraySize;
+            }
+
             difference_type rloc = r.index + arraySize - container->frontIndex;
+
             if(rloc >= arraySize)
+            {
                 rloc -= arraySize;
+            }
+
             if(rloc >= arraySize)
+            {
                 rloc -= arraySize;
+            }
+
             return loc - rloc;
         }
-        T & operator [](difference_type n) const
+        T &operator [](difference_type n) const
         {
             return *(*this + n);
         }
-        T & operator *() const
+        T &operator *() const
         {
             return container->array[index];
         }
-        T * operator ->() const
+        T *operator ->() const
         {
             return container->array + index;
         }
-        const iterator & operator --()
+        const iterator &operator --()
         {
             if(index == 0)
+            {
                 index = arraySize - 1;
+            }
             else
+            {
                 index--;
+            }
+
             return *this;
         }
         iterator operator --(int)
         {
             iterator retval = *this;
+
             if(index == 0)
+            {
                 index = arraySize - 1;
+            }
             else
+            {
                 index--;
+            }
+
             return retval;
         }
-        const iterator & operator ++()
+        const iterator &operator ++()
         {
             if(index >= arraySize - 1)
+            {
                 index = 0;
+            }
             else
+            {
                 index++;
+            }
+
             return *this;
         }
         iterator operator ++(int)
         {
             iterator retval = *this;
+
             if(index >= arraySize - 1)
+            {
                 index = 0;
+            }
             else
+            {
                 index++;
+            }
+
             return retval;
         }
-        friend bool operator ==(const iterator & l, const iterator & r)
+        friend bool operator ==(const iterator &l, const iterator &r)
         {
             return l.index == r.index;
         }
-        friend bool operator !=(const iterator & l, const iterator & r)
+        friend bool operator !=(const iterator &l, const iterator &r)
         {
             return l.index != r.index;
         }
-        friend bool operator >(const iterator & l, const iterator & r)
+        friend bool operator >(const iterator &l, const iterator &r)
         {
             return (l - r) > 0;
         }
-        friend bool operator >=(const iterator & l, const iterator & r)
+        friend bool operator >=(const iterator &l, const iterator &r)
         {
             return (l - r) >= 0;
         }
-        friend bool operator <(const iterator & l, const iterator & r)
+        friend bool operator <(const iterator &l, const iterator &r)
         {
             return (l - r) < 0;
         }
-        friend bool operator <=(const iterator & l, const iterator & r)
+        friend bool operator <=(const iterator &l, const iterator &r)
         {
             return (l - r) <= 0;
         }
@@ -358,9 +431,9 @@ public:
     {
         friend class circularDeque;
     private:
-        const circularDeque * container;
+        const circularDeque *container;
         size_t index;
-        const_iterator(const circularDeque * container, size_t index)
+        const_iterator(const circularDeque *container, size_t index)
             : container(container), index(index)
         {
         }
@@ -369,21 +442,28 @@ public:
             : container(nullptr)
         {
         }
-        const_iterator(const iterator & v)
+        const_iterator(const iterator &v)
             : container(v.container), index(v.index)
         {
         }
-        const_iterator & operator +=(difference_type n)
+        const_iterator &operator +=(difference_type n)
         {
             if(-n > (difference_type)index)
+            {
                 n = n % arraySize + arraySize;
+            }
+
             index += n;
             index %= arraySize;
+
             if(index < 0)
+            {
                 index += arraySize;
+            }
+
             return *this;
         }
-        const_iterator & operator -=(difference_type n)
+        const_iterator &operator -=(difference_type n)
         {
             return *this += -n;
         }
@@ -399,88 +479,124 @@ public:
         {
             return i -= n;
         }
-        difference_type operator -(const const_iterator & r) const
+        difference_type operator -(const const_iterator &r) const
         {
             assert(container == r.container && container != nullptr);
             difference_type loc = index + arraySize - container->frontIndex;
+
             if(loc >= arraySize)
+            {
                 loc -= arraySize;
+            }
+
             if(loc >= arraySize)
+            {
                 loc -= arraySize;
+            }
+
             difference_type rloc = r.index + arraySize - container->frontIndex;
+
             if(rloc >= arraySize)
+            {
                 rloc -= arraySize;
+            }
+
             if(rloc >= arraySize)
+            {
                 rloc -= arraySize;
+            }
+
             return loc - rloc;
         }
-        const T & operator [](difference_type n) const
+        const T &operator [](difference_type n) const
         {
             return *(*this + n);
         }
-        const T & operator *() const
+        const T &operator *() const
         {
             return container->array[index];
         }
-        const T * operator ->() const
+        const T *operator ->() const
         {
             return container->array + index;
         }
-        const const_iterator & operator --()
+        const const_iterator &operator --()
         {
             if(index == 0)
+            {
                 index = arraySize - 1;
+            }
             else
+            {
                 index--;
+            }
+
             return *this;
         }
         const_iterator operator --(int)
         {
             const_iterator retval = *this;
+
             if(index == 0)
+            {
                 index = arraySize - 1;
+            }
             else
+            {
                 index--;
+            }
+
             return retval;
         }
-        const const_iterator & operator ++()
+        const const_iterator &operator ++()
         {
             if(index >= arraySize - 1)
+            {
                 index = 0;
+            }
             else
+            {
                 index++;
+            }
+
             return *this;
         }
         const_iterator operator ++(int)
         {
             const_iterator retval = *this;
+
             if(index >= arraySize - 1)
+            {
                 index = 0;
+            }
             else
+            {
                 index++;
+            }
+
             return retval;
         }
-        friend bool operator ==(const const_iterator & l, const const_iterator & r)
+        friend bool operator ==(const const_iterator &l, const const_iterator &r)
         {
             return l.index == r.index;
         }
-        friend bool operator !=(const const_iterator & l, const const_iterator & r)
+        friend bool operator !=(const const_iterator &l, const const_iterator &r)
         {
             return l.index != r.index;
         }
-        friend bool operator >(const const_iterator & l, const const_iterator & r)
+        friend bool operator >(const const_iterator &l, const const_iterator &r)
         {
             return (l - r) > 0;
         }
-        friend bool operator >=(const const_iterator & l, const const_iterator & r)
+        friend bool operator >=(const const_iterator &l, const const_iterator &r)
         {
             return (l - r) >= 0;
         }
-        friend bool operator <(const const_iterator & l, const const_iterator & r)
+        friend bool operator <(const const_iterator &l, const const_iterator &r)
         {
             return (l - r) < 0;
         }
-        friend bool operator <=(const const_iterator & l, const const_iterator & r)
+        friend bool operator <=(const const_iterator &l, const const_iterator &r)
         {
             return (l - r) <= 0;
         }
@@ -555,22 +671,22 @@ public:
         return const_reverse_iterator(cbegin());
     }
 
-    T & front()
+    T &front()
     {
         return *begin();
     }
 
-    const T & front() const
+    const T &front() const
     {
         return *begin();
     }
 
-    T & back()
+    T &back()
     {
         return end()[-1];
     }
 
-    const T & back() const
+    const T &back() const
     {
         return end()[-1];
     }
@@ -580,26 +696,32 @@ public:
         return cend() - cbegin();
     }
 
-    T & at(size_type pos)
+    T &at(size_type pos)
     {
         if(pos >= size())
+        {
             throw out_of_range("position out of range in circularDeque::at");
+        }
+
         return begin()[pos];
     }
 
-    const T & at(size_type pos) const
+    const T &at(size_type pos) const
     {
         if(pos >= size())
+        {
             throw out_of_range("position out of range in circularDeque::at");
+        }
+
         return cbegin()[pos];
     }
 
-    T & operator [](size_type pos)
+    T &operator [](size_type pos)
     {
         return begin()[pos];
     }
 
-    const T & operator [](size_type pos) const
+    const T &operator [](size_type pos) const
     {
         return cbegin()[pos];
     }
@@ -614,49 +736,67 @@ public:
         frontIndex = backIndex = 0;
     }
 
-    void push_front(const T & v)
+    void push_front(const T &v)
     {
         if(frontIndex-- == 0)
+        {
             frontIndex = arraySize - 1;
+        }
+
         array[frontIndex] = v;
     }
 
-    void push_front(T && v)
+    void push_front(T  &&v)
     {
         if(frontIndex-- == 0)
+        {
             frontIndex = arraySize - 1;
+        }
+
         array[frontIndex] = move(v);
     }
 
-    void push_back(const T & v)
+    void push_back(const T &v)
     {
         array[backIndex] = v;
+
         if(++backIndex >= arraySize)
+        {
             backIndex = 0;
+        }
     }
 
-    void push_back(T && v)
+    void push_back(T  &&v)
     {
         array[backIndex] = move(v);
+
         if(++backIndex >= arraySize)
+        {
             backIndex = 0;
+        }
     }
 
     void pop_front()
     {
         array[frontIndex] = T();
+
         if(++frontIndex >= arraySize)
+        {
             frontIndex = 0;
+        }
     }
 
     void pop_back()
     {
         if(backIndex-- == 0)
+        {
             backIndex = arraySize - 1;
+        }
+
         array[backIndex] = T();
     }
 
-    void swap(circularDeque & other)
+    void swap(circularDeque &other)
     {
         circularDeque<T, arraySize> temp = move(*this);
         *this = move(other);
@@ -669,14 +809,135 @@ uint32_t makeSeed();
 inline uint32_t makeSeed(wstring str)
 {
     if(str == L"")
+    {
         return makeSeed();
+    }
+
     uint32_t retval = 0;
+
     for(wchar_t ch : str)
     {
         retval *= 9;
         retval += ch;
     }
+
     return retval;
 }
+
+template <typename T, typename Compare>
+class balanced_tree final
+{
+private:
+    struct Node
+    {
+        unsigned depth;
+        T value;
+        Node *left, *right;
+        Node(const T & value)
+            : value(value), depth(0)
+        {
+        }
+        void calcDepth()
+        {
+            unsigned newDepth = 0;
+            if(left)
+                newDepth = 1 + left->depth;
+            if(right && right->depth >= newDepth) // equivalent to right->depth + 1 > newDepth
+                newDepth = 1 + right->depth;
+            depth = newDepth;
+        }
+    };
+    Node * root;
+    Compare compare;
+    static void rotateLeft(Node *& node)
+    {
+        assert(node && node->right);
+        Node * tree1 = node->left;
+        Node * tree2 = node->right->left;
+        Node * tree3 = node->right->right;
+        Node * newNode = node->right;
+        newNode->left = node;
+        node = newNode;
+        node->left->left = tree1;
+        node->left->right = tree2;
+        node->right = tree3;
+        node->left->calcDepth();
+        node->calcDepth();
+    }
+    static void rotateRight(Node *& node)
+    {
+        assert(node && node->left);
+        Node * tree1 = node->left->left;
+        Node * tree2 = node->left->right;
+        Node * tree3 = node->right;
+        Node * newNode = node->left;
+        newNode->right = node;
+        node = newNode;
+        node->left = tree1;
+        node->right->left = tree2;
+        node->right->right = tree3;
+        node->right->calcDepth();
+        node->calcDepth();
+    }
+    static void balanceNode(Node *& node)
+    {
+        assert(node);
+        unsigned lDepth = 0;
+        if(node->left)
+            lDepth = node->left->depth + 1;
+        unsigned rDepth = 0;
+        if(node->right)
+            rDepth = node->right->depth + 1;
+        if(lDepth > rDepth + 1)
+            rotateRight(node);
+        else if(rDepth > lDepth + 1)
+            rotateLeft(node);
+    }
+    void insertNode(Node *& tree, Node * newNode)
+    {
+        assert(newNode);
+        if(tree == nullptr)
+        {
+            tree = newNode;
+            tree->depth = 0;
+            tree->left = nullptr;
+            tree->right = nullptr;
+            return;
+        }
+        if(compare(tree->value, newNode->value))
+            insertNode(tree->right, newNode);
+        else
+            insertNode(tree->left, newNode);
+        tree->calcDepth();
+        balanceNode(tree);
+    }
+    static Node * removeInorderPredecessorH(Node *& node)
+    {
+        assert(node != nullptr);
+        if(node->right == nullptr)
+        {
+            Node * retval = node;
+            node = node->left;
+            if(node != nullptr)
+            {
+                node->calcDepth();
+                balanceNode(node);
+            }
+            retval->left = retval->right = nullptr;
+            retval->depth = 0;
+            return retval;
+        }
+        Node * retval = removeInorderPredecessorH(node->right);
+        node->calcDepth();
+        balanceNode(node);
+        return retval;
+    }
+    static Node * removeInorderPredecessor(Node * node)
+    {
+        assert(node != nullptr);
+        return removeInorderPredecessorH(node->left);
+    }
+    #warning finish
+};
 
 #endif // UTIL_H

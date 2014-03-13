@@ -14,7 +14,6 @@ const int AverageGroundHeight = 64;
 
 class BlockIterator;
 class World;
-#warning finish adding entities
 
 #include "world_generator.h"
 
@@ -30,6 +29,7 @@ public:
     const WorldGenerator generator;
 private:
     list<shared_ptr<Chunk>> chunksList;
+    set<
     unordered_map<ChunkPosition, shared_ptr<Chunk>> chunksMap;
     shared_ptr<Chunk> getChunk(ChunkPosition pos)
     {
