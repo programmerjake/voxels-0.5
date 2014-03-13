@@ -1,7 +1,7 @@
 #ifndef CLIENT_H_INCLUDED
 #define CLIENT_H_INCLUDED
 
-#include <map>
+#include <unordered_map>
 #include <cstdint>
 #include <atomic>
 #include <memory>
@@ -13,16 +13,19 @@ using namespace std;
 class Client final
 {
 public:
-    enum class DataType : uint8_t
+    enum class DataType
     {
         Image,
         RenderObjectBlockMesh,
+        RenderObjectEntityMesh,
+        RenderObjectEntity,
         RenderObjectWorld,
         ServerFlag,
         UpdateList,
         VectorF,
         PositionF,
         Script,
+        Double,
         Last
     };
     typedef uint_fast64_t IdType;
@@ -49,8 +52,8 @@ public:
     }
 private:
     static atomic_uint_fast64_t nextId;
-    map<shared_ptr<void>, IdType> idMap[(int)DataType::Last];
-    map<IdType, shared_ptr<void>> ptrMap[(int)DataType::Last];
+    unordered_map<shared_ptr<void>, IdType> idMap[(int)DataType::Last];
+    unordered_map<IdType, shared_ptr<void>> ptrMap[(int)DataType::Last];
     recursive_mutex theLock;
 public:
     Client()
@@ -64,7 +67,7 @@ public:
     {
         theLock.unlock();
     }
-    recursive_mutex & getLock()
+    recursive_mutex &getLock()
     {
         return theLock;
     }
@@ -96,6 +99,35 @@ public:
         unlock();
         return retval;
     }
+    void removeId(IdType id, DataType dataType)
+    {
+        assert(id != NullId);
+        lock();
+        auto ptr = ptrMap[(int)dataType][id];
+
+        if(ptr != nullptr)
+        {
+            idMap[(int)dataType].erase(ptr);
+        }
+
+        ptrMap[(int)dataType].erase(id);
+        unlock();
+    }
+    template<typename T>
+    void removePtr(shared_ptr<T> ptr, DataType dataType)
+    {
+        assert(ptr != nullptr);
+        lock();
+        auto id = idMap[(int)dataType][ptr];
+
+        if(id != NullId)
+        {
+            ptrMap[(int)dataType].erase(id);
+        }
+
+        idMap[(int)dataType].erase(ptr);
+        unlock();
+    }
     template <typename T>
     void setPtr(shared_ptr<T> ptr, IdType id, DataType dataType)
     {
@@ -106,58 +138,82 @@ public:
         unlock();
     }
     template <typename T>
-    static shared_ptr<T> defaultInternalReader(Reader & reader, Client & client)
+    static shared_ptr<T> defaultInternalReader(Reader &reader, Client &client)
     {
         return T::readInternal(reader, client);
     }
     template <typename T>
-    inline shared_ptr<T> readObjectNonNull(Reader &reader, DataType dataType, shared_ptr<T> (*internalReader)(Reader&, Client&) = &defaultInternalReader<T>)
+    inline shared_ptr<T> readObjectNonNull(Reader &reader, DataType dataType,
+                                           shared_ptr<T> (*internalReader)(Reader &, Client &) = &defaultInternalReader<T>)
     {
         IdType id = readIdNonNull(reader);
         shared_ptr<T> retval = getPtr<T>(id, dataType);
+
         if(retval != nullptr)
+        {
             return retval;
+        }
+
         retval = internalReader(reader, *this);
         assert(retval != nullptr);
         setPtr(retval, dataType);
         return retval;
     }
     template <typename T>
-    inline shared_ptr<T> readObject(Reader &reader, DataType dataType, shared_ptr<T> (*internalReader)(Reader&, Client&) = &defaultInternalReader<T>)
+    inline shared_ptr<T> readObject(Reader &reader, DataType dataType,
+                                    shared_ptr<T> (*internalReader)(Reader &, Client &) = &defaultInternalReader<T>)
     {
         IdType id = readId(reader);
+
         if(id == NullId)
+        {
             return nullptr;
+        }
+
         shared_ptr<T> retval = getPtr<T>(id, dataType);
+
         if(retval != nullptr)
+        {
             return retval;
+        }
+
         retval = internalReader(reader, *this);
         assert(retval != nullptr);
-        setPtr(retval, dataType);
+        setPtr(retval, id, dataType);
         return retval;
     }
     template <typename T>
-    static void defaultInternalWriter(Reader & reader, Client & client, shared_ptr<T> object)
+    static void defaultInternalWriter(Writer &writer, Client &client, shared_ptr<T> object)
     {
-        object->writeInternal(reader, client);
+        object->writeInternal(writer, client);
     }
     template <typename T>
-    inline void writeObject(Writer &writer, shared_ptr<T> object, DataType dataType, void (*internalWriter)(Writer&,Client&,shared_ptr<T>)=&defaultInternalWriter<T>)
+    inline void writeObject(Writer &writer, shared_ptr<T> object, DataType dataType,
+                            void (*internalWriter)(Writer &, Client &, shared_ptr<T>))
     {
         if(object == nullptr)
         {
             writeId(writer, NullId);
             return;
         }
+
         IdType id = getId(object, dataType);
+
         if(id != NullId)
         {
             writeId(writer, id);
             return;
         }
+
         id = makeId(object, dataType);
         writeId(writer, id);
         internalWriter(writer, *this, object);
+    }
+
+    template <typename T>
+    inline void writeObject(Writer &writer, shared_ptr<T> object, DataType dataType)
+    {
+        writeObject(writer, object, dataType, &defaultInternalWriter);
     }
 
     template <typename T>
@@ -166,22 +222,30 @@ public:
         return make_shared<T>();
     }
     template <typename T, size_t n>
-    inline T & getPropertyReference(DataType dataType, shared_ptr<T>(*makeObject)() = &defaultMakeObject<T>)
+    inline T &getPropertyReference(DataType dataType,
+                                   shared_ptr<T>(*makeObject)() = &defaultMakeObject<T>)
     {
         static IdType id = NullId;
         static mutex idLock;
+
         if(id == NullId)
         {
-            auto lockIt = lock_guard<mutex>(idLock);
+            lock_guard<mutex> lockIt(idLock);
+
             if(id == NullId)
+            {
                 id = getNewId();
+            }
         }
-        auto lockIt = lock_guard<recursive_mutex>(getLock());
+
+        lock_guard<recursive_mutex> lockIt(getLock());
         shared_ptr<T> retval = getPtr<T>(id, dataType);
+
         if(retval == nullptr)
         {
             setPtr(retval = makeObject(), id, dataType);
         }
+
         return *retval;
     }
 };
@@ -189,11 +253,11 @@ public:
 class LockedClient
 {
     LockedClient(const LockedClient &) = delete;
-    const LockedClient & operator =(const LockedClient &) = delete;
+    const LockedClient &operator =(const LockedClient &) = delete;
 private:
-    Client & client;
+    Client &client;
 public:
-    explicit LockedClient(Client & client)
+    explicit LockedClient(Client &client)
         : client(client)
     {
         client.lock();
@@ -204,6 +268,6 @@ public:
     }
 };
 
-void clientProcess(StreamRW & streamRW);
+void clientProcess(StreamRW &streamRW);
 
 #endif // CLIENT_H_INCLUDED

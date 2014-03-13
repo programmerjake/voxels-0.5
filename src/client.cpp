@@ -33,7 +33,7 @@ struct ClientState
     bool done;
     bool paused;
     UpdateList neededChunkList;
-    bool forwardDown, backwardDown, leftDown, rightDown, jumpDown, sneakDown;
+    bool forwardDown = false, backwardDown = false, leftDown = false, rightDown = false, jumpDown = false, sneakDown = false;
     ClientState()
         : lock(client.getLock())
     {
@@ -127,6 +127,13 @@ void clientProcessReader(Reader *preader, ClientState * state)
                 for(uint64_t i = 0; i < readCount; i++)
                 {
                     shared_ptr<RenderObject> ro = RenderObject::read(reader, client);
+                    if(ro && ro->type() == RenderObject::Type::Entity)
+                    {
+                        shared_ptr<RenderObjectEntity> e = dynamic_pointer_cast<RenderObjectEntity>(ro);
+                        LockedClient lockIt(client);
+                        shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
+                        world->handleReadEntity(e);
+                    }
                 }
                 cout << "Client : received " << readCount << " updated render objects\n";
                 state->lock.lock();
@@ -150,7 +157,7 @@ void clientProcessReader(Reader *preader, ClientState * state)
     state->lock.unlock();
 }
 
-Mesh makeChunkRenderMesh(Client &client, shared_ptr<unordered_set<PositionI>> neededChunks, PositionI chunkPos, RenderLayer rl)
+void makeChunkRenderMesh(Mesh dest, Client &client, shared_ptr<unordered_set<PositionI>> neededChunks, PositionI chunkPos, RenderLayer rl)
 {
     LockedClient lock(client);
     shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
@@ -161,7 +168,8 @@ Mesh makeChunkRenderMesh(Client &client, shared_ptr<unordered_set<PositionI>> ne
 
     if(chunk->cachedMesh[(int)rl] != nullptr)
     {
-        return chunk->cachedMesh[(int)rl];
+        dest->add(chunk->cachedMesh[(int)rl]);
+        return;
     }
 
     Mesh retval = Mesh(new Mesh_t);
@@ -188,7 +196,7 @@ Mesh makeChunkRenderMesh(Client &client, shared_ptr<unordered_set<PositionI>> ne
 
     chunk->cachedMesh[(int)rl] = retval;
     chunk->cachedMeshValid = true;
-    return retval;
+    dest->add(retval);
 }
 
 Mesh makeRenderMesh(Client &client, shared_ptr<unordered_set<PositionI>> neededChunks, RenderLayer rl, PositionI pos, int renderDistance = 40)
@@ -208,7 +216,7 @@ Mesh makeRenderMesh(Client &client, shared_ptr<unordered_set<PositionI>> neededC
         {
             for(int z = minZ; z <= maxZ; z+=RenderObjectWorld::Chunk::size)
             {
-                retval->add(makeChunkRenderMesh(client, neededChunks, PositionI(x, y, z, pos.d), rl));
+                makeChunkRenderMesh(retval, client, neededChunks, PositionI(x, y, z, pos.d), rl);
             }
         }
     }
@@ -377,6 +385,46 @@ TransformedMesh makeSelectBoxMesh()
     retval->add(invert(retval));
     return transform(Matrix::translate(VectorF(-0.5f)).concat(Matrix::scale(1.05)).concat(Matrix::translate(VectorF(0.5f))), retval);
 }
+
+void renderEntities(Mesh dest, Client &client, RenderLayer rl, PositionF pos)
+{
+    vector<shared_ptr<RenderObjectEntity>> entities;
+    {
+        LockedClient lockIt(client);
+        shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
+        entities.reserve(world->entities.size());
+        for(shared_ptr<RenderObjectEntity> e : world->entities)
+        {
+            entities.push_back(e);
+        }
+    }
+
+    for(shared_ptr<RenderObjectEntity> e : entities)
+    {
+        LockedClient lockIt(client);
+        e->render(dest, rl, pos.d, client);
+    }
+}
+
+void moveEntities(Client &client, float deltaTime)
+{
+    vector<shared_ptr<RenderObjectEntity>> entities;
+    {
+        LockedClient lockIt(client);
+        shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
+        entities.reserve(world->entities.size());
+        for(shared_ptr<RenderObjectEntity> e : world->entities)
+        {
+            entities.push_back(e);
+        }
+    }
+
+    for(shared_ptr<RenderObjectEntity> e : entities)
+    {
+        LockedClient lockIt(client);
+        e->move(deltaTime);
+    }
+}
 }
 
 using namespace ClientImplementation;
@@ -422,7 +470,9 @@ void clientProcess(StreamRW & streamRW)
             tempMeshes[(int)rl] = meshes[(int)rl];
         }
         shared_ptr<PositionI> rayHitPos = RenderObjectWorld::getWorld(clientState.client)->getFirstHitBlock(Ray(tform.invert().applyToNormal(VectorF(0, 0, -1)), clientState.pos), clientReachDistance);
+        PositionF pos = clientState.pos;
         clientState.lock.unlock();
+        moveEntities(clientState.client, Display::frameDeltaTime());
         int polyCount = 0;
         for(RenderLayer rl = (RenderLayer)0; rl < RenderLayer::Last; rl = (RenderLayer)((int)rl + 1))
         {
@@ -435,6 +485,10 @@ void clientProcess(StreamRW & streamRW)
             {
                 r << transform(Matrix::translate((VectorI)*rayHitPos).concat(tform), selectBoxMesh);
             }
+            mesh = make_shared<Mesh_t>();
+            renderEntities(mesh, clientState.client, rl, pos);
+            polyCount += mesh->size();
+            r << transform(tform, mesh);
         }
         renderLayerSetup(RenderLayer::Last);
         Display::initOverlay();

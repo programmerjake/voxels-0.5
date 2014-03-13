@@ -56,21 +56,192 @@ public:
     virtual BoxRayCollision rayHits(Ray ray) = 0;
 };
 
-#if 0 // TODO(jacob#): finish
+class RenderObjectWorld;
+
 class RenderObjectEntityMesh final : public enable_shared_from_this<RenderObjectEntityMesh>
 {
 private:
-    vector<Mesh> meshs;
-    vector<shared_ptr<Script>> scripts;
-    shared_ptr<RenderObjectWorld> world;
-    #error finish
+    struct Part
+    {
+        Mesh mesh;
+        shared_ptr<Script> script;
+        Part()
+        {
+        }
+        Part(Mesh mesh, shared_ptr<Script> script)
+            : mesh(mesh), script(script)
+        {
+        }
+    };
+    vector<Part> parts;
+    VectorF hitBoxMin, hitBoxMax;
+public:
+    RenderObjectEntityMesh(VectorF hitBoxMin, VectorF hitBoxMax)
+        : hitBoxMin(hitBoxMin), hitBoxMax(hitBoxMax)
+    {
+    }
+    void addPart(Mesh mesh, shared_ptr<Script> script)
+    {
+        assert(mesh && script);
+        parts.push_back(Part(mesh, script));
+    }
+    void render(Mesh dest, VectorF position, VectorF velocity, float age)
+    {
+        for(Part part : parts)
+        {
+            runEntityPartScript(dest, part.mesh, part.script, position, velocity, age);
+        }
+    }
+private:
+    friend class Client;
+    static shared_ptr<RenderObjectEntityMesh> readInternal(Reader & reader, Client & client)
+    {
+        VectorF hitBoxMin, hitBoxMax;
+        hitBoxMin.x = reader.readLimitedF32(-1, 1);
+        hitBoxMin.y = reader.readLimitedF32(-1, 1);
+        hitBoxMin.z = reader.readLimitedF32(-1, 1);
+        hitBoxMax.x = reader.readLimitedF32(-1, 1);
+        hitBoxMax.y = reader.readLimitedF32(-1, 1);
+        hitBoxMax.z = reader.readLimitedF32(-1, 1);
+        uint32_t partCount = reader.readU32();
+        auto retval = make_shared<RenderObjectEntityMesh>(hitBoxMin, hitBoxMax);
+        for(uint32_t i = 0; i < partCount; i++)
+        {
+            Mesh mesh = readMesh(reader, client);
+            shared_ptr<Script> script = Script::read(reader);
+            retval->parts.push_back(Part(mesh, script));
+        }
+        return retval;
+    }
+    void writeInternal(Writer &writer, Client &client)
+    {
+        writer.writeF32(hitBoxMin.x);
+        writer.writeF32(hitBoxMin.y);
+        writer.writeF32(hitBoxMin.z);
+        writer.writeF32(hitBoxMax.x);
+        writer.writeF32(hitBoxMax.y);
+        writer.writeF32(hitBoxMax.z);
+        writer.writeU32(parts.size());
+        for(auto part : parts)
+        {
+            writeMesh(part.mesh, writer, client);
+            part.script->write(writer);
+        }
+    }
+public:
+    static shared_ptr<RenderObjectEntityMesh> readOrNull(Reader & reader, Client & client)
+    {
+        return client.readObject<RenderObjectEntityMesh>(reader, Client::DataType::RenderObjectEntityMesh);
+    }
+    void write(Writer &writer, Client &client)
+    {
+        client.writeObject(writer, shared_from_this(), Client::DataType::RenderObjectEntityMesh);
+    }
+    BoxRayCollision rayHits(Ray ray, PositionF pos)
+    {
+        if(ray.position.d != pos.d || hitBoxMin.x >= hitBoxMax.x || hitBoxMin.y >= hitBoxMax.y || hitBoxMin.z >= hitBoxMax.z)
+            return BoxRayCollision();
+        return rayHitBox(hitBoxMin + (VectorF)pos, hitBoxMax + (VectorF)pos, ray);
+    }
 };
 
-class RenderObjectEntity final : public RenderObject
+struct RenderObjectEntity final : public RenderObject
 {
-
+    virtual Type type() const override
+    {
+        return Type::Entity;
+    }
+    shared_ptr<RenderObjectEntityMesh> mesh;
+    bool good() const
+    {
+        return mesh != nullptr;
+    }
+    PositionF position;
+    VectorF velocity;
+    float age;
+    RenderObjectEntity()
+        : mesh(nullptr)
+    {
+    }
+    RenderObjectEntity(shared_ptr<RenderObjectEntityMesh> mesh, PositionF position, VectorF velocity, float age)
+        : mesh(mesh), position(position), velocity(velocity), age(age)
+    {
+    }
+    friend class RenderObject;
+protected:
+    static shared_ptr<RenderObjectEntity> read(Reader &reader, Client &client)
+    {
+        Client::IdType id = Client::readIdNonNull(reader);
+        auto retval = client.getPtr<RenderObjectEntity>(id, Client::DataType::RenderObjectEntity);
+        if(retval == nullptr)
+        {
+            retval = make_shared<RenderObjectEntity>();
+            client.setPtr(retval, id, Client::DataType::RenderObjectEntity);
+        }
+        retval->mesh = RenderObjectEntityMesh::readOrNull(reader, client);
+        if(retval->mesh == nullptr)
+        {
+            client.removeId(id, Client::DataType::RenderObjectEntity);
+            return retval;
+        }
+        retval->age = reader.readLimitedF32(0, 1e10);
+        retval->position.x = reader.readFiniteF32();
+        retval->position.y = reader.readFiniteF32();
+        retval->position.z = reader.readFiniteF32();
+        retval->position.d = reader.readDimension();
+        retval->velocity.x = reader.readFiniteF32();
+        retval->velocity.y = reader.readFiniteF32();
+        retval->velocity.z = reader.readFiniteF32();
+        return retval;
+    }
+    virtual void writeInternal(Writer &writer, Client &client) override
+    {
+        Client::IdType id = client.getId(shared_from_this(), Client::DataType::RenderObjectEntity);
+        if(id == Client::NullId)
+        {
+            id = client.makeId(shared_from_this(), Client::DataType::RenderObjectEntity);
+        }
+        Client::writeId(writer, id);
+        if(mesh != nullptr)
+            mesh->write(writer, client);
+        else
+        {
+            Client::writeId(writer, Client::NullId);
+            client.removeId(id, Client::DataType::RenderObjectEntity);
+            return;
+        }
+        writer.writeF32(age);
+        writer.writeF32(position.x);
+        writer.writeF32(position.y);
+        writer.writeF32(position.z);
+        writer.writeDimension(position.d);
+        writer.writeF32(velocity.x);
+        writer.writeF32(velocity.y);
+        writer.writeF32(velocity.z);
+    }
+public:
+    virtual void render(Mesh dest, RenderLayer rl, Dimension d, Client &) override
+    {
+        if(!good() || rl != RenderLayer::Opaque || d != position.d)
+            return;
+        mesh->render(dest, (VectorF)position, velocity, age);
+    }
+    void move(float deltaTime)
+    {
+        position += velocity * deltaTime;
+        age += deltaTime;
+    }
+    virtual bool operator ==(const RenderObject &rt) const override
+    {
+        return this == &rt;
+    }
+    virtual BoxRayCollision rayHits(Ray ray) override
+    {
+        if(!good())
+            return BoxRayCollision();
+        return mesh->rayHits(ray, position);
+    }
 };
-#endif
 
 class RenderObjectBlock;
 class RenderObjectBlockMesh;
@@ -79,6 +250,19 @@ struct RenderObjectWorld final : public enable_shared_from_this<RenderObjectWorl
 {
     Client & client;
     UpdateList lightingUpdates;
+    unordered_set<shared_ptr<RenderObjectEntity>> entities;
+    void handleReadEntity(shared_ptr<RenderObjectEntity> e)
+    {
+        assert(e != nullptr);
+        if(e->good())
+        {
+            entities.insert(e);
+        }
+        else
+        {
+            entities.erase(e);
+        }
+    }
     RenderObjectWorld(Client & client)
         : client(client)
     {

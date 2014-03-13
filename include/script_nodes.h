@@ -2737,7 +2737,7 @@ struct NodeMakeTranslate final : public NodeConstArgCount<1, NodeMakeTranslate>
 {
     virtual Type type() const override
     {
-        return Type::MakeScale;
+        return Type::MakeTranslate;
     }
     static shared_ptr<Data> evaluate(shared_ptr<Data> retval)
     {

@@ -5,6 +5,8 @@
 #include "platform.h"
 #include "builtin_blocks.h"
 #include "compressed_stream.h"
+#include "generate.h"
+#include "texture_atlas.h"
 #include <thread>
 #include <list>
 
@@ -67,7 +69,8 @@ inline PositionF &getClientPosition(Client &client)
 
     if(id == Client::NullId)
     {
-        retval = make_shared<PositionF>(PositionF(0.5, AverageGroundHeight + 0.5, 0.5, Dimension::Overworld));
+        retval = make_shared<PositionF>(PositionF(0.5, AverageGroundHeight + 0.5, 0.5,
+                                        Dimension::Overworld));
         id = client.makeId(retval, Client::DataType::PositionF);
         return *retval;
     }
@@ -77,7 +80,8 @@ inline PositionF &getClientPosition(Client &client)
 
     if(retval == nullptr)
     {
-        retval = make_shared<PositionF>(PositionF(0.5, AverageGroundHeight + 0.5, 0.5, Dimension::Overworld));
+        retval = make_shared<PositionF>(PositionF(0.5, AverageGroundHeight + 0.5, 0.5,
+                                        Dimension::Overworld));
         client.setPtr(retval, id, Client::DataType::PositionF);
     }
 
@@ -108,7 +112,8 @@ inline VectorF &getClientVelocity(Client &client)
     return *retval;
 }
 
-void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> pclient, shared_ptr<World> world)
+void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> pclient,
+                           shared_ptr<World> world)
 {
     Reader &reader = connection->reader();
     Client &client = *pclient;
@@ -139,6 +144,7 @@ void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                 getClientVelocity(client) = velocity;
                 continue;
             }
+
             case NetworkProtocol::NetworkEvent::RequestChunk:
             {
                 PositionI origin;
@@ -153,7 +159,8 @@ void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                     world->addGenerateChunk((PositionI)cPos);
                 }
                 LockedClient lockIt(client);
-                UpdateList & updateList = getClientUpdateList(client);
+                UpdateList &updateList = getClientUpdateList(client);
+
                 for(int x = 0; x < size; x++)
                 {
                     for(int y = 0; y < size; y++)
@@ -164,12 +171,16 @@ void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                         }
                     }
                 }
-                cout << "Server : Got Chunk Request : " << origin.x << ", " << origin.y << ", " << origin.z << ", " << (int)origin.d << endl;
+
+                cout << "Server : Got Chunk Request : " << origin.x << ", " << origin.y << ", " << origin.z << ", "
+                     << (int)origin.d << endl;
                 continue;
             }
+
             case NetworkProtocol::NetworkEvent::Last:
                 assert(false);
             }
+
             throw runtime_error("Network Event not implemented");
         }
     }
@@ -183,24 +194,32 @@ void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
 
 struct PlayerDistanceOrdering final
 {
-    const PositionF * pos;
-    bool operator ()(PositionI a, PositionI b)
+    const PositionF *pos;
+    bool operator()(PositionI a, PositionI b)
     {
-        float aDistanceSq = absSquared((VectorF)a - (VectorF)*pos);
-        float bDistanceSq = absSquared((VectorF)b - (VectorF)*pos);
+        float aDistanceSq = absSquared((VectorF)a - (VectorF) * pos);
+        float bDistanceSq = absSquared((VectorF)b - (VectorF) * pos);
+
         if(a.d != pos->d)
+        {
             aDistanceSq *= 50;
+        }
+
         if(b.d != pos->d)
+        {
             bDistanceSq *= 50;
+        }
+
         return aDistanceSq < bDistanceSq;
     }
-    PlayerDistanceOrdering(const PositionF * pos)
+    PlayerDistanceOrdering(const PositionF *pos)
         : pos(pos)
     {
     }
 };
 
-void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> pclient, shared_ptr<World> world)
+void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> pclient,
+                           shared_ptr<World> world)
 {
     Writer &writer = connection->writer();
     Client &client = *pclient;
@@ -208,7 +227,21 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
     cout << "connected\n";
     UpdateList &clientUpdateList = getClientUpdateList(client);
     //PositionF &clientPosition = getClientPosition(client);
-
+#if 1
+    {
+        shared_ptr<RenderObjectEntityMesh> entityMesh = make_shared<RenderObjectEntityMesh>(VectorF(0),
+                VectorF(0));
+        entityMesh->addPart(Generate::unitBox(TextureAtlas::Wool.td(), TextureAtlas::Wool.td(),
+                                              TextureAtlas::Wool.td(), TextureAtlas::Wool.td(), TextureAtlas::Wool.td(), TextureAtlas::Wool.td()),
+                            Script::parse(
+                                L"io.transform = make_translate(<-0.5, -0.5, -0.5>) ~ make_rotatey(io.age / 5 * 2 * pi) ~ make_translate(io.position);io.colorR=io.colorG=1-(io.colorB=0.5+0.5*sin(io.age*2*pi))"));
+        shared_ptr<RenderObjectEntity> entity = make_shared<RenderObjectEntity>(entityMesh, PositionF(0.5,
+                                                AverageGroundHeight + 10.5, 0.5, Dimension::Overworld), VectorF(0,-0.1,0), 0);
+        NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdateRenderObjects);
+        writer.writeU64(1);
+        entity->write(writer, client);
+    }
+#endif
     UpdateList updateList;
 
     try
@@ -221,18 +254,22 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
             updateList = clientUpdateList;
             clientUpdateList.clear();
             client.unlock();
+
             if(!updateList.updatesList.empty())
             {
                 world->lock.lock();
                 BlockIterator bi = world->get(updateList.updatesList.front());
                 UpdateList newClientUpdateList;
+
                 for(PositionI pos : updateList.updatesList)
                 {
                     bi = pos;
+
                     if(bi.get().good())
                     {
                         shared_ptr<RenderObjectBlockMesh> mesh = bi.get().desc->getBlockMesh(bi);
-                        shared_ptr<RenderObject> object = static_pointer_cast<RenderObject>(make_shared<RenderObjectBlock>(mesh, pos));
+                        shared_ptr<RenderObject> object = static_pointer_cast<RenderObject>(make_shared<RenderObjectBlock>
+                                                          (mesh, pos));
                         objects.push_back(object);
                     }
                     else
@@ -240,6 +277,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                         newClientUpdateList.add(pos);
                     }
                 }
+
                 world->lock.unlock();
                 client.lock();
                 clientUpdateList.merge(newClientUpdateList);
@@ -251,14 +289,18 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                 cout << "Server : writing " << objects.size() << " render objects\n";
                 NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdateRenderObjects);
                 writer.writeU64(objects.size());
+
                 for(shared_ptr<RenderObject> object : objects)
                 {
                     object->write(writer, client);
                 }
+
                 writer.flush();
             }
             else
+            {
                 writer.flush();
+            }
         }
     }
     catch(exception &e)
@@ -317,13 +359,23 @@ public:
     bool start(PositionI pos)
     {
         lock_guard<recursive_mutex> lockIt(lock);
+
         if(!generated.exchange(false))
+        {
             return false;
+        }
+
         if(needJoin)
+        {
             theThread.join();
+        }
+
         needJoin = true;
         chunkOrigin = pos;
-        theThread = thread([](ChunkGenerator * v){v->run();}, this);
+        theThread = thread([](ChunkGenerator * v)
+        {
+            v->run();
+        }, this);
         return true;
     }
     ChunkGenerator(shared_ptr<World> world)
@@ -333,8 +385,11 @@ public:
     ~ChunkGenerator()
     {
         lock_guard<recursive_mutex> lockIt(lock);
+
         if(needJoin)
+        {
             theThread.detach();
+        }
     }
     bool inUse()
     {
@@ -347,11 +402,18 @@ void generateInitialWorld(shared_ptr<World> world)
     vector<shared_ptr<ChunkGenerator>> generators;
     const int generateSize = 16;
     PositionI pos(0, 0, 0, Dimension::Overworld);
-    for(pos.x = -generateSize & WorldGeneratorPart::generateChunkSizeFloorMask.x; pos.x <= (generateSize & WorldGeneratorPart::generateChunkSizeFloorMask.x); pos.x += WorldGeneratorPart::generateChunkSize.x)
+
+    for(pos.x = -generateSize & WorldGeneratorPart::generateChunkSizeFloorMask.x;
+            pos.x <= (generateSize & WorldGeneratorPart::generateChunkSizeFloorMask.x);
+            pos.x += WorldGeneratorPart::generateChunkSize.x)
     {
-        for(pos.y = 0; pos.y < ((WorldHeight + WorldGeneratorPart::generateChunkSize.y - 1) & WorldGeneratorPart::generateChunkSizeFloorMask.x); pos.y += WorldGeneratorPart::generateChunkSize.y)
+        for(pos.y = 0;
+                pos.y < ((WorldHeight + WorldGeneratorPart::generateChunkSize.y - 1) &
+                         WorldGeneratorPart::generateChunkSizeFloorMask.x); pos.y += WorldGeneratorPart::generateChunkSize.y)
         {
-            for(pos.z = -generateSize & WorldGeneratorPart::generateChunkSizeFloorMask.z; pos.z <= (generateSize & WorldGeneratorPart::generateChunkSizeFloorMask.z); pos.z += WorldGeneratorPart::generateChunkSize.z)
+            for(pos.z = -generateSize & WorldGeneratorPart::generateChunkSizeFloorMask.z;
+                    pos.z <= (generateSize & WorldGeneratorPart::generateChunkSizeFloorMask.z);
+                    pos.z += WorldGeneratorPart::generateChunkSize.z)
             {
                 shared_ptr<ChunkGenerator> generator = make_shared<ChunkGenerator>(world);
                 bool successful = generator->start(pos);
@@ -360,16 +422,19 @@ void generateInitialWorld(shared_ptr<World> world)
             }
         }
     }
+
     for(shared_ptr<ChunkGenerator> generator : generators)
     {
         generator->generated.wait(true);
     }
+
     cout << "Server : world Generated\n";
 }
 
 void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared_ptr<World> world)
 {
     array<shared_ptr<ChunkGenerator>, GenerateThreadCount> generators;
+
     try
     {
         Periodic periodic;
@@ -390,26 +455,34 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                 }
             }
 #if 0
+
             if(frame % 1 == 0)
             {
                 lock_guard<recursive_mutex> lockIt(world->lock);
+
                 for(int i = 0; i < 1; i++)
                 {
-                    PositionI pos = PositionI(rand() % 33 - 16, rand() % 33 - 16 + AverageGroundHeight, rand() % 33 - 16, Dimension::Overworld);
+                    PositionI pos = PositionI(rand() % 33 - 16, rand() % 33 - 16 + AverageGroundHeight,
+                                              rand() % 33 - 16, Dimension::Overworld);
+
                     if(absSquared(pos - PositionI(0, AverageGroundHeight, 0, Dimension::Overworld)) > 5)
                     {
                         BlockIterator bi = world->get(pos);
+
                         switch(rand() % 4)
                         {
                         case 0:
                             bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.air")));
                             break;
+
                         case 1:
                             bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.stone")));
                             break;
+
                         case 2:
                             bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.glass")));
                             break;
+
                         default:
                             bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.bedrock")));
                             break;
@@ -417,24 +490,38 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                     }
                 }
             }
+
 #endif
-            for(shared_ptr<ChunkGenerator> & generator : generators)
+
+            for(shared_ptr<ChunkGenerator> &generator : generators)
             {
                 if(generator != nullptr && generator->inUse())
+                {
                     continue;
+                }
+
                 lock_guard<recursive_mutex> lockIt(world->lock);
+
                 if(generator == nullptr)
+                {
                     generator = make_shared<ChunkGenerator>(world);
-                UpdateList & needGeneratedChunks = world->needGenerateChunks;
-                UpdateList & generatingChunks = world->generatingChunks;
+                }
+
+                UpdateList &needGeneratedChunks = world->needGenerateChunks;
+                UpdateList &generatingChunks = world->generatingChunks;
+
                 if(needGeneratedChunks.empty())
+                {
                     break;
+                }
+
                 PositionI pos = needGeneratedChunks.updatesList.front();
                 needGeneratedChunks.remove(pos);
                 generatingChunks.add(pos);
                 bool retval = generator->start(pos);
                 assert(retval);
             }
+
             periodic.runAtFPS(20);
             frame++;
         }

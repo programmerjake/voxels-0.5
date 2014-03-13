@@ -138,6 +138,9 @@ shared_ptr<RenderObject> RenderObject::read(Reader &reader, Client &client)
     case Type::Block:
         return RenderObjectBlock::read(reader, client);
 
+    case Type::Entity:
+        return RenderObjectEntity::read(reader, client);
+
     default:
         throw InvalidDataValueException("read RenderObject type not implemented");
     }

@@ -9,6 +9,7 @@
 #include "client.h"
 #include <sstream>
 #include <cmath>
+#include <iostream>
 
 using namespace std;
 
@@ -622,6 +623,25 @@ public:
         return dynamic_pointer_cast<Scripting::DataBoolean>(retval)->value;
     }
     static shared_ptr<Script> parse(wstring code);
+    static shared_ptr<Script> read(Reader &reader)
+    {
+        uint32_t nodeCount = reader.readU32();
+        auto retval = make_shared<Script>();
+        retval->nodes.reserve(nodeCount);
+        for(uint32_t i = 0; i < nodeCount; i++)
+        {
+            retval->nodes.push_back(Scripting::Node::read(reader, nodeCount));
+        }
+        return retval;
+    }
+    void write(Writer &writer)
+    {
+        writer.writeU32(nodes.size());
+        for(auto n : nodes)
+        {
+            n->write(writer);
+        }
+    }
 };
 
 inline shared_ptr<Scripting::Data> Scripting::Data::read(Reader &reader)
@@ -649,6 +669,67 @@ inline shared_ptr<Scripting::Data> Scripting::Data::read(Reader &reader)
         break;
     }
     assert(false);
+}
+
+inline void runEntityPartScript(Mesh dest, Mesh partMesh, shared_ptr<Script> script, VectorF position, VectorF velocity, float age)
+{
+    try
+    {
+        shared_ptr<Scripting::DataObject> ioObject = make_shared<Scripting::DataObject>();
+        ioObject->value[L"age"] = make_shared<Scripting::DataFloat>(age);
+        ioObject->value[L"position"] = make_shared<Scripting::DataVector>(position);
+        ioObject->value[L"velocity"] = make_shared<Scripting::DataVector>(velocity);
+        ioObject->value[L"doDraw"] = make_shared<Scripting::DataBoolean>(true);
+        ioObject->value[L"transform"] = make_shared<Scripting::DataMatrix>(Matrix::translate(position));
+        ioObject->value[L"colorR"] = make_shared<Scripting::DataFloat>(1);
+        ioObject->value[L"colorG"] = make_shared<Scripting::DataFloat>(1);
+        ioObject->value[L"colorB"] = make_shared<Scripting::DataFloat>(1);
+        ioObject->value[L"colorA"] = make_shared<Scripting::DataFloat>(1);
+        script->evaluate(ioObject);
+        shared_ptr<Scripting::Data> pDoDraw = ioObject->value[L"doDraw"];
+        if(!pDoDraw || pDoDraw->type() != Scripting::Data::Type::Boolean)
+            throw Scripting::ScriptException(L"io.doDraw is not a valid value");
+        bool doDraw = dynamic_cast<Scripting::DataBoolean *>(pDoDraw.get())->value;
+
+        shared_ptr<Scripting::Data> pTform = ioObject->value[L"transform"];
+        if(!pTform || pTform->type() != Scripting::Data::Type::Matrix)
+            throw Scripting::ScriptException(L"io.transform is not a valid value");
+        Matrix tform = dynamic_cast<Scripting::DataMatrix *>(pTform.get())->value;
+
+        shared_ptr<Scripting::Data> pColorR = ioObject->value[L"colorR"];
+        if(!pColorR || pColorR->type() != Scripting::Data::Type::Float)
+            throw Scripting::ScriptException(L"io.colorR is not a valid value");
+        float colorR = dynamic_cast<Scripting::DataFloat *>(pColorR.get())->value;
+        if(colorR < 0 || colorR > 1)
+            throw Scripting::ScriptException(L"io.colorR is not a valid value");
+
+        shared_ptr<Scripting::Data> pColorG = ioObject->value[L"colorG"];
+        if(!pColorG || pColorG->type() != Scripting::Data::Type::Float)
+            throw Scripting::ScriptException(L"io.colorG is not a valid value");
+        float colorG = dynamic_cast<Scripting::DataFloat *>(pColorG.get())->value;
+        if(colorG < 0 || colorG > 1)
+            throw Scripting::ScriptException(L"io.colorG is not a valid value");
+
+        shared_ptr<Scripting::Data> pColorB = ioObject->value[L"colorB"];
+        if(!pColorB || pColorB->type() != Scripting::Data::Type::Float)
+            throw Scripting::ScriptException(L"io.colorB is not a valid value");
+        float colorB = dynamic_cast<Scripting::DataFloat *>(pColorB.get())->value;
+        if(colorB < 0 || colorB > 1)
+            throw Scripting::ScriptException(L"io.colorB is not a valid value");
+
+        shared_ptr<Scripting::Data> pColorA = ioObject->value[L"colorA"];
+        if(!pColorA || pColorA->type() != Scripting::Data::Type::Float)
+            throw Scripting::ScriptException(L"io.colorA is not a valid value");
+        float colorA = dynamic_cast<Scripting::DataFloat *>(pColorA.get())->value;
+        if(colorA < 0 || colorA > 1)
+            throw Scripting::ScriptException(L"io.colorA is not a valid value");
+        if(doDraw)
+            dest->add(scaleColors(Color(colorR, colorG, colorB, colorA), transform(tform, partMesh)));
+    }
+    catch(Scripting::ScriptException & e)
+    {
+        cout << "scripting error : " << e.what() << endl;
+    }
 }
 
 #endif // SCRIPT_H_INCLUDED
