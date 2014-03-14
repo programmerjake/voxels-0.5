@@ -824,7 +824,20 @@ inline uint32_t makeSeed(wstring str)
     return retval;
 }
 
-template <typename T, typename Compare>
+template <typename T>
+struct default_comparer final
+{
+    int operator()(const T & l, const T & r) const
+    {
+        if(l < r)
+            return -1;
+        if(r < l)
+            return 1;
+        return 0;
+    }
+};
+
+template <typename T, typename Compare = default_comparer<T>>
 class balanced_tree final
 {
 private:
@@ -904,7 +917,7 @@ private:
             tree->right = nullptr;
             return;
         }
-        if(compare(tree->value, newNode->value))
+        if(compare(tree->value, newNode->value) < 0)
             insertNode(tree->right, newNode);
         else
             insertNode(tree->left, newNode);
@@ -936,6 +949,144 @@ private:
     {
         assert(node != nullptr);
         return removeInorderPredecessorH(node->left);
+    }
+    static Node * removeNode(Node *& tree, const T & searchFor)
+    {
+        if(tree == nullptr)
+            return nullptr;
+        int cmpV = compare(tree->value, searchFor);
+        Node * retval;
+        if(cmpV == 0) // found it
+        {
+            if(tree->left == nullptr && tree->right == nullptr)
+            {
+                retval = node;
+                node = nullptr;
+                return retval;
+            }
+            if(tree->left == nullptr)
+            {
+                retval = node;
+                node = node->right;
+                return retval;
+            }
+            if(tree->right == nullptr)
+            {
+                retval = node;
+                node = node->left;
+                return retval;
+            }
+            retval = node;
+            Node * replaceWith = removeInorderPredecessor(node);
+            replaceWith->left = node->left;
+            replaceWith->right = node->right;
+            node = replaceWith;
+            node->calcDepth();
+            balanceNode(node);
+            return retval;
+        }
+        else
+        {
+            if(cmpV < 0)
+                retval = removeNode(tree->right, searchFor);
+            else
+                retval = removeNode(tree->left, searchFor);
+            tree->calcDepth();
+            balanceNode(tree);
+            return retval;
+        }
+    }
+    template <typename Functional, typename ComparedType>
+    static void forEachNodeInRange(Functional & fn, ComparedType min, ComparedType max, Node * tree)
+    {
+        if(tree == nullptr)
+            return;
+        bool fits = true;
+        if(compare(tree->value, min) >= 0)
+        {
+            forEachNodeInRange(fn, min, max, tree->left);
+        }
+        else
+            fits = false;
+        if(compare(tree->value, max) <= 0)
+        {
+            if(fits)
+                fn(tree->value);
+            forEachNodeInRange(fn, min, max, tree->right);
+        }
+    }
+    template <typename Functional>
+    static void forEachNode(Functional & fn, Node * tree)
+    {
+        if(tree == nullptr)
+            return;
+        forEachNode(fn, tree->left);
+        fn(tree->value);
+        forEachNode(fn, tree->right);
+    }
+    static Node * cloneTree(const Node * tree)
+    {
+        if(tree == nullptr)
+            return nullptr;
+        Node * retval = new Node(tree->value);
+        retval->left = cloneTree(tree->left);
+        retval->right = cloneTree(tree->right);
+        retval->depth = tree->depth;
+        return retval;
+    }
+    static Node * freeTree(Node * tree)
+    {
+        if(tree == nullptr)
+            return;
+        freeTree(tree->left);
+        freeTree(tree->right);
+        delete tree;
+    }
+public:
+    balanced_tree()
+        : root(nullptr), compare()
+    {
+    }
+    explicit balanced_tree(const Compare & compare)
+        : root(nullptr), compare(compare)
+    {
+    }
+    explicit balanced_tree(Compare && compare)
+        : root(nullptr), compare(move(compare))
+    {
+    }
+    balanced_tree(const balanced_tree & rt)
+        : root(cloneTree(rt)), compare(rt.compare)
+    {
+    }
+    balanced_tree(balanced_tree && rt)
+        : root(rt.root), compare(rt.compare)
+    {
+        rt.root = nullptr;
+    }
+    ~balanced_tree()
+    {
+        freeTree(root);
+    }
+    const balanced_tree & operator =(const balanced_tree & rt)
+    {
+        if(root == rt.root)
+            return *this;
+        freeTree(root);
+        root = cloneTree(rt.root);
+        compare = rt.compare;
+        return *this;
+    }
+    const balanced_tree & operator =(balanced_tree && rt)
+    {
+        swap(root, rt.root);
+        swap(compare, rt.compare);
+        return *this;
+    }
+    void clear()
+    {
+        freeTree(root);
+        root = nullptr;
     }
     #warning finish
 };
