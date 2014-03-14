@@ -827,7 +827,8 @@ inline uint32_t makeSeed(wstring str)
 template <typename T>
 struct default_comparer final
 {
-    int operator()(const T & l, const T & r) const
+    template <typename U>
+    int operator()(const T & l, const U & r) const
     {
         if(l < r)
             return -1;
@@ -846,6 +847,7 @@ private:
         unsigned depth;
         T value;
         Node *left, *right;
+        Node *prev, *next;
         Node(const T & value)
             : value(value), depth(0)
         {
@@ -864,7 +866,8 @@ private:
             depth = newDepth;
         }
     };
-    Node * root;
+    Node *root, *head, *tail;
+    #error finish converting to use linked list too
     Compare compare;
     static void rotateLeft(Node *& node)
     {
@@ -910,7 +913,7 @@ private:
         else if(rDepth > lDepth + 1)
             rotateLeft(node);
     }
-    void insertNode(Node *& tree, Node * newNode)
+    void insertNode(Node *& tree, Node * newNode, Node *& head, Node *& tail)
     {
         assert(newNode);
         if(tree == nullptr)
