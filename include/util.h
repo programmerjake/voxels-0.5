@@ -850,6 +850,10 @@ private:
             : value(value), depth(0)
         {
         }
+        Node(T && value)
+            : value(move(value)), depth(0)
+        {
+        }
         void calcDepth()
         {
             unsigned newDepth = 0;
@@ -950,7 +954,8 @@ private:
         assert(node != nullptr);
         return removeInorderPredecessorH(node->left);
     }
-    static Node * removeNode(Node *& tree, const T & searchFor)
+    template <typename ComparedType>
+    static Node * removeNode(Node *& tree, ComparedType searchFor)
     {
         if(tree == nullptr)
             return nullptr;
@@ -996,8 +1001,8 @@ private:
             return retval;
         }
     }
-    template <typename Functional, typename ComparedType>
-    static void forEachNodeInRange(Functional & fn, ComparedType min, ComparedType max, Node * tree)
+    template <typename Function, typename ComparedType>
+    static void forEachNodeInRange(Function & fn, ComparedType min, ComparedType max, Node * tree)
     {
         if(tree == nullptr)
             return;
@@ -1015,8 +1020,34 @@ private:
             forEachNodeInRange(fn, min, max, tree->right);
         }
     }
-    template <typename Functional>
-    static void forEachNode(Functional & fn, Node * tree)
+    template <typename ComparedType>
+    static Node * find(ComparedType value, Node * tree)
+    {
+        if(tree == nullptr)
+            return nullptr;
+        int cmpV = compare(tree->value, value);
+        if(cmpV == 0)
+            return tree;
+        else if(cmpV < 0)
+            return find(value, tree->right);
+        else
+            return find(value, tree->left);
+    }
+    template <typename ComparedType>
+    static const Node * find(ComparedType value, const Node * tree)
+    {
+        if(tree == nullptr)
+            return nullptr;
+        int cmpV = compare(tree->value, value);
+        if(cmpV == 0)
+            return tree;
+        else if(cmpV < 0)
+            return find(value, (const Node *)tree->right);
+        else
+            return find(value, (const Node *)tree->left);
+    }
+    template <typename Function>
+    static void forEachNode(Function & fn, Node * tree)
     {
         if(tree == nullptr)
             return;
@@ -1088,7 +1119,49 @@ public:
         freeTree(root);
         root = nullptr;
     }
-    #warning finish
+    template <typename Function>
+    void forEach(Function & fn)
+    {
+        forEachNode(fn, root);
+    }
+    template <typename Function, typename ComparedType>
+    void forEachInRange(Function & fn, ComparedType min, ComparedType max)
+    {
+        forEachNodeInRange(fn, min, max, root);
+    }
+    template <typename ComparedType>
+    const T * get(ComparedType value) const
+    {
+        const Node * node = find(value, (const Node *)root);
+        if(node == nullptr)
+            return nullptr;
+        return &node->value;
+    }
+    template <typename ComparedType>
+    T * get(ComparedType value)
+    {
+        Node * node = find(value, root);
+        if(node == nullptr)
+            return nullptr;
+        return &node->value;
+    }
+    void insert(const T & value)
+    {
+        insertNode(root, new Node(value));
+    }
+    void insert(T && value)
+    {
+        insertNode(root, new Node(move(value)));
+    }
+    template <typename ComparedType>
+    bool erase(ComparedType searchFor)
+    {
+        Node * node = removeNode(root, searchFor);
+        if(node == nullptr)
+            return false;
+        delete node;
+        return true;
+    }
 };
 
 #endif // UTIL_H
