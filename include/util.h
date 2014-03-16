@@ -1763,7 +1763,7 @@ inline int solveLinear(float a/*constant*/, float b/*linear*/, float retval[1])
 
     if(abs(b) < eps)
     {
-        return 1;
+        return (abs(a) < eps) ? 1 : 0;
     }
 
     retval[0] = -a / b;
