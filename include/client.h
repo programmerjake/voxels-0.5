@@ -27,6 +27,7 @@ public:
         PositionF, // PositionF
         Script, // Script
         Double, // double
+        Float, // float
         Last
     };
     typedef uint_fast64_t IdType;

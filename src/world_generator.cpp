@@ -1,4 +1,5 @@
 #include "world_generator.h"
+#include "builtin_entities.h"
 
 atomic_uint WorldRandom::nextRandomClass(WorldRandom::RandomClassUserStart);
 const WorldGeneratorParts_t WorldGeneratorParts;
@@ -30,6 +31,9 @@ public:
                 {
                     PositionI pos = rpos + chunkOrigin;
                     bi = pos;
+
+                    if(pos.y == AverageGroundHeight + 10 && rpos.x == 0 && rpos.z == 0)
+                        world->addEntity(EntityBlock::make(BlockDescriptors.get(L"builtin.bedrock"), (PositionF)pos + VectorF(0.5)));
 
                     if(value < 0.2 * (pos.y - AverageGroundHeight))
                     {

@@ -62,6 +62,9 @@ void clientProcessWriter(Writer *pwriter, ClientState * state)
         {
             PositionF pos = state->pos;
             VectorF velocity = state->velocity;
+            float phi = state->phi;
+            float theta = state->theta;
+            float viewDistance = state->renderDistance;
             if(state->paused)
                 velocity = VectorF(0);
             UpdateList neededChunkList = state->neededChunkList;
@@ -75,6 +78,9 @@ void clientProcessWriter(Writer *pwriter, ClientState * state)
             writer.writeF32(velocity.x);
             writer.writeF32(velocity.y);
             writer.writeF32(velocity.z);
+            writer.writeF32(phi);
+            writer.writeF32(theta);
+            writer.writeF32(viewDistance);
             writer.flush();
             for(PositionI p : neededChunkList.updatesList)
             {

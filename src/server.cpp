@@ -4,6 +4,7 @@
 #include "network_protocol.h"
 #include "platform.h"
 #include "builtin_blocks.h"
+#include "builtin_entities.h"
 #include "compressed_stream.h"
 #include "generate.h"
 #include "texture_atlas.h"
@@ -112,6 +113,21 @@ inline VectorF &getClientVelocity(Client &client)
     return *retval;
 }
 
+inline float &getClientViewPhi(Client &client)
+{
+    return client.getPropertyReference<float, 0>(Client::DataType::Float);
+}
+
+inline float &getClientViewTheta(Client &client)
+{
+    return client.getPropertyReference<float, 1>(Client::DataType::Float);
+}
+
+inline float &getClientViewDistance(Client &client)
+{
+    return client.getPropertyReference<float, 2>(Client::DataType::Float);
+}
+
 void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> pclient,
                            shared_ptr<World> world)
 {
@@ -139,9 +155,16 @@ void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                 velocity.x = reader.readFiniteF32();
                 velocity.y = reader.readFiniteF32();
                 velocity.z = reader.readFiniteF32();
+                float phi, theta, viewDistance;
+                phi = reader.readLimitedF32(-M_PI / 2 - eps, M_PI / 2 + eps);
+                theta = reader.readLimitedF32(-2 * M_PI - eps, 2 * M_PI + eps);
+                viewDistance = reader.readLimitedF32(0, 1000);
                 LockedClient lockIt(client);
                 getClientPosition(client) = pos;
                 getClientVelocity(client) = velocity;
+                getClientViewPhi(client) = phi;
+                getClientViewTheta(client) = theta;
+                getClientViewDistance(client) = viewDistance;
                 continue;
             }
 
@@ -244,6 +267,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
     }
 #endif
     UpdateList updateList;
+    unordered_set<PositionI> neededUpdates;
 
     try
     {
@@ -252,7 +276,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
             list<shared_ptr<RenderObject>> objects;
             client.lock();
             //PositionF curClientPosition = clientPosition;
-            updateList = clientUpdateList;
+            updateList.merge(clientUpdateList);
             clientUpdateList.clear();
             for(auto e : entitiesList)
             {
@@ -263,33 +287,41 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
 
             if(!updateList.updatesList.empty())
             {
+                bool locked = true;
                 world->lock.lock();
                 BlockIterator bi = world->get(updateList.updatesList.front());
-                UpdateList newClientUpdateList;
-
-                for(PositionI pos : updateList.updatesList)
+                unsigned count = 0;
+                for(auto i = updateList.updatesList.begin(); i != updateList.updatesList.end();)
                 {
+                    PositionI pos = *i;
                     bi = pos;
 
-                    if(bi.get().good())
+                    if(count >= 100)
                     {
+                        if(locked)
+                        {
+                            world->lock.unlock();
+                            locked = false;
+                        }
+                        break;
+                    }
+                    else if(bi.get().good())
+                    {
+                        assert(locked);
                         shared_ptr<RenderObjectBlockMesh> mesh = bi.get().desc->getBlockMesh(bi);
                         shared_ptr<RenderObject> object = static_pointer_cast<RenderObject>(make_shared<RenderObjectBlock>
                                                           (mesh, pos));
                         objects.push_back(object);
+                        count++;
+                        updateList.updatesSet.erase(pos);
+                        i = updateList.updatesList.erase(i);
                     }
                     else
-                    {
-                        newClientUpdateList.add(pos);
-                    }
+                        i++;
                 }
 
-
-
-                world->lock.unlock();
-                client.lock();
-                clientUpdateList.merge(newClientUpdateList);
-                client.unlock();
+                if(locked)
+                    world->lock.unlock();
             }
 
             if(!objects.empty())
@@ -343,6 +375,7 @@ struct Periodic
             deltaTime = curTime - lastFlipTime;
             lastFlipTime = curTime;
         }
+        cout << "Delta Time : " << deltaTime << endl;
     }
 };
 
@@ -411,6 +444,12 @@ public:
 
 void generateInitialWorld(shared_ptr<World> world)
 {
+#if 0
+    {
+        lock_guard<recursive_mutex> lockIt(world->lock);
+        world->addEntity(EntityBlock::make(GlassBlock::ptr, PositionF(0, AverageGroundHeight, 0, Dimension::Overworld)));
+    }
+#endif
     vector<shared_ptr<ChunkGenerator>> generators;
     const int generateSize = 16;
     PositionI pos(0, 0, 0, Dimension::Overworld);
@@ -464,6 +503,20 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                 for(shared_ptr<Client> pclient : *clients)
                 {
                     LockedClient lockClient(*pclient);
+#if 1
+                    if(frame % 5 == 0)
+                    {
+                        BlockDescriptorPtr block;
+                        if(rand() % 3 == 0)
+                            block = BlockDescriptors.get(L"builtin.bedrock");
+                        else if(rand() % 2 == 0)
+                            block = BlockDescriptors.get(L"builtin.stone");
+                        else
+                            block = BlockDescriptors.get(L"builtin.glass");
+                        VectorF lookDir = Matrix::rotateX(getClientViewPhi(*pclient)).concat(Matrix::rotateY(-getClientViewTheta(*pclient))).apply(VectorF(0, 0, -1));
+                        world->addEntity(EntityBlock::make(block, getClientPosition(*pclient) + lookDir, 10 * lookDir));
+                    }
+#endif
                     UpdateList &cul = getClientUpdateList(*pclient);
                     set<shared_ptr<RenderObjectEntity>> &entitiesList = pclient->getPropertyReference<set<shared_ptr<RenderObjectEntity>>, 0>(Client::DataType::RenderObjectEntitySet);
                     cul.merge(updateList);
@@ -472,8 +525,8 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                         entitiesList.insert(e);
                     }
                     PositionF &clientPosition = getClientPosition(*pclient);
-                    VectorF min = (VectorF)clientPosition - VectorF(30);
-                    VectorF max = (VectorF)clientPosition + VectorF(30);
+                    VectorF min = (VectorF)clientPosition - VectorF(getClientViewDistance(*pclient));
+                    VectorF max = (VectorF)clientPosition + VectorF(getClientViewDistance(*pclient));
                     world->forEachEntityInRange([&entitiesList, world](shared_ptr<EntityData> e)->int
                     {
                         entitiesList.insert(e->desc->getEntity(*e, world));
@@ -483,7 +536,7 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                     {
                         if(!e->good())
                             entitiesList.insert(e);
-                        else if(e->position.x < min.x || e->position.x > max.x || e->position.x < min.x || e->position.x > max.x || e->position.x < min.x || e->position.x > max.x || e->position.d != clientPosition.d)
+                        else if(e->position.x < min.x || e->position.x > max.x || e->position.y < min.y || e->position.y > max.y || e->position.z < min.z || e->position.z > max.z || e->position.d != clientPosition.d)
                         {
                             e->mesh = nullptr;
                             entitiesList.insert(e);
@@ -492,12 +545,12 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                 }
             }
 
-            float lastFlipTime = periodic.lastFlipTime;
-
-            world->forEachEntity([world, &entitiesSet, lastFlipTime](shared_ptr<EntityData> e)->int
+            float deltaTime = periodic.deltaTime;
+            entitiesSet.clear();
+            world->forEachEntity([world, &entitiesSet, deltaTime](shared_ptr<EntityData> e)->int
             {
                 if(get<1>(entitiesSet.insert(e)))
-                    e->desc->onMove(*e, world, lastFlipTime);
+                    e->desc->onMove(*e, world, min(deltaTime, 0.5f));
                 return 0;
             });
 
@@ -532,6 +585,7 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
 
             periodic.runAtFPS(20);
             frame++;
+            cout << "server frame : " << frame << endl;
         }
     }
     catch(exception &e)

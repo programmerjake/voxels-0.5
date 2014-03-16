@@ -957,7 +957,7 @@ private:
             rotateLeft(node);
         }
     }
-    void insertNode(Node  *&tree, Node *newNode, Node  *&head, Node  *&tail)
+    void insertNode(Node *&tree, Node *newNode, Node *&head, Node *&tail)
     {
         assert(newNode);
 
@@ -973,7 +973,13 @@ private:
             return;
         }
 
-        if(compare(tree->value, newNode->value) < 0)
+        int cmpV = compare(tree->value, newNode->value);
+        if(cmpV == 0)
+        {
+            delete newNode;
+            return;
+        }
+        else if(cmpV < 0)
         {
             insertNode(tree->right, newNode, tree->next, tail);
         }
@@ -1189,7 +1195,7 @@ private:
         freeTree(tree->right);
         delete tree;
     }
-    static void constructList(Node *tree, Node  *&head, Node  *&tail)
+    static void constructList(Node *tree, Node *&head, Node *&tail)
     {
         if(tree == nullptr)
         {
@@ -1199,8 +1205,8 @@ private:
         tree->prev = tail;
         tree->next = head;
         head = tail = tree;
-        constructList(tree->left, tree->prev, tail);
-        constructList(tree->right, head, tree->next);
+        constructList(tree->left, head, tree->prev);
+        constructList(tree->right, tree->next, tail);
     }
 public:
     friend class iterator;
@@ -1642,6 +1648,8 @@ public:
             else
             {
                 node = node->right;
+                if(node == nullptr)
+                    lastNode = lastNode->next;
             }
         }
 
@@ -1669,6 +1677,8 @@ public:
             else
             {
                 node = node->right;
+                if(node == nullptr)
+                    lastNode = lastNode->next;
             }
         }
 
@@ -1696,6 +1706,8 @@ public:
             else
             {
                 node = node->right;
+                if(node == nullptr)
+                    lastNode = lastNode->next;
             }
         }
 
@@ -1723,6 +1735,8 @@ public:
             else
             {
                 node = node->right;
+                if(node == nullptr)
+                    lastNode = lastNode->next;
             }
         }
 

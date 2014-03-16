@@ -85,10 +85,9 @@ public:
 
 class PhysicsBox final : public PhysicsObject
 {
-private:
+public:
     VectorF center, extents;
     VectorF velocity;
-public:
     PhysicsBox(VectorF center, VectorF extents/** size is 2 * extents */, Dimension dimension, PhysicsProperties properties)
         : PhysicsObject(dimension, properties), center(center), extents(extents)
     {

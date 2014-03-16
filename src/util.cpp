@@ -17,6 +17,8 @@
  */
 #include "util.h"
 #include <chrono>
+#include <iostream>
+#include <cstdlib>
 
 using namespace std;
 
@@ -25,3 +27,46 @@ uint32_t makeSeed()
     uint64_t v = chrono::system_clock::now().time_since_epoch().count();
     return (uint32_t)v ^ (uint32_t)(v >> 32);
 }
+
+#if 0 // testing balanced_tree
+namespace
+{
+initializer init1([]()
+{
+    balanced_tree<float> t, t2;
+    t.insert(1.0);
+    t.insert(1.0);
+    t.insert(5.0);
+    t.insert(2.0);
+    t.insert(4.0);
+    t.insert(3.0);
+    t.insert(6.0);
+    cout << "tree :";
+    for(auto i = t.begin(); i != t.end(); i++)
+        cout << " " << *i;
+    cout << endl;
+    cout << "tree :";
+    for(auto i = t.begin(); i != t.end();)
+    {
+        auto v = *i;
+        i = t.erase(i);
+        cout << " " << v;
+        t.insert(v);
+    }
+    cout << endl;
+    t2 = move(t);
+    t = t2;
+    cout << "tree range :";
+    for(auto i = t.rangeBegin(2.0); i != t.rangeEnd(30); i++)
+        cout << " " << *i;
+    cout << endl;
+    t.erase(3);
+    cout << "tree :";
+    for(auto i = t.begin(); i != t.end(); i++)
+        cout << " " << *i;
+    cout << endl;
+
+    exit(0);
+});
+}
+#endif // testing balanced_tree

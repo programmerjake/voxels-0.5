@@ -169,7 +169,7 @@ public:
     {
         lock_guard<recursive_mutex> lockIt(lock);
 
-        for(auto i = entities.rangeBegin(PositionF(min, d)), end = entities.rangeEnd(PositionF(min, d));
+        for(auto i = entities.rangeBegin(PositionF(min, d)), end = entities.rangeEnd(PositionF(max, d));
                 i != end;)
         {
             shared_ptr<EntityData> e = *i;
