@@ -24,7 +24,7 @@ public:
     static EntityData make(BlockDescriptorPtr block, PositionF position, VectorF velocity = VectorF(0))
     {
         assert(block);
-        return EntityData(EntityDescriptors.get(L"builtin.block"), position, velocity, shared_ptr<ExtraEntityData>(new ExtraData(block)));
+        return EntityData(EntityDescriptors.get(L"builtin.block"), position, velocity, gravityVector, shared_ptr<ExtraEntityData>(new ExtraData(block)));
     }
     virtual EntityData loadInternal(GameLoadStream & gls) const override
     {
@@ -38,7 +38,15 @@ public:
         velocity.x = gls.readFiniteF32();
         velocity.y = gls.readFiniteF32();
         velocity.z = gls.readFiniteF32();
-        return EntityData(shared_from_this(), position, velocity, shared_ptr<ExtraEntityData>(new ExtraData(block)));
+        VectorF acceleration;
+        acceleration.x = gls.readFiniteF32();
+        acceleration.y = gls.readFiniteF32();
+        acceleration.z = gls.readFiniteF32();
+        VectorF deltaAcceleration;
+        deltaAcceleration.x = gls.readFiniteF32();
+        deltaAcceleration.y = gls.readFiniteF32();
+        deltaAcceleration.z = gls.readFiniteF32();
+        return EntityData(shared_from_this(), position, velocity, acceleration, shared_ptr<ExtraEntityData>(new ExtraData(block)), deltaAcceleration);
     }
     virtual void storeInternal(EntityData data, GameStoreStream & gss) const override
     {
@@ -53,6 +61,12 @@ public:
         gss.writeF32(data.velocity.x);
         gss.writeF32(data.velocity.y);
         gss.writeF32(data.velocity.z);
+        gss.writeF32(data.acceleration.x);
+        gss.writeF32(data.acceleration.y);
+        gss.writeF32(data.acceleration.z);
+        gss.writeF32(data.deltaAcceleration.x);
+        gss.writeF32(data.deltaAcceleration.y);
+        gss.writeF32(data.deltaAcceleration.z);
     }
 public:
     virtual shared_ptr<RenderObjectEntity> getEntity(EntityData & entity, shared_ptr<World> world) const override;

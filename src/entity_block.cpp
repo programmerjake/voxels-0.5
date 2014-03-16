@@ -33,7 +33,7 @@ shared_ptr<RenderObjectEntity> EntityBlock::getEntity(EntityData & data, shared_
             mesh = make_shared<RenderObjectEntityMesh>(VectorF(0), VectorF(0));
             mesh->addPart(eData->block->makeBlockEntityMesh(), theScript);
         }
-        data.entity = make_shared<RenderObjectEntity>(mesh, data.position, data.velocity, 0);
+        data.entity = make_shared<RenderObjectEntity>(mesh, data.position, data.velocity, data.acceleration, data.deltaAcceleration, 0);
     }
     return data.entity;
 }

@@ -70,3 +70,25 @@ initializer init1([]()
 });
 }
 #endif // testing balanced_tree
+#if 1 // testing solveCubic
+namespace
+{
+void writeCubic(float a, float b, float c, float d)
+{
+    cout << a << " + " << b << "x + " << c << "x^2 + " << d << "x^3 = 0\n";
+    float roots[3];
+    int rootCount = solveCubic(a, b, c, d, roots);
+    cout << rootCount << " root" << (rootCount != 1 ? "s" : "") << " :\n";
+    for(int i = 0; i < rootCount; i++)
+        cout << roots[i] << endl;
+    cout << endl;
+}
+
+initializer init2([]()
+{
+    writeCubic(1, 2, 3, 4);
+
+    exit(0);
+});
+}
+#endif // testing solveCubic

@@ -32,9 +32,11 @@ struct EntityData
     shared_ptr<RenderObjectEntity> entity;
     PositionF position;
     VectorF velocity;
+    VectorF acceleration;
+    VectorF deltaAcceleration;
     shared_ptr<ExtraEntityData> extraData;
-    explicit EntityData(shared_ptr<const EntityDescriptor> desc = shared_ptr<EntityDescriptor>(), PositionF position = PositionF(), VectorF velocity = VectorF(0), shared_ptr<ExtraEntityData> extraData = nullptr)
-        : desc(desc), position(position), velocity(velocity), extraData(extraData)
+    explicit EntityData(shared_ptr<const EntityDescriptor> desc = shared_ptr<EntityDescriptor>(), PositionF position = PositionF(), VectorF velocity = VectorF(0), VectorF acceleration = VectorF(0), shared_ptr<ExtraEntityData> extraData = nullptr, VectorF deltaAcceleration = VectorF(0))
+        : desc(desc), position(position), velocity(velocity), acceleration(acceleration), deltaAcceleration(deltaAcceleration), extraData(extraData)
     {
     }
     bool good() const
@@ -52,6 +54,24 @@ struct EntityData
         if(entity != nullptr)
             entity->velocity = velocity;
         this->velocity = velocity;
+    }
+    void setAcceleration(VectorF acceleration)
+    {
+        if(entity != nullptr)
+            entity->acceleration = acceleration;
+        this->acceleration = acceleration;
+    }
+    void setDeltaAcceleration(VectorF deltaAcceleration)
+    {
+        if(entity != nullptr)
+            entity->deltaAcceleration = deltaAcceleration;
+        this->deltaAcceleration = deltaAcceleration;
+    }
+    void simTime(float deltaT)
+    {
+        setPosition(position + deltaT * velocity + deltaT * deltaT * 0.5f * acceleration + deltaT * deltaT * deltaT * (1 / 6.0f) * deltaAcceleration);
+        setVelocity(velocity + deltaT * acceleration + deltaT * deltaT * 0.5f * deltaAcceleration);
+        setAcceleration(acceleration + deltaT * deltaAcceleration);
     }
     void clear()
     {

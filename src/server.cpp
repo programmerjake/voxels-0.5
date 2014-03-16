@@ -297,7 +297,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                 bool locked = true;
                 world->lock.lock();
                 BlockIterator bi = world->get(updateList.updatesList.front());
-                unsigned count = 0;
+                ssize_t count = 0;
                 for(auto i = updateList.updatesList.begin(); i != updateList.updatesList.end();)
                 {
                     PositionI pos = *i;

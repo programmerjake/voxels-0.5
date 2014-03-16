@@ -87,7 +87,7 @@ class PhysicsBox final : public PhysicsObject
 {
 public:
     VectorF center, extents;
-    VectorF velocity;
+    VectorF velocity, acceleration, deltaAcceleration;
     PhysicsBox(VectorF center, VectorF extents/** size is 2 * extents */, Dimension dimension, PhysicsProperties properties)
         : PhysicsObject(dimension, properties), center(center), extents(extents)
     {

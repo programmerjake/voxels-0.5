@@ -158,13 +158,15 @@ struct RenderObjectEntity final : public RenderObject
     }
     PositionF position;
     VectorF velocity;
+    VectorF acceleration;
+    VectorF deltaAcceleration;
     float age, updateAge;
     RenderObjectEntity()
         : mesh(nullptr)
     {
     }
-    RenderObjectEntity(shared_ptr<RenderObjectEntityMesh> mesh, PositionF position, VectorF velocity, float age)
-        : mesh(mesh), position(position), velocity(velocity), age(age)
+    RenderObjectEntity(shared_ptr<RenderObjectEntityMesh> mesh, PositionF position, VectorF velocity, VectorF acceleration, VectorF deltaAcceleration, float age)
+        : mesh(mesh), position(position), velocity(velocity), acceleration(acceleration), deltaAcceleration(deltaAcceleration), age(age)
     {
     }
     friend class RenderObject;
@@ -193,6 +195,12 @@ protected:
         retval->velocity.x = reader.readFiniteF32();
         retval->velocity.y = reader.readFiniteF32();
         retval->velocity.z = reader.readFiniteF32();
+        retval->acceleration.x = reader.readFiniteF32();
+        retval->acceleration.y = reader.readFiniteF32();
+        retval->acceleration.z = reader.readFiniteF32();
+        retval->deltaAcceleration.x = reader.readFiniteF32();
+        retval->deltaAcceleration.y = reader.readFiniteF32();
+        retval->deltaAcceleration.z = reader.readFiniteF32();
         return retval;
     }
     virtual void writeInternal(Writer &writer, Client &client) override
@@ -219,6 +227,12 @@ protected:
         writer.writeF32(velocity.x);
         writer.writeF32(velocity.y);
         writer.writeF32(velocity.z);
+        writer.writeF32(acceleration.x);
+        writer.writeF32(acceleration.y);
+        writer.writeF32(acceleration.z);
+        writer.writeF32(deltaAcceleration.x);
+        writer.writeF32(deltaAcceleration.y);
+        writer.writeF32(deltaAcceleration.z);
     }
 public:
     virtual void render(Mesh dest, RenderLayer rl, Dimension d, Client &) override
@@ -229,7 +243,9 @@ public:
     }
     void move(float deltaTime)
     {
-        position += velocity * deltaTime;
+        position += velocity * deltaTime + acceleration * (deltaTime * deltaTime * 0.5f) + deltaAcceleration * (deltaTime * deltaTime * deltaTime * (1 / 6.0f));
+        velocity += acceleration * deltaTime + deltaAcceleration * (deltaTime * deltaTime * 0.5f);
+        acceleration += deltaAcceleration * deltaTime;
         age += deltaTime;
         updateAge += deltaTime;
     }
