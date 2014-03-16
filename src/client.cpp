@@ -32,10 +32,11 @@ struct ClientState
     condition_variable_any cond;
     bool done;
     bool paused;
+    flag needState;
     UpdateList neededChunkList;
     bool forwardDown = false, backwardDown = false, leftDown = false, rightDown = false, jumpDown = false, sneakDown = false;
     ClientState()
-        : lock(client.getLock())
+        : lock(client.getLock()), needState(true)
     {
         pos = PositionF(0.5, AverageGroundHeight + 5.5, 0.5, Dimension::Overworld);
         velocity = VectorF(0);
@@ -69,23 +70,43 @@ void clientProcessWriter(Writer *pwriter, ClientState * state)
                 velocity = VectorF(0);
             UpdateList neededChunkList = state->neededChunkList;
             state->neededChunkList.clear();
+            flag &needState = state->needState;
             state->lock.unlock();
-            NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdatePositionAndVelocity);
-            writer.writeF32(pos.x);
-            writer.writeF32(pos.y);
-            writer.writeF32(pos.z);
-            writer.writeDimension(pos.d);
-            writer.writeF32(velocity.x);
-            writer.writeF32(velocity.y);
-            writer.writeF32(velocity.z);
-            writer.writeF32(phi);
-            writer.writeF32(theta);
-            writer.writeF32(viewDistance);
-            writer.flush();
+            bool didAnything = false;
+            if(needState.exchange(false))
+            {
+                NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdatePositionAndVelocity);
+                writer.writeF32(pos.x);
+                writer.writeF32(pos.y);
+                writer.writeF32(pos.z);
+                writer.writeDimension(pos.d);
+                writer.writeF32(velocity.x);
+                writer.writeF32(velocity.y);
+                writer.writeF32(velocity.z);
+                writer.writeF32(phi);
+                writer.writeF32(theta);
+                writer.writeF32(viewDistance);
+                writer.flush();
+                didAnything = true;
+            }
             for(PositionI p : neededChunkList.updatesList)
             {
                 if(!get<1>(chunksAlreadyRequsted.insert(p)))
                     continue;
+                if(needState.exchange(false))
+                {
+                    NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdatePositionAndVelocity);
+                    writer.writeF32(pos.x);
+                    writer.writeF32(pos.y);
+                    writer.writeF32(pos.z);
+                    writer.writeDimension(pos.d);
+                    writer.writeF32(velocity.x);
+                    writer.writeF32(velocity.y);
+                    writer.writeF32(velocity.z);
+                    writer.writeF32(phi);
+                    writer.writeF32(theta);
+                    writer.writeF32(viewDistance);
+                }
                 NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::RequestChunk);
                 writer.writeS32(p.x);
                 writer.writeS32(p.y);
@@ -93,9 +114,11 @@ void clientProcessWriter(Writer *pwriter, ClientState * state)
                 writer.writeDimension(p.d);
                 writer.writeU32(RenderObjectWorld::Chunk::size);
                 writer.flush();
+                didAnything = true;
                 //cout << "Client : send chunk request\n";
             }
-            this_thread::sleep_for(chrono::milliseconds(50));
+            if(!didAnything)
+                this_thread::sleep_for(chrono::milliseconds(1));
             state->lock.lock();
         }
         state->lock.unlock();
@@ -143,6 +166,12 @@ void clientProcessReader(Reader *preader, ClientState * state)
                 }
                 cout << "Client : received " << readCount << " updated render objects\n";
                 state->lock.lock();
+                continue;
+            }
+            case NetworkProtocol::NetworkEvent::RequestState:
+            {
+                state->lock.lock();
+                state->needState = true;
                 continue;
             }
 

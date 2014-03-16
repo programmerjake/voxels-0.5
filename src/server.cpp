@@ -128,6 +128,11 @@ inline float &getClientViewDistance(Client &client)
     return client.getPropertyReference<float, 2>(Client::DataType::Float);
 }
 
+inline flag &getClientNeedStateFlag(Client &client)
+{
+    return client.getPropertyReference<flag, 0>(Client::DataType::ServerFlag);
+}
+
 void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> pclient,
                            shared_ptr<World> world)
 {
@@ -181,11 +186,11 @@ void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                     ChunkPosition cPos(origin);
                     world->addGenerateChunk((PositionI)cPos);
                 }
-                LockedClient lockIt(client);
                 UpdateList &updateList = getClientUpdateList(client);
 
                 for(int x = 0; x < size; x++)
                 {
+                    LockedClient lockIt(client);
                     for(int y = 0; y < size; y++)
                     {
                         for(int z = 0; z < size; z++)
@@ -247,6 +252,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
     Writer &writer = connection->writer();
     Client &client = *pclient;
     flag &terminated = getClientTerminatedFlag(client);
+    flag &needState = getClientNeedStateFlag(client);
     cout << "connected\n";
     UpdateList &clientUpdateList = getClientUpdateList(client);
     set<shared_ptr<RenderObjectEntity>> &entitiesList = client.getPropertyReference<set<shared_ptr<RenderObjectEntity>>, 0>(Client::DataType::RenderObjectEntitySet);
@@ -274,6 +280,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
         while(!terminated)
         {
             list<shared_ptr<RenderObject>> objects;
+            bool didAnything = false;
             client.lock();
             //PositionF curClientPosition = clientPosition;
             updateList.merge(clientUpdateList);
@@ -296,7 +303,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                     PositionI pos = *i;
                     bi = pos;
 
-                    if(count >= 100)
+                    if(count >= max<ssize_t>(50, 100 - (ssize_t)objects.size() / 2))
                     {
                         if(locked)
                         {
@@ -326,6 +333,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
 
             if(!objects.empty())
             {
+                didAnything = true;
                 cout << "Server : writing " << objects.size() << " render objects\n";
                 NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdateRenderObjects);
                 writer.writeU64(objects.size());
@@ -334,13 +342,15 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                 {
                     object->write(writer, client);
                 }
-
-                writer.flush();
             }
-            else
+            if(needState.exchange(false))
             {
-                writer.flush();
+                NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::RequestState);
+                didAnything = true;
             }
+            writer.flush();
+            if(!didAnything)
+                this_thread::sleep_for(chrono::milliseconds(1));
         }
     }
     catch(exception &e)
@@ -375,7 +385,7 @@ struct Periodic
             deltaTime = curTime - lastFlipTime;
             lastFlipTime = curTime;
         }
-        cout << "Delta Time : " << deltaTime << endl;
+        //cout << "Delta Time : " << deltaTime << endl;
     }
 };
 
@@ -500,11 +510,22 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                 UpdateList updateList = world->copyOutUpdates();
                 vector<shared_ptr<RenderObjectEntity>> destroyedEntities = world->copyOutDestroyedEntities();
 
+                for(auto i = clients->begin(); i != clients->end();)
+                {
+                    Client & client = **i;
+                    LockedClient lockClient(client);
+                    if(getClientTerminatedFlag(client))
+                        i = clients->erase(i);
+                    else
+                        i++;
+                }
+
                 for(shared_ptr<Client> pclient : *clients)
                 {
                     LockedClient lockClient(*pclient);
+                    getClientNeedStateFlag(*pclient) = true;
 #if 1
-                    if(frame % 5 == 0)
+                    if(frame % 2 == 0)
                     {
                         BlockDescriptorPtr block;
                         if(rand() % 3 == 0)
@@ -585,7 +606,7 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
 
             periodic.runAtFPS(20);
             frame++;
-            cout << "server frame : " << frame << endl;
+            //cout << "server frame : " << frame << endl;
         }
     }
     catch(exception &e)

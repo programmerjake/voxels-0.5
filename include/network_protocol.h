@@ -12,6 +12,7 @@ enum class NetworkEvent : uint_fast8_t
     UpdateRenderObjects,
     UpdatePositionAndVelocity,
     RequestChunk,
+    RequestState,
     Last
 };
 

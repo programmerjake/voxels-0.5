@@ -16,6 +16,51 @@ initializer signalInit([]()
 {
     signal(SIGPIPE, SIG_IGN);
 });
+
+class NetworkWriter final : public Writer
+{
+private:
+    vector<uint8_t> buffer;
+    int fd;
+public:
+    NetworkWriter(int fd)
+        : fd(fd)
+    {
+        int flag = 1;
+        setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (const void *)&flag, sizeof(flag));
+    }
+    virtual ~NetworkWriter()
+    {
+        close(fd);
+    }
+    virtual void writeByte(uint8_t v)
+    {
+        buffer.push_back(v);
+        if(buffer.size() >= 16384)
+            flush();
+    }
+    virtual void flush()
+    {
+        const uint8_t * pbuffer = buffer.data();
+        ssize_t sizeLeft = buffer.size();
+        while(sizeLeft > 0)
+        {
+            ssize_t retval = send(fd, (const void *)pbuffer, sizeLeft, 0);
+            if(retval == -1)
+            {
+                throw IOException(string("io error : ") + strerror(errno));
+            }
+            else
+            {
+                sizeLeft -= retval;
+                pbuffer += retval;
+            }
+        }
+        int flag = 1;
+        setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (const void *)&flag, sizeof(flag));
+        buffer.clear();
+    }
+};
 }
 
 NetworkConnection::NetworkConnection(wstring url, uint16_t port)
@@ -67,7 +112,7 @@ NetworkConnection::NetworkConnection(wstring url, uint16_t port)
 
     freeaddrinfo(addrList);
     readerInternal = unique_ptr<Reader>(new FileReader(fdopen(dup(fd), "r")));
-    writerInternal = unique_ptr<Writer>(new FileWriter(fdopen(fd, "w")));
+    writerInternal = unique_ptr<Writer>(new NetworkWriter(fd));
 }
 
 NetworkServer::NetworkServer(uint16_t port)
@@ -154,6 +199,6 @@ shared_ptr<StreamRW> NetworkServer::accept()
     setsockopt(fd2, IPPROTO_TCP, TCP_NODELAY, (const void *)&flag, sizeof(flag));
 
     shared_ptr<Reader> reader = shared_ptr<Reader>(new FileReader(fdopen(dup(fd2), "r")));
-    shared_ptr<Writer> writer = shared_ptr<Writer>(new FileWriter(fdopen(fd2, "w")));
+    shared_ptr<Writer> writer = shared_ptr<Writer>(new NetworkWriter(fd2));
     return shared_ptr<StreamRW>(new StreamRWWrapper(reader, writer));
 }

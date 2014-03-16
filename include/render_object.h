@@ -158,7 +158,7 @@ struct RenderObjectEntity final : public RenderObject
     }
     PositionF position;
     VectorF velocity;
-    float age;
+    float age, updateAge;
     RenderObjectEntity()
         : mesh(nullptr)
     {
@@ -185,6 +185,7 @@ protected:
             return retval;
         }
         retval->age = reader.readLimitedF32(0, 1e10);
+        retval->updateAge = 0;
         retval->position.x = reader.readFiniteF32();
         retval->position.y = reader.readFiniteF32();
         retval->position.z = reader.readFiniteF32();
@@ -222,7 +223,7 @@ protected:
 public:
     virtual void render(Mesh dest, RenderLayer rl, Dimension d, Client &) override
     {
-        if(!good() || rl != RenderLayer::Opaque || d != position.d)
+        if(!good() || rl != RenderLayer::Opaque || d != position.d || updateAge > 5)
             return;
         mesh->render(dest, (VectorF)position, velocity, age);
     }
@@ -230,6 +231,7 @@ public:
     {
         position += velocity * deltaTime;
         age += deltaTime;
+        updateAge += deltaTime;
     }
     virtual bool operator ==(const RenderObject &rt) const override
     {
