@@ -850,8 +850,8 @@ class balanced_tree final
 private:
     struct Node
     {
-        unsigned depth;
         T value;
+        unsigned depth;
         Node *left, *right;
         Node *prev, *next;
         Node(const T &value)
@@ -1016,7 +1016,7 @@ private:
         return removeInorderPredecessorH(node->left);
     }
     template <typename ComparedType>
-    Node *removeNode(Node  *&tree, ComparedType searchFor)
+    Node *removeNode(Node *&tree, ComparedType searchFor)
     {
         if(tree == nullptr)
         {
@@ -1030,35 +1030,35 @@ private:
         {
             if(tree->left == nullptr && tree->right == nullptr)
             {
-                retval = node;
-                node = nullptr;
+                retval = tree;
+                tree = nullptr;
                 removeNodeFromList(retval);
                 return retval;
             }
 
             if(tree->left == nullptr)
             {
-                retval = node;
-                node = node->right;
+                retval = tree;
+                tree = tree->right;
                 removeNodeFromList(retval);
                 return retval;
             }
 
             if(tree->right == nullptr)
             {
-                retval = node;
-                node = node->left;
+                retval = tree;
+                tree = tree->left;
                 removeNodeFromList(retval);
                 return retval;
             }
 
-            retval = node;
-            Node *replaceWith = removeInorderPredecessor(node);
-            replaceWith->left = node->left;
-            replaceWith->right = node->right;
-            node = replaceWith;
-            node->calcDepth();
-            balanceNode(node);
+            retval = tree;
+            Node *replaceWith = removeInorderPredecessor(tree);
+            replaceWith->left = tree->left;
+            replaceWith->right = tree->right;
+            tree = replaceWith;
+            tree->calcDepth();
+            balanceNode(tree);
             removeNodeFromList(retval);
             return retval;
         }
@@ -1178,7 +1178,7 @@ private:
         retval->depth = tree->depth;
         return retval;
     }
-    static Node *freeTree(Node *tree)
+    static void freeTree(Node *tree)
     {
         if(tree == nullptr)
         {
@@ -1248,7 +1248,7 @@ public:
         }
         friend bool operator !=(const_iterator a, const_iterator b)
         {
-            return a.node == b.node;
+            return a.node != b.node;
         }
         const T &operator *() const
         {
@@ -1305,7 +1305,7 @@ public:
         }
         friend bool operator !=(iterator a, iterator b)
         {
-            return a.node == b.node;
+            return a.node != b.node;
         }
         friend bool operator ==(const_iterator a, iterator b)
         {
@@ -1313,7 +1313,7 @@ public:
         }
         friend bool operator !=(const_iterator a, iterator b)
         {
-            return a.node == b.node;
+            return a.node != b.node;
         }
         friend bool operator ==(iterator a, const_iterator b)
         {
@@ -1321,7 +1321,7 @@ public:
         }
         friend bool operator !=(iterator a, const_iterator b)
         {
-            return a.node == b.node;
+            return a.node != b.node;
         }
         T &operator *() const
         {
@@ -1377,7 +1377,7 @@ public:
         }
         friend bool operator !=(const_reverse_iterator a, const_reverse_iterator b)
         {
-            return a.node == b.node;
+            return a.node != b.node;
         }
         const T &operator *() const
         {
@@ -1434,7 +1434,7 @@ public:
         }
         friend bool operator !=(reverse_iterator a, reverse_iterator b)
         {
-            return a.node == b.node;
+            return a.node != b.node;
         }
         friend bool operator ==(const_reverse_iterator a, reverse_iterator b)
         {
@@ -1442,7 +1442,7 @@ public:
         }
         friend bool operator !=(const_reverse_iterator a, reverse_iterator b)
         {
-            return a.node == b.node;
+            return a.node != b.node;
         }
         friend bool operator ==(reverse_iterator a, const_reverse_iterator b)
         {
@@ -1450,7 +1450,7 @@ public:
         }
         friend bool operator !=(reverse_iterator a, const_reverse_iterator b)
         {
-            return a.node == b.node;
+            return a.node != b.node;
         }
         T &operator *() const
         {
@@ -1558,7 +1558,6 @@ public:
         delete node;
         return true;
     }
-    template <>
     iterator erase(iterator iter)
     {
         iterator retval = iter;
@@ -1566,7 +1565,6 @@ public:
         erase<const T &>(*iter);
         return retval;
     }
-    template <>
     const_iterator erase(const_iterator iter)
     {
         const_iterator retval = iter;
@@ -1622,7 +1620,7 @@ public:
     {
         return const_reverse_iterator(nullptr);
     }
-    template <typename ComparedType>
+    template <typename CompareType>
     const_iterator rangeCBegin(CompareType searchFor) const
     {
         const Node *node = root, *lastNode = root;
@@ -1649,7 +1647,7 @@ public:
 
         return const_iterator(lastNode);
     }
-    template <typename ComparedType>
+    template <typename CompareType>
     const_iterator rangeCEnd(CompareType searchFor) const
     {
         const Node *node = root, *lastNode = root;
@@ -1676,7 +1674,7 @@ public:
 
         return const_iterator(lastNode);
     }
-    template <typename ComparedType>
+    template <typename CompareType>
     iterator rangeBegin(CompareType searchFor)
     {
         Node *node = root, *lastNode = root;
@@ -1703,7 +1701,7 @@ public:
 
         return iterator(lastNode);
     }
-    template <typename ComparedType>
+    template <typename CompareType>
     iterator rangeEnd(CompareType searchFor)
     {
         Node *node = root, *lastNode = root;

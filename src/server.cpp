@@ -226,8 +226,9 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
     flag &terminated = getClientTerminatedFlag(client);
     cout << "connected\n";
     UpdateList &clientUpdateList = getClientUpdateList(client);
+    set<shared_ptr<RenderObjectEntity>> &entitiesList = client.getPropertyReference<set<shared_ptr<RenderObjectEntity>>, 0>(Client::DataType::RenderObjectEntitySet);
     //PositionF &clientPosition = getClientPosition(client);
-#if 1
+#if 0
     {
         shared_ptr<RenderObjectEntityMesh> entityMesh = make_shared<RenderObjectEntityMesh>(VectorF(0),
                 VectorF(0));
@@ -253,6 +254,11 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
             //PositionF curClientPosition = clientPosition;
             updateList = clientUpdateList;
             clientUpdateList.clear();
+            for(auto e : entitiesList)
+            {
+                objects.push_back(e);
+            }
+            entitiesList.clear();
             client.unlock();
 
             if(!updateList.updatesList.empty())
@@ -277,6 +283,8 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                         newClientUpdateList.add(pos);
                     }
                 }
+
+
 
                 world->lock.unlock();
                 client.lock();
@@ -314,6 +322,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
 struct Periodic
 {
     double lastFlipTime = -1e9;
+    double deltaTime = 1 / 60.0;
 
     void runAtFPS(float fps)
     {
@@ -323,13 +332,16 @@ struct Periodic
 
         if(sleepTime <= eps)
         {
+            if(lastFlipTime >= 0)
+                deltaTime = curTime - lastFlipTime;
             lastFlipTime = curTime;
         }
-
-        if(sleepTime > eps)
+        else
         {
             this_thread::sleep_for(chrono::nanoseconds(static_cast<int64_t>(sleepTime * 1e9)));
-            lastFlipTime = Display::realtimeTimer();
+            curTime = Display::realtimeTimer();
+            deltaTime = curTime - lastFlipTime;
+            lastFlipTime = curTime;
         }
     }
 };
@@ -440,58 +452,54 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
         Periodic periodic;
         generateInitialWorld(world);
         uint64_t frame = 0;
+        set<shared_ptr<EntityData>> entitiesSet;
 
         while(true)
         {
             {
                 lock_guard<recursive_mutex> lockIt(world->lock);
                 UpdateList updateList = world->copyOutUpdates();
+                vector<shared_ptr<RenderObjectEntity>> destroyedEntities = world->copyOutDestroyedEntities();
 
                 for(shared_ptr<Client> pclient : *clients)
                 {
                     LockedClient lockClient(*pclient);
                     UpdateList &cul = getClientUpdateList(*pclient);
+                    set<shared_ptr<RenderObjectEntity>> &entitiesList = pclient->getPropertyReference<set<shared_ptr<RenderObjectEntity>>, 0>(Client::DataType::RenderObjectEntitySet);
                     cul.merge(updateList);
-                }
-            }
-#if 0
-
-            if(frame % 1 == 0)
-            {
-                lock_guard<recursive_mutex> lockIt(world->lock);
-
-                for(int i = 0; i < 1; i++)
-                {
-                    PositionI pos = PositionI(rand() % 33 - 16, rand() % 33 - 16 + AverageGroundHeight,
-                                              rand() % 33 - 16, Dimension::Overworld);
-
-                    if(absSquared(pos - PositionI(0, AverageGroundHeight, 0, Dimension::Overworld)) > 5)
+                    for(auto e : destroyedEntities)
                     {
-                        BlockIterator bi = world->get(pos);
-
-                        switch(rand() % 4)
+                        entitiesList.insert(e);
+                    }
+                    PositionF &clientPosition = getClientPosition(*pclient);
+                    VectorF min = (VectorF)clientPosition - VectorF(30);
+                    VectorF max = (VectorF)clientPosition + VectorF(30);
+                    world->forEachEntityInRange([&entitiesList, world](shared_ptr<EntityData> e)->int
+                    {
+                        entitiesList.insert(e->desc->getEntity(*e, world));
+                        return 0;
+                    }, min, max, clientPosition.d);
+                    for(auto e : pclient->getAllPtrs<RenderObjectEntity>(Client::DataType::RenderObjectEntity))
+                    {
+                        if(!e->good())
+                            entitiesList.insert(e);
+                        else if(e->position.x < min.x || e->position.x > max.x || e->position.x < min.x || e->position.x > max.x || e->position.x < min.x || e->position.x > max.x || e->position.d != clientPosition.d)
                         {
-                        case 0:
-                            bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.air")));
-                            break;
-
-                        case 1:
-                            bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.stone")));
-                            break;
-
-                        case 2:
-                            bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.glass")));
-                            break;
-
-                        default:
-                            bi.set(BlockData(BlockDescriptor::getBlock(L"builtin.bedrock")));
-                            break;
+                            e->mesh = nullptr;
+                            entitiesList.insert(e);
                         }
                     }
                 }
             }
 
-#endif
+            float lastFlipTime = periodic.lastFlipTime;
+
+            world->forEachEntity([world, &entitiesSet, lastFlipTime](shared_ptr<EntityData> e)->int
+            {
+                if(get<1>(entitiesSet.insert(e)))
+                    e->desc->onMove(*e, world, lastFlipTime);
+                return 0;
+            });
 
             for(shared_ptr<ChunkGenerator> &generator : generators)
             {

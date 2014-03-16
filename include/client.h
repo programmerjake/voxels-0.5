@@ -15,17 +15,18 @@ class Client final
 public:
     enum class DataType
     {
-        Image,
-        RenderObjectBlockMesh,
-        RenderObjectEntityMesh,
-        RenderObjectEntity,
-        RenderObjectWorld,
-        ServerFlag,
-        UpdateList,
-        VectorF,
-        PositionF,
-        Script,
-        Double,
+        Image, // Image::ImageData
+        RenderObjectBlockMesh, // RenderObjectBlockMesh
+        RenderObjectEntityMesh, // RenderObjectEntityMesh
+        RenderObjectEntity, // RenderObjectEntity
+        RenderObjectEntitySet, // set<RenderObjectEntity>
+        RenderObjectWorld, // RenderObjectWorld
+        ServerFlag, // flag
+        UpdateList, // UpdateList
+        VectorF, // VectorF
+        PositionF, // PositionF
+        Script, // Script
+        Double, // double
         Last
     };
     typedef uint_fast64_t IdType;
@@ -247,6 +248,18 @@ public:
         }
 
         return *retval;
+    }
+    template <typename T>
+    vector<shared_ptr<T>> getAllPtrs(DataType dataType)
+    {
+        lock_guard<recursive_mutex> lockIt(getLock());
+        vector<shared_ptr<T>> retval;
+        retval.reserve(ptrMap[(int)dataType].size());
+        for(auto p : ptrMap[(int)dataType])
+        {
+            retval.push_back(static_pointer_cast<T>(get<1>(p)));
+        }
+        return retval;
     }
 };
 

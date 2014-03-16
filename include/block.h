@@ -10,6 +10,7 @@
 #include <iostream>
 #include <vector>
 #include "render_object.h"
+#include "physics.h"
 
 using namespace std;
 
@@ -126,6 +127,8 @@ public:
         gss.writeBlockDescriptor(data.desc);
         data.desc->storeInternal(data, gss);
     }
+    virtual Mesh makeBlockEntityMesh() const = 0;
+    virtual shared_ptr<PhysicsObject> getPhysicsObject(PositionI pos) const = 0;
 };
 
 struct BlockDescriptors_t final

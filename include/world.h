@@ -1,5 +1,6 @@
 #include "block.h"
 #include "entity.h"
+#include "render_object.h"
 #ifndef WORLD_H_INCLUDED
 #define WORLD_H_INCLUDED
 
@@ -11,6 +12,7 @@ using namespace std;
 
 const int WorldHeight = ChunkHeight;
 const int AverageGroundHeight = 64;
+constexpr VectorF gravityVector = VectorF(0, -9.8, 0);
 
 class BlockIterator;
 class World;
@@ -29,7 +31,59 @@ public:
     const WorldGenerator generator;
 private:
     list<shared_ptr<Chunk>> chunksList;
-    set<
+    struct EntityCompare final
+    {
+        int operator()(shared_ptr<EntityData> a, const PositionF &b) const
+        {
+            if(a->position.x < b.x)
+            {
+                return -1;
+            }
+
+            if(a->position.x > b.x)
+            {
+                return 1;
+            }
+
+            if(a->position.y < b.y)
+            {
+                return -1;
+            }
+
+            if(a->position.y > b.y)
+            {
+                return 1;
+            }
+
+            if(a->position.z < b.z)
+            {
+                return -1;
+            }
+
+            if(a->position.z > b.z)
+            {
+                return 1;
+            }
+
+            if(a->position.d < b.d)
+            {
+                return -1;
+            }
+
+            if(a->position.d > b.d)
+            {
+                return 1;
+            }
+
+            return 0;
+        }
+        int operator()(shared_ptr<EntityData> a, shared_ptr<EntityData> b) const
+        {
+            return operator()(a, b->position);
+        }
+    };
+    balanced_tree<shared_ptr<EntityData>, EntityCompare> entities;
+    vector<shared_ptr<RenderObjectEntity>> destroyedEntities;
     unordered_map<ChunkPosition, shared_ptr<Chunk>> chunksMap;
     shared_ptr<Chunk> getChunk(ChunkPosition pos)
     {
@@ -52,7 +106,7 @@ private:
         return c;
     }
     UpdateList clientsUpdates;
-    World(uint32_t seed, const WorldGenerator & generator)
+    World(uint32_t seed, const WorldGenerator &generator)
         : lock(), random(seed, lock), generator(generator)
     {
     }
@@ -63,13 +117,21 @@ public:
     void addGenerateChunk(PositionI pos)
     {
         lock_guard<recursive_mutex> lockIt(lock);
+
         if(generatedChunks.updatesSet.find(pos) != generatedChunks.updatesSet.end())
+        {
             return;
+        }
+
         if(generatingChunks.updatesSet.find(pos) != generatingChunks.updatesSet.end())
+        {
             return;
+        }
+
         needGenerateChunks.add(pos);
     }
-    static shared_ptr<World> make(uint32_t seed = makeSeed(), const WorldGenerator & generator = WorldGenerator::makeDefault())
+    static shared_ptr<World> make(uint32_t seed = makeSeed(),
+                                  const WorldGenerator &generator = WorldGenerator::makeDefault())
     {
         return shared_ptr<World>(new World(seed, generator));
     }
@@ -89,11 +151,141 @@ public:
         clientsUpdates.clear();
         return std::move(retval);
     }
+    vector<shared_ptr<RenderObjectEntity>> copyOutDestroyedEntities()
+    {
+        lock_guard<recursive_mutex> lockIt(lock);
+        vector<shared_ptr<RenderObjectEntity>> retval = move(destroyedEntities);
+        destroyedEntities.clear();
+        return move(retval);
+    }
     void merge(shared_ptr<World> world);
     shared_ptr<World> makeWorldForGenerate()
     {
         lock_guard<recursive_mutex> lockIt(lock);
         return make(random.seed, generator);
+    }
+    template <typename Function>
+    int forEachEntityInRange(Function fn, VectorF min, VectorF max, Dimension d)
+    {
+        lock_guard<recursive_mutex> lockIt(lock);
+
+        for(auto i = entities.rangeBegin(PositionF(min, d)), end = entities.rangeEnd(PositionF(min, d));
+                i != end;)
+        {
+            shared_ptr<EntityData> e = *i;
+            if(!e->good())
+            {
+                destroyedEntities.push_back(e->entity);
+                i = entities.erase(i);
+            }
+            else if(e->position.d == d && e->position.y >= min.y && e->position.y <= max.y && e->position.z >= min.z
+                    && e->position.z <= max.z)
+            {
+                i = entities.erase(i);
+                int retval;
+
+                try
+                {
+                    retval = fn(e);
+                }
+                catch(...)
+                {
+                    if(e->good())
+                    {
+                        entities.insert(e);
+                    }
+                    else
+                    {
+                        destroyedEntities.push_back(e->entity);
+                    }
+
+                    throw;
+                }
+
+                if(e->good())
+                {
+                    entities.insert(e);
+                }
+                else
+                {
+                    destroyedEntities.push_back(e->entity);
+                }
+
+                if(retval != 0)
+                {
+                    return retval;
+                }
+            }
+            else
+            {
+                i++;
+            }
+        }
+
+        return 0;
+    }
+    template <typename Function>
+    int forEachEntity(Function fn)
+    {
+        lock_guard<recursive_mutex> lockIt(lock);
+
+        for(auto i = entities.begin(), end = entities.end(); i != end;)
+        {
+            shared_ptr<EntityData> e = *i;
+            if(!e->good())
+            {
+                destroyedEntities.push_back(e->entity);
+                i = entities.erase(i);
+            }
+            else
+            {
+                i = entities.erase(i);
+                int retval;
+
+                try
+                {
+                    retval = fn(e);
+                }
+                catch(...)
+                {
+                if(e->good())
+                {
+                    entities.insert(e);
+                }
+                else
+                {
+                    destroyedEntities.push_back(e->entity);
+                }
+
+                    throw;
+                }
+
+                if(e->good())
+                {
+                    entities.insert(e);
+                }
+                else
+                {
+                    destroyedEntities.push_back(e->entity);
+                }
+                if(retval != 0)
+                {
+                    return retval;
+                }
+            }
+        }
+
+        return 0;
+    }
+    void addEntity(const EntityData &e)
+    {
+        lock_guard<recursive_mutex> lockIt(lock);
+        entities.insert(make_shared<EntityData>(e));
+    }
+    void addEntity(EntityData &&e)
+    {
+        lock_guard<recursive_mutex> lockIt(lock);
+        entities.insert(make_shared<EntityData>(move(e)));
     }
 };
 
@@ -172,8 +364,12 @@ public:
     {
         pos = PositionI(newPos, pos.d);
         ChunkPosition cPos(pos);
+
         if(chunk == nullptr || chunk->pos != cPos)
+        {
             chunk = world()->getChunk(cPos);
+        }
+
         return *this;
     }
     BlockIterator &operator +=(VectorI deltaPos)
@@ -181,7 +377,8 @@ public:
         shared_ptr<lock_guard<recursive_mutex>> lock = nullptr;
         pos += deltaPos;
 
-        if(deltaPos.x < -ChunkSize || deltaPos.x > ChunkSize || deltaPos.z < -ChunkSize || deltaPos.z > ChunkSize)
+        if(deltaPos.x < -ChunkSize || deltaPos.x > ChunkSize || deltaPos.z < -ChunkSize
+                || deltaPos.z > ChunkSize)
         {
             return *this = pos;
         }
@@ -245,12 +442,13 @@ public:
                 return *this = pos;
             }
         }
+        return *this;
     }
-    BlockIterator & operator -=(VectorI v)
+    BlockIterator &operator -=(VectorI v)
     {
         return operator +=(-v);
     }
-    BlockIterator & operator +=(BlockFace face)
+    BlockIterator &operator +=(BlockFace face)
     {
         switch(face)
         {
@@ -260,59 +458,81 @@ public:
             {
                 lock_guard<recursive_mutex> lockIt(world()->lock);
                 chunk = chunk->nx.lock();
+
                 if(chunk == nullptr)
+                {
                     return *this = pos;
+                }
             }
+
             return *this;
         }
+
         case BlockFace::PX:
         {
             if(++pos.x == chunk->pos.x + ChunkSize)
             {
                 lock_guard<recursive_mutex> lockIt(world()->lock);
                 chunk = chunk->px.lock();
+
                 if(chunk == nullptr)
+                {
                     return *this = pos;
+                }
             }
+
             return *this;
         }
+
         case BlockFace::NY:
         {
             pos.y--;
             return *this;
         }
+
         case BlockFace::PY:
         {
             pos.y++;
             return *this;
         }
+
         case BlockFace::NZ:
         {
             if(pos.z-- == chunk->pos.z)
             {
                 lock_guard<recursive_mutex> lockIt(world()->lock);
                 chunk = chunk->nz.lock();
+
                 if(chunk == nullptr)
+                {
                     return *this = pos;
+                }
             }
+
             return *this;
         }
+
         case BlockFace::PZ:
         {
             if(++pos.z == chunk->pos.z + ChunkSize)
             {
                 lock_guard<recursive_mutex> lockIt(world()->lock);
                 chunk = chunk->pz.lock();
+
                 if(chunk == nullptr)
+                {
                     return *this = pos;
+                }
             }
+
             return *this;
         }
         }
+
         assert(false);
         return *this;
     }
-    BlockIterator & operator -=(BlockFace face)
+    BlockIterator &operator -=(BlockFace face)
     {
         switch(face)
         {
@@ -322,55 +542,77 @@ public:
             {
                 lock_guard<recursive_mutex> lockIt(world()->lock);
                 chunk = chunk->nx.lock();
+
                 if(chunk == nullptr)
+                {
                     return *this = pos;
+                }
             }
+
             return *this;
         }
+
         case BlockFace::NX:
         {
             if(++pos.x == chunk->pos.x + ChunkSize)
             {
                 lock_guard<recursive_mutex> lockIt(world()->lock);
                 chunk = chunk->px.lock();
+
                 if(chunk == nullptr)
+                {
                     return *this = pos;
+                }
             }
+
             return *this;
         }
+
         case BlockFace::PY:
         {
             pos.y--;
             return *this;
         }
+
         case BlockFace::NY:
         {
             pos.y++;
             return *this;
         }
+
         case BlockFace::PZ:
         {
             if(pos.z-- == chunk->pos.z)
             {
                 lock_guard<recursive_mutex> lockIt(world()->lock);
                 chunk = chunk->nz.lock();
+
                 if(chunk == nullptr)
+                {
                     return *this = pos;
+                }
             }
+
             return *this;
         }
+
         case BlockFace::NZ:
         {
             if(++pos.z == chunk->pos.z + ChunkSize)
             {
                 lock_guard<recursive_mutex> lockIt(world()->lock);
                 chunk = chunk->pz.lock();
+
                 if(chunk == nullptr)
+                {
                     return *this = pos;
+                }
             }
+
             return *this;
         }
         }
+
         assert(false);
         return *this;
     }
@@ -379,7 +621,7 @@ public:
         lock_guard<recursive_mutex> lock(world()->lock);
         world()->addUpdate(pos);
     }
-    recursive_mutex & getWorldLock()
+    recursive_mutex &getWorldLock()
     {
         return world()->lock;
     }
@@ -402,10 +644,12 @@ inline void World::merge(shared_ptr<World> world)
     lock_guard<recursive_mutex> lockIt(lock);
     lock_guard<recursive_mutex> lockOther(world->lock);
     clientsUpdates.merge(world->clientsUpdates);
+
     for(shared_ptr<Chunk> chunk : world->chunksList)
     {
         BlockIterator bi = get((PositionI)chunk->pos);
         BlockIterator bi2 = world->get((PositionI)chunk->pos);
+
         for(int x = 0; x < ChunkSize; x++)
         {
             for(int y = 0; y < ChunkHeight; y++)
@@ -414,11 +658,20 @@ inline void World::merge(shared_ptr<World> world)
                 {
                     bi = (PositionI)chunk->pos + VectorI(x, y, z);
                     bi2 = (PositionI)chunk->pos + VectorI(x, y, z);
+
                     if(bi2.get().good())
+                    {
                         bi.set(bi2.get());
+                    }
                 }
             }
         }
+    }
+
+    for(auto i = world->entities.begin(); i != world->entities.end();)
+    {
+        entities.insert(*i);
+        i = world->entities.erase(i);
     }
 }
 

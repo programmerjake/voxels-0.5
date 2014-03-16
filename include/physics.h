@@ -27,7 +27,7 @@ struct PhysicsCollision final
 struct PhysicsProperties final
 {
     float mass, friction, bounciness;
-    static constexpr INFINITE_MASS = 1e20;
+    static constexpr float INFINITE_MASS = 1e20;
     PhysicsProperties(float mass, float friction, float bounciness)
         : mass(mass), friction(friction), bounciness(bounciness)
     {
@@ -58,11 +58,29 @@ public:
     {
     }
     virtual PhysicsCollision collide(shared_ptr<const PhysicsObject> pother, float maxTime) const = 0;
-    enum final Type
+    enum class Type
     {
+        None,
         Box
     };
     virtual Type type() const = 0;
+};
+
+class PhysicsEmpty final : public PhysicsObject
+{
+public:
+    PhysicsEmpty()
+        : PhysicsObject(Dimension::Overworld, PhysicsProperties(1, 0, 0))
+    {
+    }
+    virtual Type type() const override
+    {
+        return Type::None;
+    }
+    virtual PhysicsCollision collide(shared_ptr<const PhysicsObject>, float) const
+    {
+        return PhysicsCollision();
+    }
 };
 
 class PhysicsBox final : public PhysicsObject
@@ -78,14 +96,14 @@ public:
     }
     virtual PhysicsCollision collide(shared_ptr<const PhysicsObject> pother, float maxTime) const override
     {
-        if(movable == false)
+        if(pother == nullptr)
             return PhysicsCollision();
-        if(other == nullptr)
+        if(pother->dimension() != dimension())
             return PhysicsCollision();
-        if(other->dimension() != dimension())
-            return PhysicsCollision();
-        switch(other->type())
+        switch(pother->type())
         {
+        case Type::None:
+            return PhysicsCollision();
         case Type::Box:
         {
             const PhysicsBox & other = *dynamic_cast<const PhysicsBox *>(pother.get());
@@ -143,9 +161,8 @@ public:
                     fixedPosition.z += deltaFixedPosition.z;
                 }
                 VectorF newPosition = (center * properties().mass + fixedPosition * other.properties().mass) / (properties().mass + other.properties().mass);
-                return PhysicsCollision(newPosition, newVelocity, 0);
+                return PhysicsCollision(PositionF(newPosition, dimension()), newVelocity, 0);
             }
-            VectorF deltaCenter = center - other.center;
             Ray ray(velocity - other.velocity, PositionF(center, dimension()));
             if(!ray.good())
                 return PhysicsCollision();
@@ -162,11 +179,11 @@ public:
             float reflectedDot = dot(partiallyReflectedVelocity, collisionNormal);
             VectorF frictionlessVelocity = velocity;
             VectorF stuckVelocity = nonReflectedVelocity;
-            VectorF newVelocity = stuckVelocity + properties().friction * other.properties().friction * (frictionlessVelocity - stuckVelocity);
+            VectorF newVelocity = frictionlessVelocity + properties().friction * other.properties().friction * (stuckVelocity - frictionlessVelocity);
             newVelocity -= collisionNormal * dot(newVelocity, collisionNormal);
             newVelocity += collisionNormal * reflectedDot;
             VectorF newPosition = velocity * collisionTime + center;
-            return PhysicsCollision(newPosition, newVelocity, collisionTime);
+            return PhysicsCollision(PositionF(newPosition, dimension()), newVelocity, collisionTime);
         }
         }
         assert(false);

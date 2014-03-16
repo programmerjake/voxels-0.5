@@ -41,6 +41,24 @@ struct EntityData
     {
         return desc != nullptr;
     }
+    void setPosition(PositionF position)
+    {
+        if(entity != nullptr)
+            entity->position = position;
+        this->position = position;
+    }
+    void setVelocity(VectorF velocity)
+    {
+        if(entity != nullptr)
+            entity->velocity = velocity;
+        this->velocity = velocity;
+    }
+    void clear()
+    {
+        if(entity != nullptr)
+            entity->mesh = nullptr;
+        desc = nullptr;
+    }
 };
 
 #include "world.h"
@@ -53,7 +71,7 @@ private:
     static map<wstring, EntityDescriptorPtr> *entities;
     static vector<EntityDescriptorPtr> *entitiesList;
 protected:
-    static void initBlock(EntityDescriptorPtr ed) /// call with all constructed EntityDescriptor daughter classes
+    static void initEntity(EntityDescriptorPtr ed) /// call with all constructed EntityDescriptor daughter classes
     {
         if(entities == nullptr) // so that we don't have problems with static initialization order
         {
@@ -106,7 +124,6 @@ public:
     virtual ~EntityDescriptor()
     {
     }
-    virtual shared_ptr<RenderObjectEntity> getEntity(EntityData & entity, World & world) const = 0;
 protected:
     EntityDescriptor(wstring name)
         : name(name)
@@ -115,7 +132,8 @@ protected:
     virtual EntityData loadInternal(GameLoadStream & gls) const = 0;
     virtual void storeInternal(EntityData data, GameStoreStream & gss) const = 0;
 public:
-    virtual void onMove(EntityData & entity, World & world) const = 0;
+    virtual shared_ptr<RenderObjectEntity> getEntity(EntityData & entity, shared_ptr<World> world) const = 0;
+    virtual void onMove(EntityData & entity, shared_ptr<World> world, float deltaTime) const = 0;
     static EntityData load(GameLoadStream & gls)
     {
         return gls.readEntityDescriptor()->loadInternal(gls);

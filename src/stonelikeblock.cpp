@@ -36,4 +36,12 @@ shared_ptr<RenderObjectBlockMesh> StoneLikeBlock::internalMakeBlockMesh() const
                                                  );
 }
 
-
+Mesh StoneLikeBlock::makeBlockEntityMesh() const
+{
+    return Generate::unitBox(getFaceTexture(BlockFace::NX),
+                             getFaceTexture(BlockFace::PX),
+                             getFaceTexture(BlockFace::NY),
+                             getFaceTexture(BlockFace::PY),
+                             getFaceTexture(BlockFace::NZ),
+                             getFaceTexture(BlockFace::PZ));
+}

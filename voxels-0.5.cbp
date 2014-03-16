@@ -54,6 +54,7 @@
 		<Unit filename="include/block.h" />
 		<Unit filename="include/block_face.h" />
 		<Unit filename="include/builtin_blocks.h" />
+		<Unit filename="include/builtin_entities.h" />
 		<Unit filename="include/chunk.h" />
 		<Unit filename="include/client.h" />
 		<Unit filename="include/color.h" />
@@ -95,6 +96,7 @@
 		<Unit filename="src/client.cpp" />
 		<Unit filename="src/compressed_stream.cpp" />
 		<Unit filename="src/entity.cpp" />
+		<Unit filename="src/entity_block.cpp" />
 		<Unit filename="src/game_stream.cpp" />
 		<Unit filename="src/game_version.cpp" />
 		<Unit filename="src/image.cpp" />
@@ -102,6 +104,7 @@
 		<Unit filename="src/matrix.cpp" />
 		<Unit filename="src/mesh.cpp" />
 		<Unit filename="src/network.cpp" />
+		<Unit filename="src/physics.cpp" />
 		<Unit filename="src/platform.cpp">
 			<Option compiler="gcc" use="1" buildCommand="$compiler $options $includes `sdl-config --cflags` -c $file -o $object" />
 		</Unit>

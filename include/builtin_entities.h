@@ -1,0 +1,6 @@
+#ifndef BUILTIN_ENTITIES_H_INCLUDED
+#define BUILTIN_ENTITIES_H_INCLUDED
+
+#include "entity_block.h"
+
+#endif // BUILTIN_ENTITIES_H_INCLUDED

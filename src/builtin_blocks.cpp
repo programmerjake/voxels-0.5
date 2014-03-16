@@ -59,3 +59,13 @@ shared_ptr<RenderObjectBlockMesh> GlassBlock::makeBlockMesh()
 }
 
 shared_ptr<BlockDescriptor> StoneBlock::ptr, BedrockBlock::ptr, AirBlock::ptr, GlassBlock::ptr;
+
+Mesh GlassBlock::makeBlockEntityMesh() const
+{
+    return Generate::unitBox(TextureAtlas::Glass.td(),
+                             TextureAtlas::Glass.td(),
+                             TextureAtlas::Glass.td(),
+                             TextureAtlas::Glass.td(),
+                             TextureAtlas::Glass.td(),
+                             TextureAtlas::Glass.td());
+}
