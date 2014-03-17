@@ -35,7 +35,7 @@ protected:
     virtual Mesh makeBlockEntityMesh() const override;
     virtual shared_ptr<PhysicsObject> getPhysicsObject(PositionI pos) const override
     {
-        return static_pointer_cast<PhysicsObject>(make_shared<PhysicsBox>((VectorI)pos + VectorF(0.5), VectorF(0.5), pos.d, PhysicsProperties(PhysicsProperties::INFINITE_MASS, 0.8, 0.1)));
+        return static_pointer_cast<PhysicsObject>(make_shared<PhysicsBox>((VectorI)pos + VectorF(0.5), VectorF(0.5), VectorF(0), VectorF(0), VectorF(0), pos.d, PhysicsProperties(PhysicsProperties::INFINITE_MASS, 0.8, 0.1)));
     }
 private:
     mutable shared_ptr<RenderObjectBlockMesh> blockMesh;

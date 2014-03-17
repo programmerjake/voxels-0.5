@@ -154,7 +154,7 @@ PhysicsCollision PhysicsBox::collide(shared_ptr<const PhysicsObject> pother, flo
                 fixedPosition.z += deltaFixedPosition.z;
             }
             VectorF newPosition = (center * properties().mass + fixedPosition * other.properties().mass) / (properties().mass + other.properties().mass);
-            return PhysicsCollision(PositionF(newPosition, dimension()), newVelocity, normalize(newPosition - center), 0);
+            return PhysicsCollision(PositionF(newPosition, dimension()), newVelocity, normalizeNoThrow(newPosition - center), 0);
         }
 #if 0
         Ray ray(velocity - other.velocity, PositionF(center, dimension()));

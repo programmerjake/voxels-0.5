@@ -89,10 +89,18 @@ class PhysicsBox final : public PhysicsObject
 public:
     VectorF center, extents;
     VectorF velocity, acceleration, deltaAcceleration;
-    PhysicsBox(VectorF center, VectorF extents/** size is 2 * extents */, Dimension dimension, PhysicsProperties properties)
-        : PhysicsObject(dimension, properties), center(center), extents(extents)
+    PhysicsBox(VectorF center, VectorF extents/** size is 2 * extents */, VectorF velocity, VectorF acceleration, VectorF deltaAcceleration, Dimension dimension, PhysicsProperties properties)
+        : PhysicsObject(dimension, properties), center(center), extents(extents), velocity(velocity), acceleration(acceleration), deltaAcceleration(deltaAcceleration)
     {
         assert(extents.x > eps && extents.y > eps && extents.z > eps);
+    }
+    void reInit(VectorF center, VectorF extents/** size is 2 * extents */, VectorF velocity, VectorF acceleration, VectorF deltaAcceleration)
+    {
+        this->center = center;
+        this->extents = extents;
+        this->velocity = velocity;
+        this->acceleration = acceleration;
+        this->deltaAcceleration = deltaAcceleration;
     }
     virtual PhysicsCollision collide(shared_ptr<const PhysicsObject> pother, float maxTime) const override;
     virtual Type type() const override

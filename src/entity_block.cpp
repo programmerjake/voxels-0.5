@@ -41,22 +41,28 @@ shared_ptr<RenderObjectEntity> EntityBlock::getEntity(EntityData & data, shared_
 void EntityBlock::onMove(EntityData & data, shared_ptr<World> world, float deltaTime) const
 {
     getEntity(data, world);
+    data.deltaAcceleration = VectorF(0);
+    data.acceleration = gravityVector;
     int count = (iceil(deltaTime * abs(data.velocity) / 0.5 + 1),1);
     deltaTime /= count;
     BlockIterator bi = world->get((PositionI)data.position);
-    auto pphysicsObject = make_shared<PhysicsBox>((VectorF)data.position, VectorF(0.125), data.position.d, PhysicsProperties(0.1, 0.5, 0.1));
+    data.entity->acceleration = data.acceleration;
+    data.entity->deltaAcceleration = data.deltaAcceleration;
+    auto pphysicsObject = make_shared<PhysicsBox>((VectorF)data.position, VectorF(0.125), data.velocity, data.entity->acceleration, data.entity->deltaAcceleration, data.position.d, PhysicsProperties(0.1, 0.5, 0.1));
     PhysicsBox & physicsObject = *pphysicsObject;
     for(int step = 0; step < count; step++)
     {
         data.entity->age += deltaTime;
+        int zeroCount = 0;
         while(deltaTime * deltaTime * absSquared(data.velocity) > eps * eps)
         {
-            PhysicsCollision firstCollision(data.position + deltaTime * data.velocity + deltaTime * deltaTime * 0.5f * data.acceleration + deltaTime * deltaTime * deltaTime * (1 / 6.0f) * data.deltaAcceleration, data.velocity + deltaTime * data.acceleration + deltaTime * deltaTime * 0.5f * data.deltaAcceleration, VectorF(0), deltaTime);
-            for(int dx = -3; dx <= 3; dx++)
+            PhysicsCollision firstCollision(data.position + deltaTime * data.velocity + deltaTime * deltaTime * 0.5f * data.entity->acceleration + deltaTime * deltaTime * deltaTime * (1 / 6.0f) * data.entity->deltaAcceleration, data.velocity + deltaTime * data.entity->acceleration + deltaTime * deltaTime * 0.5f * data.entity->deltaAcceleration, VectorF(0), deltaTime);
+            physicsObject.reInit((VectorF)data.position, VectorF(0.125), data.velocity, data.entity->acceleration, data.entity->deltaAcceleration);
+            for(int dx = -1; dx <= 1; dx++)
             {
-                for(int dy = -3; dy <= 3; dy++)
+                for(int dy = -1; dy <= 1; dy++)
                 {
-                    for(int dz = -3; dz <= 3; dz++)
+                    for(int dz = -1; dz <= 1; dz++)
                     {
                         BlockIterator curBI = bi;
                         curBI += VectorI(dx, dy, dz);
@@ -64,7 +70,7 @@ void EntityBlock::onMove(EntityData & data, shared_ptr<World> world, float delta
                         if(curBI.get().good())
                             otherObject = curBI.get().desc->getPhysicsObject(curBI.position());
                         else
-                            otherObject = static_pointer_cast<PhysicsObject>(make_shared<PhysicsBox>((VectorI)curBI.position() + VectorF(0.5), VectorF(0.5), curBI.position().d, PhysicsProperties(PhysicsProperties::INFINITE_MASS, 1, 0)));
+                            otherObject = static_pointer_cast<PhysicsObject>(make_shared<PhysicsBox>((VectorI)curBI.position() + VectorF(0.5), VectorF(0.5), VectorF(0), VectorF(0), VectorF(0), curBI.position().d, PhysicsProperties(PhysicsProperties::INFINITE_MASS, 1, 0)));
                         assert(otherObject);
                         if(dx == 0 && dy == 0 && dz == 0)
                         {
@@ -100,15 +106,27 @@ void EntityBlock::onMove(EntityData & data, shared_ptr<World> world, float delta
                             }
                         }
                         PhysicsCollision collision = physicsObject.collide(otherObject, deltaTime);
+                        if(collision.valid)
+                        {
+                            if(collision.time < eps)
+                            {
+                                if(zeroCount > 25)
+                                    collision.valid = false;
+                                else
+                                    zeroCount++;
+                            }
+                            else
+                                zeroCount = 0;
+                        }
                         if(collision.valid && collision.time < firstCollision.time)
                             firstCollision = collision;
                     }
                 }
             }
             deltaTime -= firstCollision.time;
-            data.setPosition(firstCollision.newPosition);
+            data.setPosition(firstCollision.newPosition + eps * (2 + abs(firstCollision.newVelocity)) * firstCollision.collisionNormal);
             data.setVelocity(firstCollision.newVelocity);
-            data.setAcceleration(data.acceleration + data.deltaAcceleration * firstCollision.time);
+            data.setAcceleration(data.entity->acceleration + data.entity->deltaAcceleration * firstCollision.time);
             if(absSquared(firstCollision.collisionNormal) > eps * eps)
             {
                 firstCollision.collisionNormal = normalize(firstCollision.collisionNormal);
