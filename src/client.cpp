@@ -164,7 +164,7 @@ void clientProcessReader(Reader *preader, ClientState * state)
                         world->handleReadEntity(e);
                     }
                 }
-                cout << "Client : received " << readCount << " updated render objects\n";
+                //cout << "Client : received " << readCount << " updated render objects\n";
                 state->lock.lock();
                 continue;
             }

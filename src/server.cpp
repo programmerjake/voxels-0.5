@@ -334,7 +334,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
             if(!objects.empty())
             {
                 didAnything = true;
-                cout << "Server : writing " << objects.size() << " render objects\n";
+                //cout << "Server : writing " << objects.size() << " render objects\n";
                 NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdateRenderObjects);
                 writer.writeU64(objects.size());
 
