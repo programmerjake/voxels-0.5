@@ -79,7 +79,16 @@ private:
         }
         int operator()(shared_ptr<EntityData> a, shared_ptr<EntityData> b) const
         {
-            return operator()(a, b->position);
+            int retval = operator()(a, b->position);
+            if(retval == 0)
+            {
+                if(a < b)
+                    return -1;
+                if(a > b)
+                    return 1;
+                return 0;
+            }
+            return retval;
         }
     };
     balanced_tree<shared_ptr<EntityData>, EntityCompare> entities;

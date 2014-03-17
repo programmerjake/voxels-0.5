@@ -525,7 +525,7 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                     LockedClient lockClient(*pclient);
                     getClientNeedStateFlag(*pclient) = true;
 #if 1
-                    if(frame % 2 == 0)
+                    if(frame % 1 == 0)
                     {
                         BlockDescriptorPtr block;
                         if(rand() % 3 == 0)
@@ -535,7 +535,8 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                         else
                             block = BlockDescriptors.get(L"builtin.glass");
                         VectorF lookDir = Matrix::rotateX(getClientViewPhi(*pclient)).concat(Matrix::rotateY(-getClientViewTheta(*pclient))).apply(VectorF(0, 0, -1));
-                        world->addEntity(EntityBlock::make(block, getClientPosition(*pclient) + lookDir, 10 * lookDir));
+                        for(int i = 10; i <= 10; i++)
+                            world->addEntity(EntityBlock::make(block, getClientPosition(*pclient) + lookDir, (i) * lookDir));
                     }
 #endif
                     UpdateList &cul = getClientUpdateList(*pclient);

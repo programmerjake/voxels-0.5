@@ -95,7 +95,7 @@ void EntityBlock::onMove(EntityData & data, shared_ptr<World> world, float delta
                             case PhysicsObject::Type::None:
                                 break;
                             }
-                            if(filled)
+                            if(filled && true)
                             {
                                 firstCollision.time = 0;
                                 firstCollision.newPosition = data.position;

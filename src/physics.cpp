@@ -106,6 +106,7 @@ PhysicsCollision PhysicsBox::collide(shared_ptr<const PhysicsObject> pother, flo
         VectorF otherMax = other.center + other.extents;
         if(min.x < otherMax.x && min.y < otherMax.y && min.z < otherMax.z && max.x > otherMin.x && max.y > otherMin.y && max.z > otherMin.z) // intersects now
         {
+#if 1
             VectorF newVelocity = (velocity * properties().mass + other.velocity * other.properties().mass) / (properties().mass + other.properties().mass);
             VectorF deltaCenter = center - other.center;
             VectorF deltaFixedPosition;
@@ -155,6 +156,9 @@ PhysicsCollision PhysicsBox::collide(shared_ptr<const PhysicsObject> pother, flo
             }
             VectorF newPosition = (center * properties().mass + fixedPosition * other.properties().mass) / (properties().mass + other.properties().mass);
             return PhysicsCollision(PositionF(newPosition, dimension()), newVelocity, normalizeNoThrow(newPosition - center), 0);
+#else
+            return PhysicsCollision();
+#endif
         }
 #if 0
         Ray ray(velocity - other.velocity, PositionF(center, dimension()));
