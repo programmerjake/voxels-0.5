@@ -79,6 +79,14 @@ struct Color final
     {
         return Color(l.r * r.r, l.g * r.g, l.b * r.b, l.a * r.a);
     }
+    friend Color scale(float l, Color r)
+    {
+        return Color(l * r.r, l * r.g, l * r.b, r.a);
+    }
+    friend Color scale(Color l, float r)
+    {
+        return Color(l.r * r, l.g * r, l.b * r, l.a);
+    }
     friend ostream & operator <<(ostream & os, const Color & c)
     {
         return os << "RGBA(" << c.r << ", " << c.g << ", " << c.b << ", " << c.a << ")";

@@ -1,4 +1,3 @@
-// Automatically generated : don't modify
 /*
  * Voxels is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,26 +15,23 @@
  * MA 02110-1301, USA.
  *
  */
-#include "game_version.h"
+#ifndef GRAVITY_AFFECTED_BLOCK_H_INCLUDED
+#define GRAVITY_AFFECTED_BLOCK_H_INCLUDED
 
-const wstring GameVersion::VERSION = L"0.5.3.32";
-const uint32_t GameVersion::FILE_VERSION = 0;
+#include "block.h"
+#include "entity.h"
 
-#ifdef COMPILE_DUMP_VERSION
-#include <iostream>
-
-int main(int argc, char ** argv)
+class GravityAffectedBlock : public BlockDescriptor
 {
-    const int curVersion = 32;
-    if(argc > 1 && string(argv[1]) == "--next-version")
-        cout << (curVersion + 1) << endl;
-    else if(argc > 1 && string(argv[1]) == "--next-version-str")
-        cout << "0.5.3." << (curVersion + 1) << endl;
-    else if(argc > 1)
-        cout << "0.5.3." << curVersion << endl;
-    else
-        cout << GameVersion::FILE_VERSION << endl;
-    return 0;
-}
-#endif // COMPILE_DUMP_VERSION
+protected:
+    GravityAffectedBlock(wstring name, LightProperties lightProperties)
+        : BlockDescriptor(name, lightProperties)
+    {
+    }
+    virtual void onMove(BlockIterator) const override
+    {
+#warning finish
+    }
+};
 
+#endif // GRAVITY_AFFECTED_BLOCK_H_INCLUDED

@@ -1,3 +1,20 @@
+/*
+ * Voxels is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * Voxels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Voxels; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ *
+ */
 #include "world.h"
 #ifndef WORLD_GENERATOR_H_INCLUDED
 #define WORLD_GENERATOR_H_INCLUDED
@@ -10,6 +27,7 @@
 #include <random>
 #include <cmath>
 #include <mutex>
+#include "biome_server.h"
 
 //#define WORLD_RANDOM_USE_CACHING
 
@@ -21,7 +39,8 @@ public:
     typedef unsigned RandomClass;
     static constexpr RandomClass RandomClassNull = 0;
     static constexpr RandomClass RandomClassGround = RandomClassNull + 1;
-    static constexpr RandomClass RandomClassUserStart = RandomClassGround + 1;
+    static constexpr RandomClass RandomClassBiome = RandomClassGround + 1;
+    static constexpr RandomClass RandomClassUserStart = RandomClassBiome + 1;
     const uint_fast32_t seed;
 private:
     recursive_mutex & lock;
@@ -154,6 +173,32 @@ public:
     {
         cout << "RandomWorld : seed = " << seed << endl;
     }
+private:
+    struct BiomeProbabilitiesItem final
+    {
+        bool valid = false;
+        BiomeProbabilities probs;
+        BiomeProbabilitiesItem()
+        {
+        }
+    };
+    unordered_map<PositionI, BiomeProbabilitiesItem> biomeProbabilitiesMap;
+    float getTemperatureInternal(PositionI pos)
+    {
+        PositionF fPos = (PositionF)pos;
+        fPos /= 128;
+        fPos.y = 0;
+        return getFBM2D(fPos, VectorF(2), 0.2f, 4, RandomClassBiome);
+    }
+    float getHumidityInternal(PositionI pos)
+    {
+        PositionF fPos = (PositionF)pos;
+        fPos /= 128;
+        fPos.y = 1;
+        return getFBM2D(fPos, VectorF(2), 0.2f, 4, RandomClassBiome);
+    }
+public:
+    BiomeProbabilities getBiomeProbabilities(PositionI pos);
 };
 
 class WorldGeneratorPart;
@@ -240,6 +285,88 @@ inline WorldGeneratorPartPtrIterator begin(const WorldGeneratorParts_t &)
 inline WorldGeneratorPartPtrIterator end(const WorldGeneratorParts_t &)
 {
     return WorldGeneratorParts.end();
+}
+
+class BiomeDescriptor;
+typedef const BiomeDescriptor * BiomeDescriptorPtr;
+
+class BiomeDescriptor
+{
+    BiomeDescriptor(const BiomeDescriptor &) = delete;
+    const BiomeDescriptor & operator =(const BiomeDescriptor &) = delete;
+public:
+    const wstring name;
+    const Biome biome;
+protected:
+    static BiomeDescriptorPtr biomeDescriptors[(int)Biome::Last];
+    BiomeDescriptor(wstring name, Biome biome)
+        : name(name), biome(biome)
+    {
+        assert((unsigned)biome < (unsigned)Biome::Last);
+        assert(biomeDescriptors[(unsigned)biome] == nullptr);
+        biomeDescriptors[(unsigned)biome] = this;
+    }
+public:
+    virtual float temperature() const = 0;
+    virtual float humidity() const = 0;
+    virtual float getMatch(PositionI pos, float temperature, float humidity, WorldRandom & r) const = 0;
+    virtual BlockData getCover(PositionI pos, WorldRandom & r, int depth) const = 0;
+    virtual bool isBlockValueHeightDependant() const = 0;
+    virtual float getBlockValue(PositionI pos, WorldRandom & r) const = 0;
+    static BiomeDescriptorPtr get(Biome biome)
+    {
+        auto index = (unsigned)biome;
+        if(index >= (unsigned)Biome::Last)
+            throw range_error("invalid biome in BiomeDescriptor::get");
+        return biomeDescriptors[index];
+    }
+};
+
+inline BiomeProbabilities WorldRandom::getBiomeProbabilities(PositionI pos)
+{
+    pos.y = 0;
+    lock_guard<recursive_mutex> lockIt(lock);
+    BiomeProbabilitiesItem & biomeProbabilitiesItem = biomeProbabilitiesMap[pos];
+    BiomeProbabilities & retval = biomeProbabilitiesItem.probs;
+    if(biomeProbabilitiesItem.valid)
+        return retval;
+    biomeProbabilitiesItem.valid = true;
+    float temperature = getTemperatureInternal(pos);
+    float humidity = getHumidityInternal(pos);
+    float sum = 0;
+    for(size_t i = 0; i < retval.size(); i++)
+    {
+        BiomeDescriptorPtr pbd = BiomeDescriptor::get((Biome)i);
+        if(pbd != nullptr)
+            retval[i] = pbd->getMatch(pos, temperature, humidity, *this);
+        else
+        {
+            static bool didWarn = false;
+            if(!didWarn)
+            {
+                didWarn = true;
+                cout << "Warning : Not all BiomeDescriptor's are implemented" << endl;
+            }
+            retval[i] = 0;
+        }
+        sum += retval[i];
+    }
+    float sum2 = 0;
+    for(float & p : retval)
+    {
+        p /= sum;
+        p *= p;
+        p *= p;
+        p *= p;
+        p *= p;
+        p *= p;
+        sum2 += p;
+    }
+    for(float & p : retval)
+    {
+        p /= sum2;
+    }
+    return retval;
 }
 
 class WorldGenerator final

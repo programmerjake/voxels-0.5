@@ -1,3 +1,20 @@
+/*
+ * Voxels is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * Voxels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Voxels; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ *
+ */
 #include "client.h"
 #include "network_protocol.h"
 #include "render_object.h"
@@ -24,6 +41,7 @@ struct ClientState
     float theta, phi;
     float dtheta, dphi;
     int renderDistance;
+    int naturalLight = Lighting::MAX_INTENSITY;
     PositionF pos;
     VectorF velocity;
     bool needMeshes;
@@ -38,7 +56,7 @@ struct ClientState
     ClientState()
         : lock(client.getLock()), needState(true)
     {
-        pos = PositionF(0.5, AverageGroundHeight + 5.5, 0.5, Dimension::Overworld);
+        pos = PositionF(0.5, AverageGroundHeight + 7.5, 0.5, Dimension::Overworld);
         velocity = VectorF(0);
         theta = phi = dtheta = dphi = 0;
         renderDistance = 30;
@@ -192,7 +210,23 @@ void clientProcessReader(Reader *preader, ClientState * state)
     state->lock.unlock();
 }
 
-void makeChunkRenderMesh(Mesh dest, Client &client, shared_ptr<unordered_set<PositionI>> neededChunks, PositionI chunkPos, RenderLayer rl)
+void lightingThread(ClientState * state)
+{
+    try
+    {
+
+    }
+    catch(exception &e)
+    {
+        cerr << e.what() << "\n";
+    }
+
+    state->lock.lock();
+    state->done = true;
+    state->lock.unlock();
+}
+
+void makeChunkRenderMesh(Mesh dest, Client &client, shared_ptr<unordered_set<PositionI>> neededChunks, PositionI chunkPos, RenderLayer rl, unsigned naturalLight)
 {
     LockedClient lock(client);
     shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
@@ -223,7 +257,7 @@ void makeChunkRenderMesh(Mesh dest, Client &client, shared_ptr<unordered_set<Pos
 
                 if(mesh != nullptr)
                 {
-                    mesh->render(retval, rl, biXYZ);
+                    mesh->render(retval, rl, biXYZ, naturalLight);
                 }
             }
         }
@@ -234,7 +268,7 @@ void makeChunkRenderMesh(Mesh dest, Client &client, shared_ptr<unordered_set<Pos
     dest->add(retval);
 }
 
-Mesh makeRenderMesh(Client &client, shared_ptr<unordered_set<PositionI>> neededChunks, RenderLayer rl, PositionI pos, int renderDistance = 40)
+Mesh makeRenderMesh(Client &client, shared_ptr<unordered_set<PositionI>> neededChunks, RenderLayer rl, PositionI pos, int renderDistance, unsigned naturalLight)
 {
     Mesh retval = Mesh(new Mesh_t);
 
@@ -251,7 +285,7 @@ Mesh makeRenderMesh(Client &client, shared_ptr<unordered_set<PositionI>> neededC
         {
             for(int z = minZ; z <= maxZ; z+=RenderObjectWorld::Chunk::size)
             {
-                makeChunkRenderMesh(retval, client, neededChunks, PositionI(x, y, z, pos.d), rl);
+                makeChunkRenderMesh(retval, client, neededChunks, PositionI(x, y, z, pos.d), rl, naturalLight);
             }
         }
     }
@@ -271,13 +305,14 @@ void meshMakerThread(Mesh meshes[], ClientState * state)
         state->needMeshes = false;
         Client & client = state->client;
         int renderDistance = state->renderDistance;
+        int naturalLight = state->naturalLight;
         PositionI pos = (PositionI)state->pos;
         state->lock.unlock();
         Mesh tempMeshes[(int)RenderLayer::Last];
         shared_ptr<unordered_set<PositionI>> neededChunks = make_shared<unordered_set<PositionI>>();
         for(RenderLayer rl = (RenderLayer)0; rl < RenderLayer::Last; rl = (RenderLayer)((int)rl + 1))
         {
-            tempMeshes[(int)rl] = makeRenderMesh(client, neededChunks, rl, pos, renderDistance);
+            tempMeshes[(int)rl] = makeRenderMesh(client, neededChunks, rl, pos, renderDistance, naturalLight);
         }
         state->lock.lock();
         for(PositionI p : *neededChunks)
@@ -421,7 +456,7 @@ TransformedMesh makeSelectBoxMesh()
     return transform(Matrix::translate(VectorF(-0.5f)).concat(Matrix::scale(1.05)).concat(Matrix::translate(VectorF(0.5f))), retval);
 }
 
-void renderEntities(Mesh dest, Client &client, RenderLayer rl, PositionF pos)
+void renderEntities(Mesh dest, Client &client, RenderLayer rl, PositionF pos, unsigned naturalLight)
 {
     vector<shared_ptr<RenderObjectEntity>> entities;
     {
@@ -437,7 +472,7 @@ void renderEntities(Mesh dest, Client &client, RenderLayer rl, PositionF pos)
     for(shared_ptr<RenderObjectEntity> e : entities)
     {
         LockedClient lockIt(client);
-        e->render(dest, rl, pos.d, client);
+        e->render(dest, rl, pos.d, client, naturalLight);
     }
 }
 
@@ -521,7 +556,7 @@ void clientProcess(StreamRW & streamRW)
                 r << transform(Matrix::translate((VectorI)*rayHitPos).concat(tform), selectBoxMesh);
             }
             mesh = make_shared<Mesh_t>();
-            renderEntities(mesh, clientState.client, rl, pos);
+            renderEntities(mesh, clientState.client, rl, pos, clientState.naturalLight);
             polyCount += mesh->size();
             r << transform(tform, mesh);
         }

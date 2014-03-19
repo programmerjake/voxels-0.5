@@ -1,3 +1,20 @@
+/*
+ * Voxels is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * Voxels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Voxels; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ *
+ */
 #ifndef MESH_H_INCLUDED
 #define MESH_H_INCLUDED
 
@@ -472,7 +489,102 @@ public:
     friend void writeMesh(Mesh mesh, Writer &writer, Client &client);
 
     friend Mesh readMesh(Reader &reader, Client &client);
+    friend Mesh interpolateColors(Mesh dest, Mesh mesh, Color cNXNYNZ, Color cNXNYPZ, Color cNXPYNZ, Color cNXPYPZ, Color cPXNYNZ, Color cPXNYPZ, Color cPXPYNZ, Color cPXPYPZ);
+    friend Mesh interpolateColors(Mesh mesh, Color cNXNYNZ, Color cNXNYPZ, Color cNXPYNZ, Color cNXPYPZ, Color cPXNYNZ, Color cPXNYPZ, Color cPXPYNZ, Color cPXPYPZ);
+    friend Mesh lightColors(Mesh dest, Mesh mesh, VectorF lightDir, float ambient, float diffuse);
 };
+
+inline Mesh interpolateColors(Mesh dest, Mesh mesh, Color cNXNYNZ, Color cNXNYPZ, Color cNXPYNZ, Color cNXPYPZ, Color cPXNYNZ, Color cPXNYPZ, Color cPXPYNZ, Color cPXPYPZ)
+{
+    assert(dest && mesh);
+
+    if(dest->texture())
+    {
+        if(mesh->texture() && mesh->texture() != dest->texture())
+        {
+            throw ImageNotSameException();
+        }
+    }
+    else
+    {
+        dest->textureInternal = mesh->texture();
+    }
+
+    dest->length += mesh->length;
+    dest->textureCoords.insert(dest->textureCoords.end(), mesh->textureCoords.begin(), mesh->textureCoords.end());
+    size_t vi = 0, ci = 0;
+    for(size_t i = 0; i < mesh->length; i++)
+    {
+        float x = mesh->points[vi++];
+        float y = mesh->points[vi++];
+        float z = mesh->points[vi++];
+        dest->points.push_back(x);
+        dest->points.push_back(y);
+        dest->points.push_back(z);
+        Color c;
+        c.r = mesh->colors[ci++];
+        c.g = mesh->colors[ci++];
+        c.b = mesh->colors[ci++];
+        c.a = mesh->colors[ci++];
+        c = scale(c, interpolate(x, interpolate(y, interpolate(z, cNXNYNZ, cNXNYPZ), interpolate(z, cNXPYNZ, cNXPYPZ)), interpolate(y, interpolate(z, cPXNYNZ, cPXNYPZ), interpolate(z, cPXPYNZ, cPXPYPZ))));
+        dest->colors.push_back(c.r);
+        dest->colors.push_back(c.g);
+        dest->colors.push_back(c.b);
+        dest->colors.push_back(c.a);
+    }
+    return dest;
+}
+
+inline Mesh interpolateColors(Mesh mesh, Color cNXNYNZ, Color cNXNYPZ, Color cNXPYNZ, Color cNXPYPZ, Color cPXNYNZ, Color cPXNYPZ, Color cPXPYNZ, Color cPXPYPZ)
+{
+    assert(mesh);
+    Mesh dest = Mesh(new Mesh_t);
+
+    dest->textureInternal = mesh->texture();
+
+    dest->length += mesh->length;
+    dest->textureCoords.insert(dest->textureCoords.end(), mesh->textureCoords.begin(), mesh->textureCoords.end());
+    size_t vi = 0, ci = 0;
+    for(size_t i = 0; i < mesh->length; i++)
+    {
+        float x = mesh->points[vi++];
+        float y = mesh->points[vi++];
+        float z = mesh->points[vi++];
+        dest->points.push_back(x);
+        dest->points.push_back(y);
+        dest->points.push_back(z);
+        Color c;
+        c.r = mesh->colors[ci++];
+        c.g = mesh->colors[ci++];
+        c.b = mesh->colors[ci++];
+        c.a = mesh->colors[ci++];
+        c = scale(c, interpolate(x, interpolate(y, interpolate(z, cNXNYNZ, cNXNYPZ), interpolate(z, cNXPYNZ, cNXPYPZ)), interpolate(y, interpolate(z, cPXNYNZ, cPXNYPZ), interpolate(z, cPXPYNZ, cPXPYPZ))));
+        dest->colors.push_back(c.r);
+        dest->colors.push_back(c.g);
+        dest->colors.push_back(c.b);
+        dest->colors.push_back(c.a);
+    }
+    return dest;
+}
+
+inline Mesh lightColors(Mesh mesh, VectorF lightDir, float ambient, float diffuse)
+{
+    vector<Triangle> triangles;
+    triangles.reserve(mesh->size());
+    for(Triangle t : *mesh)
+    {
+        float v = dot(t.normal(), lightDir);
+        if(v < 0)
+            v = 0;
+        v *= diffuse;
+        v += ambient;
+        t.c[0] = scale(t.c[0], v);
+        t.c[1] = scale(t.c[1], v);
+        t.c[2] = scale(t.c[2], v);
+        triangles.push_back(t);
+    }
+    return Mesh(new Mesh_t(mesh->texture(), triangles));
+}
 
 inline void writeMesh(Mesh mesh, Writer &writer, Client &client)
 {

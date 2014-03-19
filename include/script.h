@@ -1,3 +1,20 @@
+/*
+ * Voxels is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * Voxels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Voxels; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ *
+ */
 #ifndef SCRIPT_H_INCLUDED
 #define SCRIPT_H_INCLUDED
 
@@ -671,11 +688,10 @@ inline shared_ptr<Scripting::Data> Scripting::Data::read(Reader &reader)
     assert(false);
 }
 
-inline void runEntityPartScript(Mesh dest, Mesh partMesh, shared_ptr<Script> script, VectorF position, VectorF velocity, float age)
+inline void runEntityPartScript(Mesh dest, Mesh partMesh, shared_ptr<Script> script, VectorF position, VectorF velocity, float age, shared_ptr<Scripting::DataObject> ioObject = make_shared<Scripting::DataObject>())
 {
     try
     {
-        shared_ptr<Scripting::DataObject> ioObject = make_shared<Scripting::DataObject>();
         ioObject->value[L"age"] = make_shared<Scripting::DataFloat>(age);
         ioObject->value[L"position"] = make_shared<Scripting::DataVector>(position);
         ioObject->value[L"velocity"] = make_shared<Scripting::DataVector>(velocity);

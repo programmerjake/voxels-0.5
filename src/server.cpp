@@ -1,3 +1,20 @@
+/*
+ * Voxels is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * Voxels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Voxels; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ *
+ */
 #include "server.h"
 #include "world.h"
 #include "client.h"
@@ -317,7 +334,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                         assert(locked);
                         shared_ptr<RenderObjectBlockMesh> mesh = bi.get().desc->getBlockMesh(bi);
                         shared_ptr<RenderObject> object = static_pointer_cast<RenderObject>(make_shared<RenderObjectBlock>
-                                                          (mesh, pos));
+                                                          (mesh, pos, bi.get().light));
                         objects.push_back(object);
                         count++;
                         updateList.updatesSet.erase(pos);
@@ -525,7 +542,7 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                     LockedClient lockClient(*pclient);
                     getClientNeedStateFlag(*pclient) = true;
 #if 1
-                    if(frame % 1 == 0)
+                    if(frame % 10 == 0)
                     {
                         BlockDescriptorPtr block;
                         if(rand() % 3 == 0)

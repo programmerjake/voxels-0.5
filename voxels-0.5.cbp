@@ -51,6 +51,7 @@
 			<Add library="png" />
 		</Linker>
 		<Unit filename="include/biome_server.h" />
+		<Unit filename="include/biomes.h" />
 		<Unit filename="include/block.h" />
 		<Unit filename="include/block_face.h" />
 		<Unit filename="include/builtin_blocks.h" />
@@ -66,6 +67,7 @@
 		<Unit filename="include/game_stream.h" />
 		<Unit filename="include/game_version.h" />
 		<Unit filename="include/generate.h" />
+		<Unit filename="include/gravity_affected_block.h" />
 		<Unit filename="include/image.h" />
 		<Unit filename="include/light.h" />
 		<Unit filename="include/matrix.h" />
@@ -74,6 +76,7 @@
 		<Unit filename="include/network_protocol.h" />
 		<Unit filename="include/physics.h" />
 		<Unit filename="include/platform.h" />
+		<Unit filename="include/player.h" />
 		<Unit filename="include/png_decoder.h" />
 		<Unit filename="include/position.h" />
 		<Unit filename="include/ray_casting.h" />
@@ -91,6 +94,7 @@
 		<Unit filename="include/vector.h" />
 		<Unit filename="include/world.h" />
 		<Unit filename="include/world_generator.h" />
+		<Unit filename="src/biomes.cpp" />
 		<Unit filename="src/block.cpp" />
 		<Unit filename="src/builtin_blocks.cpp" />
 		<Unit filename="src/client.cpp" />
@@ -108,6 +112,7 @@
 		<Unit filename="src/platform.cpp">
 			<Option compiler="gcc" use="1" buildCommand="$compiler $options $includes `sdl-config --cflags` -c $file -o $object" />
 		</Unit>
+		<Unit filename="src/player.cpp" />
 		<Unit filename="src/png_decoder.cpp" />
 		<Unit filename="src/render_object.cpp" />
 		<Unit filename="src/script.cpp" />

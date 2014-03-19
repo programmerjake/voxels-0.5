@@ -1,3 +1,20 @@
+/*
+ * Voxels is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * Voxels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Voxels; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ *
+ */
 #include "entity_block.h"
 #include "block.h"
 
@@ -56,6 +73,7 @@ void EntityBlock::onMove(EntityData & data, shared_ptr<World> world, float delta
         int zeroCount = 0;
         while(deltaTime * deltaTime * absSquared(data.velocity) > eps * eps)
         {
+            bool supported = false;
             PhysicsCollision firstCollision(data.position + deltaTime * data.velocity + deltaTime * deltaTime * 0.5f * data.entity->acceleration + deltaTime * deltaTime * deltaTime * (1 / 6.0f) * data.entity->deltaAcceleration, data.velocity + deltaTime * data.entity->acceleration + deltaTime * deltaTime * 0.5f * data.entity->deltaAcceleration, VectorF(0), deltaTime);
             physicsObject.reInit((VectorF)data.position, VectorF(0.125), data.velocity, data.entity->acceleration, data.entity->deltaAcceleration);
             for(int dx = -1; dx <= 1; dx++)
@@ -72,7 +90,6 @@ void EntityBlock::onMove(EntityData & data, shared_ptr<World> world, float delta
                         else
                             otherObject = static_pointer_cast<PhysicsObject>(make_shared<PhysicsBox>((VectorI)curBI.position() + VectorF(0.5), VectorF(0.5), VectorF(0), VectorF(0), VectorF(0), curBI.position().d, PhysicsProperties(PhysicsProperties::INFINITE_MASS, 1, 0)));
                         assert(otherObject);
-                        if(dx == 0 && dy == 0 && dz == 0)
                         {
                             bool filled = false;
                             float newY;
@@ -90,12 +107,17 @@ void EntityBlock::onMove(EntityData & data, shared_ptr<World> world, float delta
                                     newY = max.y + physicsObject.extents.y;
                                     filled = true;
                                 }
+                                VectorF temp;
+                                if(isBoxCollision(pbox->center, pbox->extents, physicsObject.center - VectorF(0, eps * 10, 0), physicsObject.extents, temp) && !isBoxCollision(pbox->center, pbox->extents, physicsObject.center, physicsObject.extents, temp))
+                                {
+                                    supported = true;
+                                }
                                 break;
                             }
                             case PhysicsObject::Type::None:
                                 break;
                             }
-                            if(filled && true)
+                            if(filled && zeroCount >= 2 && dx == 0 && dy == 0 && dz == 0)
                             {
                                 firstCollision.time = 0;
                                 firstCollision.newPosition = data.position;
@@ -134,6 +156,14 @@ void EntityBlock::onMove(EntityData & data, shared_ptr<World> world, float delta
                 {
                     data.entity->acceleration = data.acceleration - firstCollision.collisionNormal * dot(data.acceleration, firstCollision.collisionNormal);
                     data.entity->deltaAcceleration = data.deltaAcceleration - firstCollision.collisionNormal * dot(data.deltaAcceleration, firstCollision.collisionNormal);
+                }
+            }
+            if(supported)
+            {
+                if(data.entity->velocity.y <= 0)
+                {
+                    data.entity->velocity.y = 0;
+                    data.entity->acceleration.y = max(0.0f, data.entity->acceleration.y);
                 }
             }
         }

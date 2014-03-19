@@ -1,3 +1,20 @@
+/*
+ * Voxels is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * Voxels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Voxels; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ *
+ */
 #include "render_object.h"
 #include <iostream>
 
@@ -61,8 +78,9 @@ shared_ptr<RenderObjectBlock> RenderObjectBlock::read(Reader &reader, Client &cl
     pos.y = reader.readS32();
     pos.z = reader.readS32();
     pos.d = reader.readDimension();
+    Lighting lighting = Lighting::read(reader);
     //cout << "Read Block : " << pos.x << ", " << pos.y << ", " << pos.z << ", " << (int)pos.d << endl;
-    auto retval = shared_ptr<RenderObjectBlock>(new RenderObjectBlock(block, pos));
+    auto retval = shared_ptr<RenderObjectBlock>(new RenderObjectBlock(block, pos, lighting));
     retval->addToClient(client);
     return retval;
 }

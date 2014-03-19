@@ -1,4 +1,3 @@
-// Automatically generated : don't modify
 /*
  * Voxels is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,26 +15,14 @@
  * MA 02110-1301, USA.
  *
  */
-#include "game_version.h"
+#include "player.h"
 
-const wstring GameVersion::VERSION = L"0.5.3.32";
-const uint32_t GameVersion::FILE_VERSION = 0;
-
-#ifdef COMPILE_DUMP_VERSION
-#include <iostream>
-
-int main(int argc, char ** argv)
+void initEntityPlayer()
 {
-    const int curVersion = 32;
-    if(argc > 1 && string(argv[1]) == "--next-version")
-        cout << (curVersion + 1) << endl;
-    else if(argc > 1 && string(argv[1]) == "--next-version-str")
-        cout << "0.5.3." << (curVersion + 1) << endl;
-    else if(argc > 1)
-        cout << "0.5.3." << curVersion << endl;
-    else
-        cout << GameVersion::FILE_VERSION << endl;
-    return 0;
+    EntityPlayer::init();
 }
-#endif // COMPILE_DUMP_VERSION
 
+namespace
+{
+initializer init1(initEntityPlayer);
+}
