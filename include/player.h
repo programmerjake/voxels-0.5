@@ -37,7 +37,7 @@ private:
     };
     static void init()
     {
-#if 0
+#if 1
         initEntity(EntityDescriptorPtr(new EntityPlayer));
 #else
 #warning finish
@@ -61,6 +61,7 @@ public:
         }
         return retval;
     }
+protected:
     virtual EntityData loadInternal(GameLoadStream & gls) const override
     {
         PositionF position;
@@ -103,6 +104,9 @@ public:
         gss.writeF32(data.deltaAcceleration.z);
         gss.writeString(eData->name);
     }
+public:
+    virtual shared_ptr<RenderObjectEntity> getEntity(EntityData & entity, shared_ptr<World> world) const override;
+    virtual void onMove(EntityData & entity, shared_ptr<World> world, float deltaTime) const override;
 };
 
 #endif // PLAYER_H_INCLUDED

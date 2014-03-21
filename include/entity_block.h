@@ -43,6 +43,7 @@ public:
         assert(block);
         return EntityData(EntityDescriptors.get(L"builtin.block"), position, velocity, gravityVector, shared_ptr<ExtraEntityData>(new ExtraData(block)));
     }
+protected:
     virtual EntityData loadInternal(GameLoadStream & gls) const override
     {
         BlockDescriptorPtr block = gls.readBlockDescriptor();
