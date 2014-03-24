@@ -17,7 +17,7 @@
  */
 #include "platform.h"
 #include <SDL.h>
-#include <SDL_image.h>
+//#include <SDL_image.h>
 #include <GL/gl.h>
 #include "matrix.h"
 #include "vector.h"
@@ -97,11 +97,10 @@ initializer initializer1([]()
     ResourcePrefix = p + L"res/";
 });
 
-static const auto ImageDecoderFlags = IMG_INIT_PNG;
-
 static int xResInternal, yResInternal;
 
-static SDL_Surface *videoSurface = nullptr;
+static SDL_Window *window = nullptr;
+static SDL_GLContext glcontext = nullptr;
 static atomic_bool runningGraphics(false);
 
 void startGraphics()
@@ -114,12 +113,6 @@ void startGraphics()
         exit(1);
     }
     atexit(SDL_Quit);
-    if(ImageDecoderFlags != (ImageDecoderFlags & IMG_Init(ImageDecoderFlags)))
-    {
-        cerr << "error : can't start SDLImage : " << IMG_GetError() << endl;
-        exit(1);
-    }
-    atexit(IMG_Quit);
 #if 0
     const SDL_VideoInfo * vidInfo = SDL_GetVideoInfo();
     if(vidInfo == nullptr)
@@ -153,14 +146,19 @@ void startGraphics()
     SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    videoSurface = SDL_SetVideoMode(xResInternal, yResInternal, 32, SDL_OPENGL);
-    if(videoSurface == nullptr)
+    window = SDL_CreateWindow("Voxels", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, xResInternal, yResInternal, SDL_WINDOW_OPENGL);
+    if(window == nullptr)
     {
-        cerr << "error : can't set video mode : " << SDL_GetError();
+        cerr << "error : can't create window : " << SDL_GetError();
         exit(1);
     }
-    SDL_EnableUNICODE(1);
-    SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
+    glcontext = SDL_GL_CreateContext(window);
+    if(glcontext == nullptr)
+    {
+        cerr << "error : can't create OpenGL context : " << SDL_GetError();
+        exit(1);
+    }
+    SDL_SetHint(SDL_HINT_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK, "1");
 }
 
 static volatile double lastFlipTime = 0;
@@ -256,279 +254,237 @@ static void flipDisplay(float fps = defaultFPS)
             averageFPSInternal += FPSUpdateFactor * instantaneousFPS();
         }
     }
-    SDL_GL_SwapBuffers();
+    SDL_GL_SwapWindow(window);
 }
 
-static KeyboardKey translateKey(SDLKey input)
+static KeyboardKey translateKey(SDL_Scancode input)
 {
     switch(input)
     {
-    case SDLK_BACKSPACE:
+    case SDL_SCANCODE_BACKSPACE:
         return KeyboardKey_Backspace;
-    case SDLK_TAB:
+    case SDL_SCANCODE_TAB:
         return KeyboardKey_Tab;
-    case SDLK_CLEAR:
+    case SDL_SCANCODE_CLEAR:
         return KeyboardKey_Clear;
-    case SDLK_RETURN:
+    case SDL_SCANCODE_RETURN:
         return KeyboardKey_Return;
-    case SDLK_PAUSE:
+    case SDL_SCANCODE_PAUSE:
         return KeyboardKey_Pause;
-    case SDLK_ESCAPE:
+    case SDL_SCANCODE_ESCAPE:
         return KeyboardKey_Escape;
-    case SDLK_SPACE:
+    case SDL_SCANCODE_SPACE:
         return KeyboardKey_Space;
-    case SDLK_EXCLAIM:
-        return KeyboardKey_EMark;
-    case SDLK_QUOTEDBL:
-        return KeyboardKey_DQuote;
-    case SDLK_HASH:
-        return KeyboardKey_Pound;
-    case SDLK_DOLLAR:
-        return KeyboardKey_Dollar;
-    case SDLK_AMPERSAND:
-        return KeyboardKey_Amp;
-    case SDLK_QUOTE:
+    case SDL_SCANCODE_APOSTROPHE:
         return KeyboardKey_SQuote;
-    case SDLK_LEFTPAREN:
-        return KeyboardKey_LParen;
-    case SDLK_RIGHTPAREN:
-        return KeyboardKey_RParen;
-    case SDLK_ASTERISK:
-        return KeyboardKey_Star;
-    case SDLK_PLUS:
-        return KeyboardKey_Plus;
-    case SDLK_COMMA:
+    case SDL_SCANCODE_COMMA:
         return KeyboardKey_Comma;
-    case SDLK_MINUS:
+    case SDL_SCANCODE_MINUS:
         return KeyboardKey_Dash;
-    case SDLK_PERIOD:
+    case SDL_SCANCODE_PERIOD:
         return KeyboardKey_Period;
-    case SDLK_SLASH:
+    case SDL_SCANCODE_SLASH:
         return KeyboardKey_FSlash;
-    case SDLK_0:
+    case SDL_SCANCODE_0:
         return KeyboardKey_Num0;
-    case SDLK_1:
+    case SDL_SCANCODE_1:
         return KeyboardKey_Num1;
-    case SDLK_2:
+    case SDL_SCANCODE_2:
         return KeyboardKey_Num2;
-    case SDLK_3:
+    case SDL_SCANCODE_3:
         return KeyboardKey_Num3;
-    case SDLK_4:
+    case SDL_SCANCODE_4:
         return KeyboardKey_Num4;
-    case SDLK_5:
+    case SDL_SCANCODE_5:
         return KeyboardKey_Num5;
-    case SDLK_6:
+    case SDL_SCANCODE_6:
         return KeyboardKey_Num6;
-    case SDLK_7:
+    case SDL_SCANCODE_7:
         return KeyboardKey_Num7;
-    case SDLK_8:
+    case SDL_SCANCODE_8:
         return KeyboardKey_Num8;
-    case SDLK_9:
+    case SDL_SCANCODE_9:
         return KeyboardKey_Num9;
-    case SDLK_COLON:
-        return KeyboardKey_Colon;
-    case SDLK_SEMICOLON:
+    case SDL_SCANCODE_SEMICOLON:
         return KeyboardKey_Semicolon;
-    case SDLK_LESS:
-        return KeyboardKey_LAngle;
-    case SDLK_EQUALS:
+    case SDL_SCANCODE_EQUALS:
         return KeyboardKey_Equals;
-    case SDLK_GREATER:
-        return KeyboardKey_RAngle;
-    case SDLK_QUESTION:
-        return KeyboardKey_QMark;
-    case SDLK_AT:
-        return KeyboardKey_AtSign;
-    case SDLK_LEFTBRACKET:
+    case SDL_SCANCODE_LEFTBRACKET:
         return KeyboardKey_LBracket;
-    case SDLK_BACKSLASH:
+    case SDL_SCANCODE_BACKSLASH:
         return KeyboardKey_BSlash;
-    case SDLK_RIGHTBRACKET:
+    case SDL_SCANCODE_RIGHTBRACKET:
         return KeyboardKey_RBracket;
-    case SDLK_CARET:
-        return KeyboardKey_Caret;
-    case SDLK_UNDERSCORE:
-        return KeyboardKey_Underline;
-    case SDLK_BACKQUOTE:
-        return KeyboardKey_BQuote;
-    case SDLK_a:
+    case SDL_SCANCODE_A:
         return KeyboardKey_A;
-    case SDLK_b:
+    case SDL_SCANCODE_B:
         return KeyboardKey_B;
-    case SDLK_c:
+    case SDL_SCANCODE_C:
         return KeyboardKey_C;
-    case SDLK_d:
+    case SDL_SCANCODE_D:
         return KeyboardKey_D;
-    case SDLK_e:
+    case SDL_SCANCODE_E:
         return KeyboardKey_E;
-    case SDLK_f:
+    case SDL_SCANCODE_F:
         return KeyboardKey_F;
-    case SDLK_g:
+    case SDL_SCANCODE_G:
         return KeyboardKey_G;
-    case SDLK_h:
+    case SDL_SCANCODE_H:
         return KeyboardKey_H;
-    case SDLK_i:
+    case SDL_SCANCODE_I:
         return KeyboardKey_I;
-    case SDLK_j:
+    case SDL_SCANCODE_J:
         return KeyboardKey_J;
-    case SDLK_k:
+    case SDL_SCANCODE_K:
         return KeyboardKey_K;
-    case SDLK_l:
+    case SDL_SCANCODE_L:
         return KeyboardKey_L;
-    case SDLK_m:
+    case SDL_SCANCODE_M:
         return KeyboardKey_M;
-    case SDLK_n:
+    case SDL_SCANCODE_N:
         return KeyboardKey_N;
-    case SDLK_o:
+    case SDL_SCANCODE_O:
         return KeyboardKey_O;
-    case SDLK_p:
+    case SDL_SCANCODE_P:
         return KeyboardKey_P;
-    case SDLK_q:
+    case SDL_SCANCODE_Q:
         return KeyboardKey_Q;
-    case SDLK_r:
+    case SDL_SCANCODE_R:
         return KeyboardKey_R;
-    case SDLK_s:
+    case SDL_SCANCODE_S:
         return KeyboardKey_S;
-    case SDLK_t:
+    case SDL_SCANCODE_T:
         return KeyboardKey_T;
-    case SDLK_u:
+    case SDL_SCANCODE_U:
         return KeyboardKey_U;
-    case SDLK_v:
+    case SDL_SCANCODE_V:
         return KeyboardKey_V;
-    case SDLK_w:
+    case SDL_SCANCODE_W:
         return KeyboardKey_W;
-    case SDLK_x:
+    case SDL_SCANCODE_X:
         return KeyboardKey_X;
-    case SDLK_y:
+    case SDL_SCANCODE_Y:
         return KeyboardKey_Y;
-    case SDLK_z:
+    case SDL_SCANCODE_Z:
         return KeyboardKey_Z;
-    case SDLK_DELETE:
+    case SDL_SCANCODE_DELETE:
         return KeyboardKey_Delete;
-    case SDLK_KP0:
+    case SDL_SCANCODE_KP_0:
         return KeyboardKey_KPad0;
-    case SDLK_KP1:
+    case SDL_SCANCODE_KP_1:
         return KeyboardKey_KPad1;
-    case SDLK_KP2:
+    case SDL_SCANCODE_KP_2:
         return KeyboardKey_KPad2;
-    case SDLK_KP3:
+    case SDL_SCANCODE_KP_3:
         return KeyboardKey_KPad3;
-    case SDLK_KP4:
+    case SDL_SCANCODE_KP_4:
         return KeyboardKey_KPad4;
-    case SDLK_KP5:
+    case SDL_SCANCODE_KP_5:
         return KeyboardKey_KPad5;
-    case SDLK_KP6:
+    case SDL_SCANCODE_KP_6:
         return KeyboardKey_KPad6;
-    case SDLK_KP7:
+    case SDL_SCANCODE_KP_7:
         return KeyboardKey_KPad7;
-    case SDLK_KP8:
+    case SDL_SCANCODE_KP_8:
         return KeyboardKey_KPad8;
-    case SDLK_KP9:
+    case SDL_SCANCODE_KP_9:
         return KeyboardKey_KPad8;
-    case SDLK_KP_PERIOD:
+    case SDL_SCANCODE_KP_PERIOD:
         return KeyboardKey_KPadPeriod;
-    case SDLK_KP_DIVIDE:
+    case SDL_SCANCODE_KP_DIVIDE:
         return KeyboardKey_KPadFSlash;
-    case SDLK_KP_MULTIPLY:
+    case SDL_SCANCODE_KP_MULTIPLY:
         return KeyboardKey_KPadStar;
-    case SDLK_KP_MINUS:
+    case SDL_SCANCODE_KP_MINUS:
         return KeyboardKey_KPadDash;
-    case SDLK_KP_PLUS:
+    case SDL_SCANCODE_KP_PLUS:
         return KeyboardKey_KPadPlus;
-    case SDLK_KP_ENTER:
+    case SDL_SCANCODE_KP_ENTER:
         return KeyboardKey_KPadReturn;
-    case SDLK_KP_EQUALS:
+    case SDL_SCANCODE_KP_EQUALS:
         return KeyboardKey_KPadEquals;
-    case SDLK_UP:
+    case SDL_SCANCODE_UP:
         return KeyboardKey_Up;
-    case SDLK_DOWN:
+    case SDL_SCANCODE_DOWN:
         return KeyboardKey_Down;
-    case SDLK_RIGHT:
+    case SDL_SCANCODE_RIGHT:
         return KeyboardKey_Right;
-    case SDLK_LEFT:
+    case SDL_SCANCODE_LEFT:
         return KeyboardKey_Left;
-    case SDLK_INSERT:
+    case SDL_SCANCODE_INSERT:
         return KeyboardKey_Insert;
-    case SDLK_HOME:
+    case SDL_SCANCODE_HOME:
         return KeyboardKey_Home;
-    case SDLK_END:
+    case SDL_SCANCODE_END:
         return KeyboardKey_End;
-    case SDLK_PAGEUP:
+    case SDL_SCANCODE_PAGEUP:
         return KeyboardKey_PageUp;
-    case SDLK_PAGEDOWN:
+    case SDL_SCANCODE_PAGEDOWN:
         return KeyboardKey_PageDown;
-    case SDLK_F1:
+    case SDL_SCANCODE_F1:
         return KeyboardKey_F1;
-    case SDLK_F2:
+    case SDL_SCANCODE_F2:
         return KeyboardKey_F2;
-    case SDLK_F3:
+    case SDL_SCANCODE_F3:
         return KeyboardKey_F3;
-    case SDLK_F4:
+    case SDL_SCANCODE_F4:
         return KeyboardKey_F4;
-    case SDLK_F5:
+    case SDL_SCANCODE_F5:
         return KeyboardKey_F5;
-    case SDLK_F6:
+    case SDL_SCANCODE_F6:
         return KeyboardKey_F6;
-    case SDLK_F7:
+    case SDL_SCANCODE_F7:
         return KeyboardKey_F7;
-    case SDLK_F8:
+    case SDL_SCANCODE_F8:
         return KeyboardKey_F8;
-    case SDLK_F9:
+    case SDL_SCANCODE_F9:
         return KeyboardKey_F9;
-    case SDLK_F10:
+    case SDL_SCANCODE_F10:
         return KeyboardKey_F10;
-    case SDLK_F11:
+    case SDL_SCANCODE_F11:
         return KeyboardKey_F11;
-    case SDLK_F12:
+    case SDL_SCANCODE_F12:
         return KeyboardKey_F12;
-    case SDLK_F13:
-    case SDLK_F14:
-    case SDLK_F15:
+    case SDL_SCANCODE_F13:
+    case SDL_SCANCODE_F14:
+    case SDL_SCANCODE_F15:
         // TODO (jacob#): implement keys
         return KeyboardKey_Unknown;
-    case SDLK_NUMLOCK:
+    case SDL_SCANCODE_NUMLOCKCLEAR:
         return KeyboardKey_NumLock;
-    case SDLK_CAPSLOCK:
+    case SDL_SCANCODE_CAPSLOCK:
         return KeyboardKey_CapsLock;
-    case SDLK_SCROLLOCK:
+    case SDL_SCANCODE_SCROLLLOCK:
         return KeyboardKey_ScrollLock;
-    case SDLK_RSHIFT:
+    case SDL_SCANCODE_RSHIFT:
         return KeyboardKey_RShift;
-    case SDLK_LSHIFT:
+    case SDL_SCANCODE_LSHIFT:
         return KeyboardKey_LShift;
-    case SDLK_RCTRL:
+    case SDL_SCANCODE_RCTRL:
         return KeyboardKey_RCtrl;
-    case SDLK_LCTRL:
+    case SDL_SCANCODE_LCTRL:
         return KeyboardKey_LCtrl;
-    case SDLK_RALT:
+    case SDL_SCANCODE_RALT:
         return KeyboardKey_RAlt;
-    case SDLK_LALT:
+    case SDL_SCANCODE_LALT:
         return KeyboardKey_LAlt;
-    case SDLK_RMETA:
+    case SDL_SCANCODE_RGUI:
         return KeyboardKey_RMeta;
-    case SDLK_LMETA:
+    case SDL_SCANCODE_LGUI:
         return KeyboardKey_LMeta;
-    case SDLK_LSUPER:
-        return KeyboardKey_LSuper;
-    case SDLK_RSUPER:
-        return KeyboardKey_RSuper;
-    case SDLK_MODE:
+    case SDL_SCANCODE_MODE:
         return KeyboardKey_Mode;
-    case SDLK_COMPOSE:
-    case SDLK_HELP:
+    case SDL_SCANCODE_HELP:
         // TODO (jacob#): implement keys
         return KeyboardKey_Unknown;
-    case SDLK_PRINT:
+    case SDL_SCANCODE_PRINTSCREEN:
         return KeyboardKey_PrintScreen;
-    case SDLK_SYSREQ:
+    case SDL_SCANCODE_SYSREQ:
         return KeyboardKey_SysRequest;
-    case SDLK_BREAK:
-        return KeyboardKey_Break;
-    case SDLK_MENU:
+    case SDL_SCANCODE_MENU:
         return KeyboardKey_Menu;
-    case SDLK_POWER:
-    case SDLK_EURO:
-    case SDLK_UNDO:
+    case SDL_SCANCODE_POWER:
+    case SDL_SCANCODE_UNDO:
         // TODO (jacob#): implement keys
         return KeyboardKey_Unknown;
     default:
@@ -536,7 +492,7 @@ static KeyboardKey translateKey(SDLKey input)
     }
 }
 
-static KeyboardModifiers translateModifiers(SDLMod input)
+static KeyboardModifiers translateModifiers(SDL_Keymod input)
 {
     int retval = KeyboardModifiers_None;
     if(input & KMOD_LSHIFT)
@@ -563,11 +519,11 @@ static KeyboardModifiers translateModifiers(SDLMod input)
     {
         retval |= KeyboardModifiers_RCtrl;
     }
-    if(input & KMOD_LMETA)
+    if(input & KMOD_LGUI)
     {
         retval |= KeyboardModifiers_LMeta;
     }
-    if(input & KMOD_RMETA)
+    if(input & KMOD_RGUI)
     {
         retval |= KeyboardModifiers_RMeta;
     }
@@ -616,10 +572,12 @@ static MouseButton buttonState = MouseButton_None;
 static Event *makeEvent()
 {
     static bool needCharEvent = false;
-    static wchar_t character;
+    static wstring characters;
     if(needCharEvent)
     {
         needCharEvent = false;
+        wchar_t character = characters[0];
+        characters.erase(0, 1);
         return new KeyPressEvent(character);
     }
     while(true)
@@ -631,22 +589,17 @@ static Event *makeEvent()
         }
         switch(SDLEvent.type)
         {
-        case SDL_ACTIVEEVENT:
-            // TODO (jacob#): handle SDL_ACTIVEEVENT
-            break;
         case SDL_KEYDOWN:
         {
-            KeyboardKey key = translateKey(SDLEvent.key.keysym.sym);
-            Event *retval = new KeyDownEvent(key, translateModifiers(SDLEvent.key.keysym.mod), keyState(key));
+            KeyboardKey key = translateKey(SDLEvent.key.keysym.scancode);
+            Event *retval = new KeyDownEvent(key, translateModifiers((SDL_Keymod)SDLEvent.key.keysym.mod), keyState(key));
             keyState(key) = true;
-            character = SDLEvent.key.keysym.unicode;
-            needCharEvent = (SDLEvent.key.keysym.unicode != 0);
             return retval;
         }
         case SDL_KEYUP:
         {
-            KeyboardKey key = translateKey(SDLEvent.key.keysym.sym);
-            Event *retval = new KeyUpEvent(key, translateModifiers(SDLEvent.key.keysym.mod));
+            KeyboardKey key = translateKey(SDLEvent.key.keysym.scancode);
+            Event *retval = new KeyUpEvent(key, translateModifiers((SDL_Keymod)SDLEvent.key.keysym.mod));
             keyState(key) = false;
             return retval;
         }
@@ -654,22 +607,12 @@ static Event *makeEvent()
             return new MouseMoveEvent(SDLEvent.motion.x, SDLEvent.motion.y, SDLEvent.motion.xrel, SDLEvent.motion.yrel);
         case SDL_MOUSEBUTTONDOWN:
         {
-            if(SDLEvent.button.button == SDL_BUTTON_WHEELDOWN)
-            {
-                return new MouseScrollEvent(SDLEvent.button.x, SDLEvent.button.y, 0, 0, 0, -1);
-            }
-            if(SDLEvent.button.button == SDL_BUTTON_WHEELUP)
-            {
-                return new MouseScrollEvent(SDLEvent.button.x, SDLEvent.button.y, 0, 0, 0, 1);
-            }
             MouseButton button = translateButton(SDLEvent.button.button);
             buttonState = static_cast<MouseButton>(buttonState | button); // set bit
             return new MouseDownEvent(SDLEvent.button.x, SDLEvent.button.y, 0, 0, button);
         }
         case SDL_MOUSEBUTTONUP:
         {
-            if(SDLEvent.button.button == SDL_BUTTON_WHEELDOWN || SDLEvent.button.button == SDL_BUTTON_WHEELUP)
-                break;
             MouseButton button = translateButton(SDLEvent.button.button);
             buttonState = static_cast<MouseButton>(buttonState & ~button); // clear bit
             return new MouseUpEvent(SDLEvent.button.x, SDLEvent.button.y, 0, 0, button);
@@ -685,22 +628,6 @@ static Event *makeEvent()
             return new QuitEvent();
         case SDL_SYSWMEVENT:
             //TODO (jacob#): handle SDL_SYSWMEVENT
-            break;
-        case SDL_VIDEORESIZE:
-            //TODO (jacob#): handle SDL_VIDEORESIZE
-            break;
-        case SDL_VIDEOEXPOSE:
-            //TODO (jacob#): handle SDL_VIDEOEXPOSE
-            break;
-        case SDL_EVENT_RESERVEDA:
-        case SDL_EVENT_RESERVEDB:
-        case SDL_EVENT_RESERVED2:
-        case SDL_EVENT_RESERVED3:
-        case SDL_EVENT_RESERVED4:
-        case SDL_EVENT_RESERVED5:
-        case SDL_EVENT_RESERVED6:
-        case SDL_EVENT_RESERVED7:
-        default:
             break;
         }
     }
@@ -792,15 +719,13 @@ void glLoadMatrix(Matrix mat)
 
 wstring Display::title()
 {
-    char *title_, *icon;
-    SDL_WM_GetCaption(&title_, &icon);
-    return mbsrtowcs(title_);
+    return mbsrtowcs(SDL_GetWindowTitle(window));
 }
 
 void Display::title(wstring newTitle)
 {
     string s = wcsrtombs(newTitle);
-    SDL_WM_SetCaption(s.c_str(), nullptr);
+    SDL_SetWindowTitle(window, s.c_str());
 }
 
 void Display::handleEvents(shared_ptr<EventHandler> eventHandler)
@@ -918,8 +843,7 @@ bool Display::grabMouse()
 void Display::grabMouse(bool g)
 {
     grabMouse_ = g;
-    SDL_ShowCursor(g ? 0 : 1);
-    SDL_WM_GrabInput(g ? SDL_GRAB_ON : SDL_GRAB_OFF);
+    SDL_SetRelativeMouseMode(g ? SDL_TRUE : SDL_FALSE);
 }
 
 VectorF Display::transformMouseTo3D(float x, float y, float depth)

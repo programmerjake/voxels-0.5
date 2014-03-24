@@ -40,12 +40,12 @@
 		<Compiler>
 			<Add option="-Wextra" />
 			<Add option="-Wall" />
-			<Add option="-std=c++11 -fexceptions `sdl-config --cflags`" />
+			<Add option="-std=c++11 -fexceptions `sdl2-config --cflags`" />
 			<Add option="-D__cplusplus=201103L" />
-			<Add directory="/usr/include/SDL" />
+			<Add directory="/usr/local/include/SDL2" />
 		</Compiler>
 		<Linker>
-			<Add option="`sdl-config --libs`" />
+			<Add option="`sdl2-config --libs`" />
 			<Add library="GL" />
 			<Add library="SDL_image" />
 			<Add library="png" />
