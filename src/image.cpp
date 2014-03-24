@@ -25,10 +25,11 @@ Image::Image(wstring resourceName)
 {
     try
     {
-        PngDecoder decoder(getResourceFileName(resourceName));
+        shared_ptr<Reader> preader = getResourceReader(resourceName);
+        PngDecoder decoder(*preader);
         data = shared_ptr<data_t>(new data_t(decoder.removeData(), decoder.width(), decoder.height(), TopToBottom));
     }
-    catch(PngLoadError &e)
+    catch(IOException &e)
     {
         throw ImageLoadError(e.what());
     }

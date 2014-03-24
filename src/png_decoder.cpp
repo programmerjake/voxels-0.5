@@ -38,18 +38,26 @@ void pngloadwarning(png_structp, png_const_charp)
     // do nothing
 }
 
-inline bool LoadPNG(const char *filename, uint8_t *&pixels, unsigned &width, unsigned &height, string &errorMsg)
+void readBytes(png_structp png_ptr, png_bytep output, png_size_t count)
 {
-    FILE *f = fopen(filename, "rb");
-    if(!f)
+    png_voidp user_data = png_get_io_ptr(png_ptr);
+    Reader & reader = *(Reader *)user_data;
+    try
     {
-        errorMsg = string("can't open file : ") + strerror(errno) + " : \"" + filename + "\"";
-        return false;
+        reader.readBytes((uint8_t *)output, count);
     }
+    catch(IOException & e)
+    {
+        *(string *)png_get_error_ptr(png_ptr) = e.what();
+        longjmp(png_jmpbuf(png_ptr), 1);
+    }
+}
+
+inline bool LoadPNG(Reader * preader, uint8_t *&pixels, unsigned &width, unsigned &height, string &errorMsg)
+{
     png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, (void *)&errorMsg, pngloaderror, pngloadwarning);
     if(!png_ptr)
     {
-        fclose(f);
         errorMsg = "can't create png read struct";
         return false;
     }
@@ -58,7 +66,6 @@ inline bool LoadPNG(const char *filename, uint8_t *&pixels, unsigned &width, uns
     if(!info_ptr)
     {
         png_destroy_read_struct(&png_ptr, png_infopp_NULL, png_infopp_NULL);
-        fclose(f);
         errorMsg = "can't create png info struct";
         return false;
     }
@@ -69,13 +76,12 @@ inline bool LoadPNG(const char *filename, uint8_t *&pixels, unsigned &width, uns
     if(setjmp(png_jmpbuf(png_ptr)))
     {
         png_destroy_read_struct(&png_ptr, &info_ptr, png_infopp_NULL);
-        fclose(f);
         delete []retval;
         delete []rows;
         return false;
     }
 
-    png_init_io(png_ptr, f);
+    png_set_read_fn(png_ptr, (png_voidp)preader, readBytes);
 
     png_read_info(png_ptr, info_ptr);
 
@@ -123,17 +129,16 @@ inline bool LoadPNG(const char *filename, uint8_t *&pixels, unsigned &width, uns
     delete []rows;
 
     png_destroy_read_struct(&png_ptr, &info_ptr, png_infopp_NULL);
-    fclose(f);
     pixels = (uint8_t *)retval;
     return true;
 }
 
 }
 
-PngDecoder::PngDecoder(wstring fileName)
+PngDecoder::PngDecoder(Reader & reader)
 {
-    string errorMsg, str = wcsrtombs(fileName);
-    if(!LoadPNG(str.c_str(), data, w, h, errorMsg))
+    string errorMsg;
+    if(!LoadPNG(&reader, data, w, h, errorMsg))
     {
         throw PngLoadError(errorMsg);
     }

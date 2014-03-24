@@ -510,6 +510,30 @@ public:
     }
 };
 
+class MemoryReader final : public Reader
+{
+private:
+    const shared_ptr<const uint8_t> mem;
+    size_t offset;
+    const size_t length;
+public:
+    explicit MemoryReader(shared_ptr<const uint8_t> mem, size_t length)
+        : mem(mem), offset(0), length(length)
+    {
+    }
+    template <size_t length>
+    explicit MemoryReader(const uint8_t a[length])
+        : MemoryReader(shared_ptr<const uint8_t>(&a[0], [](const uint8_t *){}))
+    {
+    }
+    virtual uint8_t readByte() override
+    {
+        if(offset >= length)
+            throw EOFException();
+        return mem.get()[offset++];
+    }
+};
+
 class StreamPipe final
 {
     StreamPipe(const StreamPipe &) = delete;

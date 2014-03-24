@@ -38,28 +38,53 @@ double Display::realtimeTimer()
     return static_cast<double>(chrono::duration_cast<chrono::nanoseconds>(chrono::system_clock::now().time_since_epoch()).count()) * 1e-9;
 }
 
-static wstring ResourcePrefix;
-static wstring getExecutablePath();
-
-wstring getResourceFileName(wstring resource)
+namespace
 {
-    return ResourcePrefix + resource;
+class RWOpsReader final : public Reader
+{
+private:
+    SDL_RWops * rw;
+public:
+    RWOpsReader(SDL_RWops * rw)
+        : rw(rw)
+    {
+    }
+    virtual uint8_t readByte() override
+    {
+        SDL_ClearError(); // for error detection
+        uint8_t retval;
+        if(0 == SDL_RWread(rw, &retval, sizeof(retval), 1))
+        {
+            const char * str = SDL_GetError();
+            if(str[0]) // non-empty string : error
+                throw IOException(str);
+            throw EOFException();
+        }
+        return retval;
+    }
+    ~RWOpsReader()
+    {
+        SDL_RWclose(rw);
+    }
+};
 }
+
+static void startSDL();
 
 #ifdef _WIN64
 #error implement getExecutablePath for Win64
 #elif _WIN32
-#error implement getExecutablePath for Win32
+#error implement getResourceReader for Win32
 #elif __ANDROID
-#error implement getExecutablePath for Android
+#error implement getResourceReader for Android
 #elif __APPLE__
 #include "TargetConditionals.h"
 #if TARGET_OS_IPHONE && TARGET_IPHONE_SIMULATOR
-#error implement getExecutablePath for iPhone simulator
+#error implement getResourceReader for iPhone simulator
 #elif TARGET_OS_IPHONE
-#error implement getExecutablePath for iPhone
+#error implement getResourceReader for iPhone
 #else
-#error implement getExecutablePath for OS X
+#error implement getResourceReader for OS X
 #endif
 #elif __linux
 #include <unistd.h>
@@ -67,6 +92,14 @@ wstring getResourceFileName(wstring resource)
 #include <cerrno>
 #include <cstring>
 #include <cwchar>
+static wstring ResourcePrefix;
+static wstring getExecutablePath();
+
+static wstring getResourceFileName(wstring resource)
+{
+    return ResourcePrefix + resource;
+}
+
 static wstring getExecutablePath()
 {
     char buf[PATH_MAX + 1];
@@ -78,13 +111,6 @@ static wstring getExecutablePath()
     buf[rv] = '\0';
     return mbsrtowcs(&buf[0]);
 }
-#elif __unix
-#error implement getExecutablePath for other unix
-#elif __posix
-#error implement getExecutablePath for other posix
-#else
-#error unknown platform in getExecutablePath
-#endif
 
 initializer initializer1([]()
 {
@@ -97,15 +123,29 @@ initializer initializer1([]()
     ResourcePrefix = p + L"res/";
 });
 
+shared_ptr<Reader> getResourceReader(wstring resource)
+{
+    startSDL();
+    string fname = wcsrtombs(getResourceFileName(resource));
+    return make_shared<RWOpsReader>(SDL_RWFromFile(fname.c_str(), "rb"));
+}
+#elif __unix
+#error implement getResourceReader for other unix
+#elif __posix
+#error implement getResourceReader for other posix
+#else
+#error unknown platform in getResourceReader
+#endif
+
 static int xResInternal, yResInternal;
 
 static SDL_Window *window = nullptr;
 static SDL_GLContext glcontext = nullptr;
-static atomic_bool runningGraphics(false);
+static atomic_bool runningGraphics(false), runningSDL(false);
 
-void startGraphics()
+static void startSDL()
 {
-    if(runningGraphics.exchange(true))
+    if(runningSDL.exchange(true))
         return;
     if(0 != SDL_Init(SDL_INIT_TIMER | SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     {
@@ -113,6 +153,13 @@ void startGraphics()
         exit(1);
     }
     atexit(SDL_Quit);
+}
+
+void startGraphics()
+{
+    startSDL();
+    if(runningGraphics.exchange(true))
+        return;
 #if 0
     const SDL_VideoInfo * vidInfo = SDL_GetVideoInfo();
     if(vidInfo == nullptr)

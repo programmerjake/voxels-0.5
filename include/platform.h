@@ -23,6 +23,7 @@
 #include <memory>
 #include "matrix.h"
 #include "vector.h"
+#include "stream.h"
 
 #ifndef EVENT_H_INCLUDED
 class EventHandler;
@@ -32,7 +33,7 @@ void glLoadMatrix(Matrix mat);
 
 const float defaultFPS = 60;
 
-wstring getResourceFileName(wstring resource);
+shared_ptr<Reader> getResourceReader(wstring resource);
 
 enum KeyboardKey
 {

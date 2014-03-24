@@ -21,14 +21,15 @@
 #include <string>
 #include <cstdint>
 #include <stdexcept>
+#include "stream.h"
 
 using namespace std;
 
-class PngLoadError final : public runtime_error
+class PngLoadError final : public IOException
 {
 public:
     explicit PngLoadError(const string & arg)
-        : runtime_error(arg)
+        : IOException(arg)
     {
     }
 };
@@ -44,7 +45,7 @@ private:
     PngDecoder(const PngDecoder &) = delete;
     const PngDecoder &operator =(const PngDecoder &) = delete;
 public:
-    explicit PngDecoder(wstring fileName);
+    explicit PngDecoder(Reader & reader);
     PngDecoder(PngDecoder && rt)
     {
         w = rt.w;
