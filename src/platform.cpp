@@ -72,7 +72,7 @@ public:
 static void startSDL();
 
 #ifdef _WIN64
-#error implement getExecutablePath for Win64
+#error implement getResourceReader for Win64
 #elif _WIN32
 #error implement getResourceReader for Win32
 #elif __ANDROID

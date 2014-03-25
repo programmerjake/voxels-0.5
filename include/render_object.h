@@ -680,8 +680,6 @@ struct RenderObjectWorld final : public enable_shared_from_this<RenderObjectWorl
             return retval;
         }
     };
-    //FIXME(#jacob): add entities
-    //list<shared_ptr<RenderObjectEntity>> entities;
     static shared_ptr<RenderObjectWorld> getWorld(Client &client)
     {
         static Client::IdType worldId = Client::NullId;

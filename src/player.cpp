@@ -25,6 +25,7 @@ void initEntityPlayer()
 namespace
 {
 initializer init1(initEntityPlayer);
+const wchar_t program[] = L"";
 }
 
 #warning finish
@@ -36,22 +37,13 @@ shared_ptr<RenderObjectEntity> EntityPlayer::getEntity(EntityData & data, shared
     assert(eData);
     if(data.entity == nullptr)
     {
-        static shared_ptr<unordered_map<BlockDescriptorPtr, shared_ptr<RenderObjectEntityMesh>>> meshs_static = nullptr;
-        if(meshs_static == nullptr)
-        {
-            meshs_static = make_shared<unordered_map<BlockDescriptorPtr, shared_ptr<RenderObjectEntityMesh>>>();
-        }
-        unordered_map<BlockDescriptorPtr, shared_ptr<RenderObjectEntityMesh>> & meshs = *meshs_static;
         BlockDescriptorPtr block = BlockDescriptors.get(L"builtin.glass");
-        shared_ptr<RenderObjectEntityMesh> & mesh = meshs[block];
-        if(mesh == nullptr)
-        {
-            static shared_ptr<Script> theScript = nullptr;
-            if(theScript == nullptr)
-                theScript = Script::parse(L"io.transform = make_translate(<-0.5, -0.5, -0.5>) ~ make_scale(0.25) ~ make_rotatey(io.age / 5 * 2 * pi) ~ make_translate(io.position)");
-            mesh = make_shared<RenderObjectEntityMesh>(VectorF(0), VectorF(0));
-            mesh->addPart(block->makeBlockEntityMesh(), theScript);
-        }
+        shared_ptr<RenderObjectEntityMesh> & mesh;
+        static shared_ptr<Script> theScript = nullptr;
+        if(theScript == nullptr)
+            theScript = Script::parse(program);
+        mesh = make_shared<RenderObjectEntityMesh>(VectorF(0), VectorF(0));
+        mesh->addPart(block->makeBlockEntityMesh(), theScript);
         data.entity = make_shared<RenderObjectEntity>(mesh, data.position, data.velocity, data.acceleration, data.deltaAcceleration, 0);
     }
     return data.entity;
