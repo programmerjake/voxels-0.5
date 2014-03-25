@@ -313,6 +313,11 @@ public:
         lock_guard<recursive_mutex> lockIt(lock);
         entities.insert(make_shared<EntityData>(move(e)));
     }
+    void addEntity(shared_ptr<EntityData> e)
+    {
+        lock_guard<recursive_mutex> lockIt(lock);
+        entities.insert(e);
+    }
 };
 
 class BlockIterator final

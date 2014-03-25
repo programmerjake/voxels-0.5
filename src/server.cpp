@@ -25,6 +25,7 @@
 #include "compressed_stream.h"
 #include "generate.h"
 #include "texture_atlas.h"
+#include "player.h"
 #include <thread>
 #include <list>
 
@@ -181,12 +182,17 @@ void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                 phi = reader.readLimitedF32(-M_PI / 2 - eps, M_PI / 2 + eps);
                 theta = reader.readLimitedF32(-2 * M_PI - eps, 2 * M_PI + eps);
                 viewDistance = reader.readLimitedF32(0, 1000);
-                LockedClient lockIt(client);
-                getClientPosition(client) = pos;
-                getClientVelocity(client) = velocity;
-                getClientViewPhi(client) = phi;
-                getClientViewTheta(client) = theta;
-                getClientViewDistance(client) = viewDistance;
+                bool flying = reader.readBool();
+                {
+                    LockedClient lockIt(client);
+                    getClientPosition(client) = pos;
+                    getClientVelocity(client) = velocity;
+                    getClientViewPhi(client) = phi;
+                    getClientViewTheta(client) = theta;
+                    getClientViewDistance(client) = viewDistance;
+                }
+                lock_guard<recursive_mutex> lockIt(world->lock);
+                EntityPlayer::update(EntityPlayer::get(client), pos, velocity, theta, phi, flying);
                 continue;
             }
 
@@ -217,8 +223,8 @@ void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                     }
                 }
 
-                cout << "Server : Got Chunk Request : " << origin.x << ", " << origin.y << ", " << origin.z << ", "
-                     << (int)origin.d << endl;
+                //cout << "Server : Got Chunk Request : " << origin.x << ", " << origin.y << ", " << origin.z << ", "
+                //     << (int)origin.d << endl;
                 continue;
             }
 
@@ -274,6 +280,20 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
     UpdateList &clientUpdateList = getClientUpdateList(client);
     set<shared_ptr<RenderObjectEntity>> &entitiesList = client.getPropertyReference<set<shared_ptr<RenderObjectEntity>>, 0>(Client::DataType::RenderObjectEntitySet);
     //PositionF &clientPosition = getClientPosition(client);
+#if 1
+    {
+        shared_ptr<RenderObjectEntity> roplayer;
+        {
+            LockedClient lockClient(client);
+            lock_guard<recursive_mutex> lockWorld(world->lock);
+            shared_ptr<EntityData> eplayer = EntityPlayer::get(client);
+            world->addEntity(eplayer);
+            roplayer = eplayer->desc->getEntity(*eplayer, world);
+        }
+        NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::SendPlayer);
+        roplayer->write(writer, client);
+    }
+#endif
 #if 0
     {
         shared_ptr<RenderObjectEntityMesh> entityMesh = make_shared<RenderObjectEntityMesh>(VectorF(0),

@@ -30,8 +30,10 @@ private:
         Client * pclient;
         const wstring name;
         float theta = 0, phi = 0;
-        ExtraData(Client * pclient, wstring name)
-            : pclient(pclient), name(name)
+        int playerIndex;
+        bool flying = false;
+        ExtraData(Client * pclient, wstring name, int playerIndex)
+            : pclient(pclient), name(name), playerIndex(playerIndex)
         {
         }
     };
@@ -49,17 +51,32 @@ private:
     {
     }
 public:
-    static EntityData & get(Client & client)
+    static shared_ptr<EntityData> get(Client & client)
     {
-        EntityData & retval = client.getPropertyReference<EntityData, 0>(Client::DataType::Player);
-        if(!retval.good())
+        shared_ptr<EntityData> retval = client.getPropertyPtr<EntityData, 0>(Client::DataType::Player);
+        if(!retval->good())
         {
             wstring name = L"";
+            static int playerIndex = 0;
+            cout << "Server : made player #" << ++playerIndex << endl;
 #warning finish
-            retval = EntityData(EntityDescriptors.get(L"builtin.player"), PositionF(0.5, AverageGroundHeight + 0.5, 0.5,
-                                        Dimension::Overworld), VectorF(0), VectorF(0), shared_ptr<ExtraEntityData>(new ExtraData(&client, name)));
+            *retval = EntityData(EntityDescriptors.get(L"builtin.player"), PositionF(0.5, AverageGroundHeight + 0.5, 0.5,
+                                        Dimension::Overworld), VectorF(0), VectorF(0), shared_ptr<ExtraEntityData>(new ExtraData(&client, name, playerIndex)));
         }
         return retval;
+    }
+    static void update(shared_ptr<EntityData> player, PositionF position, VectorF velocity, float theta, float phi, bool flying)
+    {
+        EntityData & data = *player;
+        assert(data.extraData);
+        auto eData = dynamic_pointer_cast<ExtraData>(data.extraData);
+        assert(eData);
+        eData->theta = theta;
+        eData->phi = phi;
+        eData->flying = flying;
+        data.position = position;
+        data.velocity = velocity;
+        cout << "updated Player #" << eData->playerIndex << "\r" << flush;
     }
 protected:
     virtual EntityData loadInternal(GameLoadStream & gls) const override
@@ -82,7 +99,7 @@ protected:
         deltaAcceleration.y = gls.readFiniteF32();
         deltaAcceleration.z = gls.readFiniteF32();
         wstring name = gls.readString();
-        return EntityData(shared_from_this(), position, velocity, acceleration, shared_ptr<ExtraEntityData>(new ExtraData(nullptr, name)), deltaAcceleration);
+        return EntityData(shared_from_this(), position, velocity, acceleration, shared_ptr<ExtraEntityData>(new ExtraData(nullptr, name, 0)), deltaAcceleration);
     }
     virtual void storeInternal(EntityData data, GameStoreStream & gss) const override
     {

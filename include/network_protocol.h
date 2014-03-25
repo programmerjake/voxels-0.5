@@ -30,6 +30,7 @@ enum class NetworkEvent : uint_fast8_t
     UpdatePositionAndVelocity,
     RequestChunk,
     RequestState,
+    SendPlayer,
     Last
 };
 

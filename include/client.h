@@ -268,6 +268,33 @@ public:
 
         return *retval;
     }
+    template <typename T, size_t n>
+    inline shared_ptr<T> getPropertyPtr(DataType dataType,
+                                   shared_ptr<T>(*makeObject)() = &defaultMakeObject<T>)
+    {
+        static IdType id = NullId;
+        static mutex idLock;
+
+        if(id == NullId)
+        {
+            lock_guard<mutex> lockIt(idLock);
+
+            if(id == NullId)
+            {
+                id = getNewId();
+            }
+        }
+
+        lock_guard<recursive_mutex> lockIt(getLock());
+        shared_ptr<T> retval = getPtr<T>(id, dataType);
+
+        if(retval == nullptr)
+        {
+            setPtr(retval = makeObject(), id, dataType);
+        }
+
+        return retval;
+    }
     template <typename T>
     vector<shared_ptr<T>> getAllPtrs(DataType dataType)
     {

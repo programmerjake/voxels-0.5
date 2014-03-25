@@ -49,10 +49,12 @@ struct ClientState
     recursive_mutex & lock;
     condition_variable_any cond;
     bool done;
-    bool paused;
+    bool paused, flying = true;
+    #warning finish implementing flying
     flag needState;
     UpdateList neededChunkList;
     bool forwardDown = false, backwardDown = false, leftDown = false, rightDown = false, jumpDown = false, sneakDown = false;
+    shared_ptr<RenderObjectEntity> player;
     ClientState()
         : lock(client.getLock()), needState(true)
     {
@@ -79,13 +81,6 @@ void clientProcessWriter(Writer *pwriter, ClientState * state)
         state->lock.lock();
         while(!state->done)
         {
-            PositionF pos = state->pos;
-            VectorF velocity = state->velocity;
-            float phi = state->phi;
-            float theta = state->theta;
-            float viewDistance = state->renderDistance;
-            if(state->paused)
-                velocity = VectorF(0);
             UpdateList neededChunkList = state->neededChunkList;
             state->neededChunkList.clear();
             flag &needState = state->needState;
@@ -93,6 +88,16 @@ void clientProcessWriter(Writer *pwriter, ClientState * state)
             bool didAnything = false;
             if(needState.exchange(false))
             {
+                state->lock.lock();
+                PositionF pos = state->pos;
+                VectorF velocity = state->velocity;
+                float phi = state->phi;
+                float theta = state->theta;
+                float viewDistance = state->renderDistance;
+                if(state->paused)
+                    velocity = VectorF(0);
+                bool flying = state->paused || state->flying;
+                state->lock.unlock();
                 NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdatePositionAndVelocity);
                 writer.writeF32(pos.x);
                 writer.writeF32(pos.y);
@@ -104,6 +109,7 @@ void clientProcessWriter(Writer *pwriter, ClientState * state)
                 writer.writeF32(phi);
                 writer.writeF32(theta);
                 writer.writeF32(viewDistance);
+                writer.writeBool(flying);
                 writer.flush();
                 didAnything = true;
             }
@@ -113,6 +119,16 @@ void clientProcessWriter(Writer *pwriter, ClientState * state)
                     continue;
                 if(needState.exchange(false))
                 {
+                    state->lock.lock();
+                    PositionF pos = state->pos;
+                    VectorF velocity = state->velocity;
+                    float phi = state->phi;
+                    float theta = state->theta;
+                    float viewDistance = state->renderDistance;
+                    if(state->paused)
+                        velocity = VectorF(0);
+                    bool flying = state->paused || state->flying;
+                    state->lock.unlock();
                     NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdatePositionAndVelocity);
                     writer.writeF32(pos.x);
                     writer.writeF32(pos.y);
@@ -124,6 +140,8 @@ void clientProcessWriter(Writer *pwriter, ClientState * state)
                     writer.writeF32(phi);
                     writer.writeF32(theta);
                     writer.writeF32(viewDistance);
+                    writer.writeBool(flying);
+                    writer.flush();
                 }
                 NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::RequestChunk);
                 writer.writeS32(p.x);
@@ -190,6 +208,28 @@ void clientProcessReader(Reader *preader, ClientState * state)
             {
                 state->lock.lock();
                 state->needState = true;
+                continue;
+            }
+            case NetworkProtocol::NetworkEvent::SendPlayer:
+            {
+                shared_ptr<RenderObject> ro = RenderObject::read(reader, client);
+                if(!ro || ro->type() != RenderObject::Type::Entity)
+                {
+                    throw InvalidDataValueException("in receive SendPlayer : didn't read entity");
+                }
+                shared_ptr<RenderObjectEntity> player = dynamic_pointer_cast<RenderObjectEntity>(ro);
+                if(!player)
+                {
+                    throw InvalidDataValueException("in receive SendPlayer : didn't read entity (can't cast)");
+                }
+                else
+                {
+                    LockedClient lockIt(client);
+                    shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
+                    world->handleReadEntity(player);
+                }
+                state->lock.lock();
+                state->player = player;
                 continue;
             }
 
@@ -456,7 +496,7 @@ TransformedMesh makeSelectBoxMesh()
     return transform(Matrix::translate(VectorF(-0.5f)).concat(Matrix::scale(1.05)).concat(Matrix::translate(VectorF(0.5f))), retval);
 }
 
-void renderEntities(Mesh dest, Client &client, RenderLayer rl, PositionF pos, unsigned naturalLight)
+void renderEntities(Mesh dest, Client &client, RenderLayer rl, unsigned naturalLight, float playerTheta, float playerPhi, PositionF & playerPosition, shared_ptr<RenderObjectEntity> player)
 {
     vector<shared_ptr<RenderObjectEntity>> entities;
     {
@@ -472,7 +512,14 @@ void renderEntities(Mesh dest, Client &client, RenderLayer rl, PositionF pos, un
     for(shared_ptr<RenderObjectEntity> e : entities)
     {
         LockedClient lockIt(client);
-        e->render(dest, rl, pos.d, client, naturalLight);
+        if(e == player)
+        {
+            e->scriptIOObject->value[L"theta"] = make_shared<Scripting::DataFloat>(playerTheta);
+            e->scriptIOObject->value[L"phi"] = make_shared<Scripting::DataFloat>(playerPhi);
+            e->scriptIOObject->value[L"isCurrentPlayer"] = make_shared<Scripting::DataBoolean>(true);
+            e->position = playerPosition;
+        }
+        e->render(dest, rl, playerPosition.d, client, naturalLight);
     }
 }
 
@@ -541,6 +588,8 @@ void clientProcess(StreamRW & streamRW)
         }
         shared_ptr<PositionI> rayHitPos = RenderObjectWorld::getWorld(clientState.client)->getFirstHitBlock(Ray(tform.invert().applyToNormal(VectorF(0, 0, -1)), clientState.pos), clientReachDistance);
         PositionF pos = clientState.pos;
+        float phi = clientState.phi, theta = clientState.theta;
+        int naturalLight = clientState.naturalLight;
         clientState.lock.unlock();
         moveEntities(clientState.client, Display::frameDeltaTime());
         int polyCount = 0;
@@ -556,7 +605,7 @@ void clientProcess(StreamRW & streamRW)
                 r << transform(Matrix::translate((VectorI)*rayHitPos).concat(tform), selectBoxMesh);
             }
             mesh = make_shared<Mesh_t>();
-            renderEntities(mesh, clientState.client, rl, pos, clientState.naturalLight);
+            renderEntities(mesh, clientState.client, rl, naturalLight, theta, phi, clientState.pos, clientState.player);
             polyCount += mesh->size();
             r << transform(tform, mesh);
         }

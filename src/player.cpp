@@ -16,6 +16,7 @@
  *
  */
 #include "player.h"
+#include "generate.h"
 
 void initEntityPlayer()
 {
@@ -25,7 +26,8 @@ void initEntityPlayer()
 namespace
 {
 initializer init1(initEntityPlayer);
-const wchar_t program[] = L"";
+const wstring program1 = L"io.transform = make_translate(<-0.5, -0.5, -0.5>) ~ make_scale(0.6) ~ make_rotatex(io.phi) ~ make_rotatey(-io.theta) ~ make_translate(io.position); io.doDraw = io.isCurrentPlayer";
+const wstring program2 = L"io.transform = make_translate(<-0.5, -0.5, -0.5>) ~ make_scale(0.6) ~ make_rotatex(io.phi) ~ make_rotatey(-io.theta) ~ make_translate(io.position); io.doDraw = not io.isCurrentPlayer";
 }
 
 #warning finish
@@ -38,28 +40,39 @@ shared_ptr<RenderObjectEntity> EntityPlayer::getEntity(EntityData & data, shared
     if(data.entity == nullptr)
     {
         BlockDescriptorPtr block = BlockDescriptors.get(L"builtin.glass");
-        shared_ptr<RenderObjectEntityMesh> & mesh;
-        static shared_ptr<Script> theScript = nullptr;
-        if(theScript == nullptr)
-            theScript = Script::parse(program);
+        shared_ptr<RenderObjectEntityMesh> mesh;
         mesh = make_shared<RenderObjectEntityMesh>(VectorF(0), VectorF(0));
-        mesh->addPart(block->makeBlockEntityMesh(), theScript);
+        Mesh blockMesh = block->makeBlockEntityMesh();
+        mesh->addPart(invert(blockMesh), Script::parse(program1));
+        mesh->addPart(blockMesh, Script::parse(program2));
         data.entity = make_shared<RenderObjectEntity>(mesh, data.position, data.velocity, data.acceleration, data.deltaAcceleration, 0);
     }
+    data.entity->scriptIOObject->value[L"theta"] = make_shared<Scripting::DataFloat>(eData->theta);
+    data.entity->scriptIOObject->value[L"phi"] = make_shared<Scripting::DataFloat>(eData->phi);
+    data.entity->scriptIOObject->value[L"isCurrentPlayer"] = make_shared<Scripting::DataBoolean>(false);
+    data.entity->position = data.position;
+    data.entity->velocity = data.velocity;
+    data.entity->acceleration = data.acceleration;
+    data.entity->deltaAcceleration = data.deltaAcceleration;
     return data.entity;
 }
 
 void EntityPlayer::onMove(EntityData & data, shared_ptr<World> world, float deltaTime) const
 {
     getEntity(data, world);
+    assert(data.extraData);
+    auto eData = dynamic_pointer_cast<ExtraData>(data.extraData);
+    assert(eData);
     data.deltaAcceleration = VectorF(0);
     data.acceleration = gravityVector;
+    if(eData->flying)
+        data.acceleration = VectorF(0);
     int count = (iceil(deltaTime * abs(data.velocity) / 0.5 + 1),1);
     deltaTime /= count;
     BlockIterator bi = world->get((PositionI)data.position);
     data.entity->acceleration = data.acceleration;
     data.entity->deltaAcceleration = data.deltaAcceleration;
-    auto pphysicsObject = make_shared<PhysicsBox>((VectorF)data.position, VectorF(0.125), data.velocity, data.entity->acceleration, data.entity->deltaAcceleration, data.position.d, PhysicsProperties(0.1, 0.5, 0.1));
+    auto pphysicsObject = make_shared<PhysicsBox>((VectorF)data.position, VectorF(0.3, 0.9, 0.3), data.velocity, data.entity->acceleration, data.entity->deltaAcceleration, data.position.d, PhysicsProperties(0.1, 0.5, 0.1));
     PhysicsBox & physicsObject = *pphysicsObject;
     for(int step = 0; step < count; step++)
     {
@@ -69,10 +82,10 @@ void EntityPlayer::onMove(EntityData & data, shared_ptr<World> world, float delt
         {
             bool supported = false;
             PhysicsCollision firstCollision(data.position + deltaTime * data.velocity + deltaTime * deltaTime * 0.5f * data.entity->acceleration + deltaTime * deltaTime * deltaTime * (1 / 6.0f) * data.entity->deltaAcceleration, data.velocity + deltaTime * data.entity->acceleration + deltaTime * deltaTime * 0.5f * data.entity->deltaAcceleration, VectorF(0), deltaTime);
-            physicsObject.reInit((VectorF)data.position, VectorF(0.125), data.velocity, data.entity->acceleration, data.entity->deltaAcceleration);
+            physicsObject.reInit((VectorF)data.position, VectorF(0.3, 0.9, 0.3), data.velocity, data.entity->acceleration, data.entity->deltaAcceleration);
             for(int dx = -1; dx <= 1; dx++)
             {
-                for(int dy = -1; dy <= 1; dy++)
+                for(int dy = -2; dy <= 2; dy++)
                 {
                     for(int dz = -1; dz <= 1; dz++)
                     {
@@ -161,9 +174,5 @@ void EntityPlayer::onMove(EntityData & data, shared_ptr<World> world, float delt
                 }
             }
         }
-    }
-    if(data.entity->age > 15)
-    {
-        data.clear();
     }
 }

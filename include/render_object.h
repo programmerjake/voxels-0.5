@@ -233,7 +233,7 @@ protected:
         assert(newObj);
         for(auto v : newObj->value)
         {
-            retval->scriptIOObject->value.insert(v);
+            retval->scriptIOObject->value[get<0>(v)] = get<1>(v);
         }
         return retval;
     }
