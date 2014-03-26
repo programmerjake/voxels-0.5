@@ -25,6 +25,9 @@
 class EntityPlayer final : public EntityDescriptor
 {
 private:
+    static constexpr VectorF physicsExtents = VectorF(0.3, 0.9, 0.3);
+    static constexpr PhysicsProperties physicsProperties(0.1, 0.5, 0.1);
+    static constexpr VectorF physicsOffset = VectorF(0, 1.62 - physicsExtents.y, 0);
     struct ExtraData final : public ExtraEntityData
     {
         Client * pclient;
@@ -124,6 +127,10 @@ protected:
 public:
     virtual shared_ptr<RenderObjectEntity> getEntity(EntityData & entity, shared_ptr<World> world) const override;
     virtual void onMove(EntityData & entity, shared_ptr<World> world, float deltaTime) const override;
+    virtual shared_ptr<PhysicsObjectConstructor> getPhysicsObjectConstructor(EntityData & entity) const override
+    {
+        return PhysicsObjectConstructor::box(physicsProperties, physicsExtents, physicsOffset);
+    }
 };
 
 #endif // PLAYER_H_INCLUDED

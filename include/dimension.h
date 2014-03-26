@@ -20,6 +20,8 @@
 
 #include <cstdint>
 #include <cassert>
+#include <ostream>
+#include <cwchar>
 
 using namespace std;
 

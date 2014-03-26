@@ -56,7 +56,15 @@ inline flag &getClientTerminatedFlag(Client &client)
 
     return *retval;
 }
+}
 
+bool isClientValid(Client &client)
+{
+    return !getClientTerminatedFlag(client);
+}
+
+namespace
+{
 inline UpdateList &getClientUpdateList(Client &client)
 {
     static Client::IdType id = Client::NullId;
@@ -148,7 +156,12 @@ inline float &getClientViewDistance(Client &client)
 
 inline flag &getClientNeedStateFlag(Client &client)
 {
-    return client.getPropertyReference<flag, 0>(Client::DataType::ServerFlag);
+    return client.getPropertyReference<flag, 0>(Client::DataType::ServerFlag, [](){return make_shared<flag>(true);});
+}
+
+inline flag &getClientGotStateFlag(Client &client)
+{
+    return client.getPropertyReference<flag, 1>(Client::DataType::ServerFlag);
 }
 
 void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> pclient,
@@ -183,6 +196,13 @@ void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                 theta = reader.readLimitedF32(-2 * M_PI - eps, 2 * M_PI + eps);
                 viewDistance = reader.readLimitedF32(0, 1000);
                 bool flying = reader.readBool();
+                float age = reader.readLimitedF32(0, 1e10);
+                {
+                    lock_guard<recursive_mutex> lockIt(world->lock);
+                    shared_ptr<EntityData> player = EntityPlayer::get(client);
+                    float serverAge = player->entity ? player->entity->age : 0;
+                    EntityPlayer::update(player, pos, velocity, theta, phi, flying);
+                }
                 {
                     LockedClient lockIt(client);
                     getClientPosition(client) = pos;
@@ -190,9 +210,9 @@ void runServerReaderThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                     getClientViewPhi(client) = phi;
                     getClientViewTheta(client) = theta;
                     getClientViewDistance(client) = viewDistance;
+                    getClientGotStateFlag(client) = true;
+                    getClientNeedStateFlag(client) = false;
                 }
-                lock_guard<recursive_mutex> lockIt(world->lock);
-                EntityPlayer::update(EntityPlayer::get(client), pos, velocity, theta, phi, flying);
                 continue;
             }
 
@@ -280,40 +300,39 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
     UpdateList &clientUpdateList = getClientUpdateList(client);
     set<shared_ptr<RenderObjectEntity>> &entitiesList = client.getPropertyReference<set<shared_ptr<RenderObjectEntity>>, 0>(Client::DataType::RenderObjectEntitySet);
     //PositionF &clientPosition = getClientPosition(client);
-#if 1
-    {
-        shared_ptr<RenderObjectEntity> roplayer;
-        {
-            LockedClient lockClient(client);
-            lock_guard<recursive_mutex> lockWorld(world->lock);
-            shared_ptr<EntityData> eplayer = EntityPlayer::get(client);
-            world->addEntity(eplayer);
-            roplayer = eplayer->desc->getEntity(*eplayer, world);
-        }
-        NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::SendPlayer);
-        roplayer->write(writer, client);
-    }
-#endif
-#if 0
-    {
-        shared_ptr<RenderObjectEntityMesh> entityMesh = make_shared<RenderObjectEntityMesh>(VectorF(0),
-                VectorF(0));
-        entityMesh->addPart(Generate::unitBox(TextureAtlas::Wool.td(), TextureAtlas::Wool.td(),
-                                              TextureAtlas::Wool.td(), TextureAtlas::Wool.td(), TextureAtlas::Wool.td(), TextureAtlas::Wool.td()),
-                            Script::parse(
-                                L"io.transform = make_translate(<-0.5, -0.5, -0.5>) ~ make_rotatey(io.age / 5 * 2 * pi) ~ make_translate(io.position);io.colorR=io.colorG=1-(io.colorB=0.5+0.5*sin(io.age*2*pi))"));
-        shared_ptr<RenderObjectEntity> entity = make_shared<RenderObjectEntity>(entityMesh, PositionF(0.5,
-                                                AverageGroundHeight + 10.5, 0.5, Dimension::Overworld), VectorF(0,-0.1,0), 0);
-        NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdateRenderObjects);
-        writer.writeU64(1);
-        entity->write(writer, client);
-    }
-#endif
     UpdateList updateList;
     unordered_set<PositionI> neededUpdates;
 
     try
     {
+        {
+            shared_ptr<RenderObjectEntity> roplayer;
+            {
+                LockedClient lockClient(client);
+                lock_guard<recursive_mutex> lockWorld(world->lock);
+                shared_ptr<EntityData> eplayer = EntityPlayer::get(client);
+                EntityPlayer::update(eplayer, PositionF(0.5, 0.5 + AverageGroundHeight + 10, 0.5, Dimension::Overworld), VectorF(0), 0, 0, false);
+                world->addEntity(eplayer);
+                roplayer = eplayer->desc->getEntity(*eplayer, world);
+            }
+            NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::SendPlayer);
+            roplayer->write(writer, client);
+        }
+#if 0
+        {
+            shared_ptr<RenderObjectEntityMesh> entityMesh = make_shared<RenderObjectEntityMesh>(VectorF(0),
+                    VectorF(0));
+            entityMesh->addPart(Generate::unitBox(TextureAtlas::Wool.td(), TextureAtlas::Wool.td(),
+                                                  TextureAtlas::Wool.td(), TextureAtlas::Wool.td(), TextureAtlas::Wool.td(), TextureAtlas::Wool.td()),
+                                Script::parse(
+                                    L"io.transform = make_translate(<-0.5, -0.5, -0.5>) ~ make_rotatey(io.age / 5 * 2 * pi) ~ make_translate(io.position);io.colorR=io.colorG=1-(io.colorB=0.5+0.5*sin(io.age*2*pi))"));
+            shared_ptr<RenderObjectEntity> entity = make_shared<RenderObjectEntity>(entityMesh, PositionF(0.5,
+                                                    AverageGroundHeight + 10.5, 0.5, Dimension::Overworld), VectorF(0,-0.1,0), 0);
+            NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdateRenderObjects);
+            writer.writeU64(1);
+            entity->write(writer, client);
+        }
+#endif
         while(!terminated)
         {
             list<shared_ptr<RenderObject>> objects;
@@ -546,6 +565,7 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                 lock_guard<recursive_mutex> lockIt(world->lock);
                 UpdateList updateList = world->copyOutUpdates();
                 vector<shared_ptr<RenderObjectEntity>> destroyedEntities = world->copyOutDestroyedEntities();
+                vector<shared_ptr<EntityData>> playerEntities;
 
                 for(auto i = clients->begin(); i != clients->end();)
                 {
@@ -554,14 +574,21 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                     if(getClientTerminatedFlag(client))
                         i = clients->erase(i);
                     else
+                    {
+                        playerEntities.push_back(EntityPlayer::get(client));
                         i++;
+                    }
                 }
 
                 for(shared_ptr<Client> pclient : *clients)
                 {
                     LockedClient lockClient(*pclient);
-                    getClientNeedStateFlag(*pclient) = true;
-#if 1
+                    if(getClientGotStateFlag(*pclient))
+                    {
+                        getClientNeedStateFlag(*pclient) = true;
+                        getClientGotStateFlag(*pclient) = false;
+                    }
+#if 0
                     if(frame % 10 == 0)
                     {
                         BlockDescriptorPtr block;
@@ -583,6 +610,10 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                     {
                         entitiesList.insert(e);
                     }
+                    for(auto e : playerEntities)
+                    {
+                        entitiesList.insert(e->desc->getEntity(*e, world));
+                    }
                     PositionF &clientPosition = getClientPosition(*pclient);
                     VectorF min = (VectorF)clientPosition - VectorF(getClientViewDistance(*pclient));
                     VectorF max = (VectorF)clientPosition + VectorF(getClientViewDistance(*pclient));
@@ -595,9 +626,9 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                     {
                         if(!e->good())
                             entitiesList.insert(e);
-                        else if(e->position.x < min.x || e->position.x > max.x || e->position.y < min.y || e->position.y > max.y || e->position.z < min.z || e->position.z > max.z || e->position.d != clientPosition.d)
+                        else if((e->position.x < min.x || e->position.x > max.x || e->position.y < min.y || e->position.y > max.y || e->position.z < min.z || e->position.z > max.z || e->position.d != clientPosition.d) && !e->isPlayer())
                         {
-                            e->mesh = nullptr;
+                            e->clear();
                             entitiesList.insert(e);
                         }
                     }
@@ -609,7 +640,7 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
             world->forEachEntity([world, &entitiesSet, deltaTime](shared_ptr<EntityData> e)->int
             {
                 if(get<1>(entitiesSet.insert(e)))
-                    e->desc->onMove(*e, world, min(deltaTime, 0.5f));
+                    e->desc->onMove(*e, world, deltaTime);
                 return 0;
             });
 

@@ -21,6 +21,8 @@
 #include "position.h"
 #include "util.h"
 #include "ray_casting.h"
+#include "stream.h"
+#include "client.h"
 #include <memory>
 
 using namespace std;
@@ -46,9 +48,23 @@ struct PhysicsProperties final
 {
     float mass, friction, bounciness;
     static constexpr float INFINITE_MASS = 1e20;
-    PhysicsProperties(float mass, float friction, float bounciness)
+    constexpr PhysicsProperties(float mass, float friction, float bounciness)
         : mass(mass), friction(friction), bounciness(bounciness)
     {
+    }
+    static PhysicsProperties read(Reader &reader)
+    {
+        float mass, friction, bounciness;
+        mass = reader.readLimitedF32(eps, INFINITE_MASS);
+        friction = reader.readLimitedF32(0, 1);
+        bounciness = reader.readLimitedF32(0, 1);
+        return PhysicsProperties(mass, friction, bounciness);
+    }
+    void write(Writer &writer)
+    {
+        writer.writeF32(mass);
+        writer.writeF32(friction);
+        writer.writeF32(bounciness);
     }
 };
 
@@ -105,9 +121,9 @@ class PhysicsBox final : public PhysicsObject
 {
 public:
     VectorF center, extents;
-    VectorF velocity, acceleration, deltaAcceleration;
-    PhysicsBox(VectorF center, VectorF extents/** size is 2 * extents */, VectorF velocity, VectorF acceleration, VectorF deltaAcceleration, Dimension dimension, PhysicsProperties properties)
-        : PhysicsObject(dimension, properties), center(center), extents(extents), velocity(velocity), acceleration(acceleration), deltaAcceleration(deltaAcceleration)
+    VectorF velocity, acceleration, deltaAcceleration, answerOffset;
+    PhysicsBox(VectorF center, VectorF extents/** size is 2 * extents */, VectorF velocity, VectorF acceleration, VectorF deltaAcceleration, Dimension dimension, PhysicsProperties properties, VectorF answerOffset = VectorF(0))
+        : PhysicsObject(dimension, properties), center(center), extents(extents), velocity(velocity), acceleration(acceleration), deltaAcceleration(deltaAcceleration), answerOffset(answerOffset)
     {
         assert(extents.x > eps && extents.y > eps && extents.z > eps);
     }
@@ -159,5 +175,99 @@ inline bool isBoxCollision(VectorF center1, VectorF extents1, VectorF center2, V
     }
     return false;
 }
+
+struct PhysicsObjectConstructor final : public enable_shared_from_this<PhysicsObjectConstructor>
+{
+private:
+    PhysicsProperties properties;
+    VectorF extents, offset;
+    enum class Type : uint8_t
+    {
+        Box,
+        Empty,
+        Last
+    };
+    const Type type;
+    PhysicsObjectConstructor(Type type)
+        : type(type)
+    {
+    }
+public:
+    static shared_ptr<PhysicsObjectConstructor> box(PhysicsProperties properties, VectorF extents, VectorF offset = VectorF(0))
+    {
+        shared_ptr<PhysicsObjectConstructor> retval(new PhysicsObjectConstructor(Type::Box));
+        retval->properties = properties;
+        retval->extents = extents;
+        retval->offset = offset;
+        return retval;
+    }
+    static shared_ptr<PhysicsObjectConstructor> empty()
+    {
+        return shared_ptr<PhysicsObjectConstructor>(new PhysicsObjectConstructor(Type::Empty));
+    }
+    shared_ptr<PhysicsObject> make(PositionF position, VectorF velocity = VectorF(0), VectorF acceleration = VectorF(0), VectorF deltaAcceleration = VectorF(0))
+    {
+        switch(type)
+        {
+        case Type::Last:
+            assert(false);
+        case Type::Box:
+            return shared_ptr<PhysicsObject>(new PhysicsBox(offset + (VectorF)position, extents, velocity, acceleration, deltaAcceleration, position.d, properties, -offset));
+        case Type::Empty:
+            return shared_ptr<PhysicsObject>(new PhysicsEmpty());
+        }
+        assert(false);
+    }
+    static shared_ptr<PhysicsObjectConstructor> read(Reader &reader)
+    {
+        Type type = (Type)reader.readLimitedU8(0, (uint8_t)Type::Last - 1);
+        shared_ptr<PhysicsObjectConstructor> retval(new PhysicsObjectConstructor(type));
+        switch(type)
+        {
+        case Type::Empty:
+            return retval;
+        default:
+            break;
+        }
+        retval->properties = PhysicsProperties::read(reader);
+        switch(type)
+        {
+        case Type::Empty:
+        case Type::Last:
+            break;
+        case Type::Box:
+            retval->extents.x = reader.readFiniteF32();
+            retval->extents.y = reader.readFiniteF32();
+            retval->extents.z = reader.readFiniteF32();
+            retval->offset.x = reader.readFiniteF32();
+            retval->offset.y = reader.readFiniteF32();
+            retval->offset.z = reader.readFiniteF32();
+            return retval;
+        }
+        assert(false);
+    }
+    void write(Writer &writer)
+    {
+        writer.writeU8(type);
+        if(type == Type::Empty)
+            return;
+        properties.write(writer);
+        switch(type)
+        {
+        case Type::Empty:
+        case Type::Last:
+            assert(false);
+        case Type::Box:
+            writer.writeF32(extents.x);
+            writer.writeF32(extents.y);
+            writer.writeF32(extents.z);
+            writer.writeF32(offset.x);
+            writer.writeF32(offset.y);
+            writer.writeF32(offset.z);
+            return;
+        }
+        assert(false);
+    }
+};
 
 #endif // PHYSICS_H_INCLUDED

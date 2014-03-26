@@ -17,6 +17,9 @@
  */
 #include "player.h"
 #include "generate.h"
+#include "server.h"
+
+#error finish converting to use PhysicsObjectConstructor and to use physics offsets
 
 void initEntityPlayer()
 {
@@ -41,7 +44,7 @@ shared_ptr<RenderObjectEntity> EntityPlayer::getEntity(EntityData & data, shared
     {
         BlockDescriptorPtr block = BlockDescriptors.get(L"builtin.glass");
         shared_ptr<RenderObjectEntityMesh> mesh;
-        mesh = make_shared<RenderObjectEntityMesh>(VectorF(0), VectorF(0));
+        mesh = make_shared<RenderObjectEntityMesh>(VectorF(0), VectorF(0), true);
         Mesh blockMesh = block->makeBlockEntityMesh();
         mesh->addPart(invert(blockMesh), Script::parse(program1));
         mesh->addPart(blockMesh, Script::parse(program2));
@@ -54,6 +57,7 @@ shared_ptr<RenderObjectEntity> EntityPlayer::getEntity(EntityData & data, shared
     data.entity->velocity = data.velocity;
     data.entity->acceleration = data.acceleration;
     data.entity->deltaAcceleration = data.deltaAcceleration;
+    data.entity->age = 0;
     return data.entity;
 }
 
@@ -72,7 +76,7 @@ void EntityPlayer::onMove(EntityData & data, shared_ptr<World> world, float delt
     BlockIterator bi = world->get((PositionI)data.position);
     data.entity->acceleration = data.acceleration;
     data.entity->deltaAcceleration = data.deltaAcceleration;
-    auto pphysicsObject = make_shared<PhysicsBox>((VectorF)data.position, VectorF(0.3, 0.9, 0.3), data.velocity, data.entity->acceleration, data.entity->deltaAcceleration, data.position.d, PhysicsProperties(0.1, 0.5, 0.1));
+    auto pphysicsObject = make_shared<PhysicsBox>((VectorF)data.position + physicsOffset, physicsExtents, data.velocity, data.entity->acceleration, data.entity->deltaAcceleration, data.position.d, PhysicsProperties(0.1, 0.5, 0.1), -physicsOffset);
     PhysicsBox & physicsObject = *pphysicsObject;
     for(int step = 0; step < count; step++)
     {
@@ -82,7 +86,7 @@ void EntityPlayer::onMove(EntityData & data, shared_ptr<World> world, float delt
         {
             bool supported = false;
             PhysicsCollision firstCollision(data.position + deltaTime * data.velocity + deltaTime * deltaTime * 0.5f * data.entity->acceleration + deltaTime * deltaTime * deltaTime * (1 / 6.0f) * data.entity->deltaAcceleration, data.velocity + deltaTime * data.entity->acceleration + deltaTime * deltaTime * 0.5f * data.entity->deltaAcceleration, VectorF(0), deltaTime);
-            physicsObject.reInit((VectorF)data.position, VectorF(0.3, 0.9, 0.3), data.velocity, data.entity->acceleration, data.entity->deltaAcceleration);
+            physicsObject.reInit((VectorF)data.position + physicsOffset, physicsExtents, data.velocity, data.entity->acceleration, data.entity->deltaAcceleration);
             for(int dx = -1; dx <= 1; dx++)
             {
                 for(int dy = -2; dy <= 2; dy++)
@@ -111,11 +115,11 @@ void EntityPlayer::onMove(EntityData & data, shared_ptr<World> world, float delt
                                    min.y <= curBI.position().y && max.y >= curBI.position().y + 1 &&
                                    min.z <= curBI.position().z && max.z >= curBI.position().z + 1)
                                 {
-                                    newY = max.y + physicsObject.extents.y;
+                                    newY = max.y + physicsObject.extents.y - physicsOffset.y;
                                     filled = true;
                                 }
                                 VectorF temp;
-                                if(isBoxCollision(pbox->center, pbox->extents, physicsObject.center - VectorF(0, eps * 10, 0), physicsObject.extents, temp) && !isBoxCollision(pbox->center, pbox->extents, physicsObject.center, physicsObject.extents, temp))
+                                if(isBoxCollision(pbox->center, pbox->extents, physicsObject.center - VectorF(0, eps * 10, 0) + physicsOffset, physicsObject.extents, temp) && !isBoxCollision(pbox->center, pbox->extents, physicsObject.center + physicsOffset, physicsObject.extents, temp))
                                 {
                                     supported = true;
                                 }
@@ -174,5 +178,10 @@ void EntityPlayer::onMove(EntityData & data, shared_ptr<World> world, float delt
                 }
             }
         }
+    }
+    if(eData->pclient == nullptr || !isClientValid(*eData->pclient))
+    {
+        data.clear();
+        return;
     }
 }

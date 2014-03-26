@@ -71,6 +71,10 @@ public:
     virtual bool operator ==(const RenderObject &rt) const = 0;
     virtual void render(Mesh dest, RenderLayer rl, Dimension d, Client &client, unsigned naturalLight) = 0;
     virtual BoxRayCollision rayHits(Ray ray) = 0;
+    virtual bool isPlayer() const
+    {
+        return false;
+    }
 };
 
 class RenderObjectWorld;
@@ -93,8 +97,9 @@ private:
     vector<Part> parts;
     VectorF hitBoxMin, hitBoxMax;
 public:
-    RenderObjectEntityMesh(VectorF hitBoxMin, VectorF hitBoxMax)
-        : hitBoxMin(hitBoxMin), hitBoxMax(hitBoxMax)
+    const bool isPlayer;
+    RenderObjectEntityMesh(VectorF hitBoxMin, VectorF hitBoxMax, bool isPlayer = false)
+        : hitBoxMin(hitBoxMin), hitBoxMax(hitBoxMax), isPlayer(isPlayer)
     {
     }
     void addPart(Mesh mesh, shared_ptr<Script> script)
@@ -115,7 +120,8 @@ private:
         hitBoxMax.y = reader.readLimitedF32(-1, 1);
         hitBoxMax.z = reader.readLimitedF32(-1, 1);
         uint32_t partCount = reader.readU32();
-        auto retval = make_shared<RenderObjectEntityMesh>(hitBoxMin, hitBoxMax);
+        bool isPlayer = reader.readBool();
+        auto retval = make_shared<RenderObjectEntityMesh>(hitBoxMin, hitBoxMax, isPlayer);
 
         for(uint32_t i = 0; i < partCount; i++)
         {
@@ -135,6 +141,7 @@ private:
         writer.writeF32(hitBoxMax.y);
         writer.writeF32(hitBoxMax.z);
         writer.writeU32(parts.size());
+        writer.writeBool(isPlayer);
 
         for(auto part : parts)
         {
@@ -169,10 +176,20 @@ struct RenderObjectEntity final : public RenderObject
     {
         return Type::Entity;
     }
-    shared_ptr<RenderObjectEntityMesh> mesh;
+private:
+    shared_ptr<RenderObjectEntityMesh> meshInternal;
+public:
+    const shared_ptr<RenderObjectEntityMesh> mesh() const
+    {
+        return meshInternal;
+    }
     bool good() const
     {
-        return mesh != nullptr;
+        return mesh() != nullptr;
+    }
+    void clear()
+    {
+        meshInternal = nullptr;
     }
     PositionF position;
     VectorF velocity;
@@ -180,12 +197,12 @@ struct RenderObjectEntity final : public RenderObject
     VectorF deltaAcceleration;
     float age, updateAge;
     RenderObjectEntity()
-        : mesh(nullptr), scriptIOObject(make_shared<Scripting::DataObject>())
+        : meshInternal(nullptr), scriptIOObject(make_shared<Scripting::DataObject>())
     {
     }
     RenderObjectEntity(shared_ptr<RenderObjectEntityMesh> mesh, PositionF position, VectorF velocity,
                        VectorF acceleration, VectorF deltaAcceleration, float age, shared_ptr<Scripting::DataObject> scriptIOObject = make_shared<Scripting::DataObject>())
-        : mesh(mesh), position(position), velocity(velocity), acceleration(acceleration),
+        : meshInternal(mesh), position(position), velocity(velocity), acceleration(acceleration),
           deltaAcceleration(deltaAcceleration), age(age), scriptIOObject(scriptIOObject)
     {
     }
@@ -195,7 +212,7 @@ protected:
     static shared_ptr<RenderObjectEntity> read(Reader &reader, Client &client)
     {
         Client::IdType id = Client::readIdNonNull(reader);
-        auto retval = client.getPtr<RenderObjectEntity>(id, Client::DataType::RenderObjectEntity);
+        shared_ptr<RenderObjectEntity> retval = client.getPtr<RenderObjectEntity>(id, Client::DataType::RenderObjectEntity);
 
         if(retval == nullptr)
         {
@@ -203,9 +220,9 @@ protected:
             client.setPtr(retval, id, Client::DataType::RenderObjectEntity);
         }
 
-        retval->mesh = RenderObjectEntityMesh::readOrNull(reader, client);
+        retval->meshInternal = RenderObjectEntityMesh::readOrNull(reader, client);
 
-        if(retval->mesh == nullptr)
+        if(retval->mesh() == nullptr)
         {
             client.removeId(id, Client::DataType::RenderObjectEntity);
             return retval;
@@ -217,9 +234,11 @@ protected:
         retval->position.y = reader.readFiniteF32();
         retval->position.z = reader.readFiniteF32();
         retval->position.d = reader.readDimension();
+        cout << "Prev velocity : <" << retval->velocity.x << ", " << retval->velocity.y << ", " << retval->velocity.z << ">\n" << flush;
         retval->velocity.x = reader.readFiniteF32();
         retval->velocity.y = reader.readFiniteF32();
         retval->velocity.z = reader.readFiniteF32();
+        cout << "Read velocity : <" << retval->velocity.x << ", " << retval->velocity.y << ", " << retval->velocity.z << ">\n" << flush;
         retval->acceleration.x = reader.readFiniteF32();
         retval->acceleration.y = reader.readFiniteF32();
         retval->acceleration.z = reader.readFiniteF32();
@@ -248,9 +267,9 @@ protected:
 
         Client::writeId(writer, id);
 
-        if(mesh != nullptr)
+        if(mesh() != nullptr)
         {
-            mesh->write(writer, client);
+            mesh()->write(writer, client);
         }
         else
         {
@@ -297,7 +316,13 @@ public:
             return BoxRayCollision();
         }
 
-        return mesh->rayHits(ray, position);
+        return mesh()->rayHits(ray, position);
+    }
+    virtual bool isPlayer() const override
+    {
+        if(!good())
+            return false;
+        return mesh()->isPlayer;
     }
 };
 
@@ -1219,7 +1244,7 @@ inline void RenderObjectWorld::calcLight(float & lNXNYNZ, float & lNXNYPZ, float
 
 inline void RenderObjectEntity::render(Mesh dest, RenderLayer rl, Dimension d, Client & client, unsigned naturalLight)
 {
-    if(!good() || rl != RenderLayer::Opaque || d != position.d || updateAge > 5)
+    if(!good() || rl != RenderLayer::Opaque || d != position.d)
     {
         return;
     }
@@ -1228,7 +1253,7 @@ inline void RenderObjectEntity::render(Mesh dest, RenderLayer rl, Dimension d, C
 
     Mesh temp(new Mesh_t);
 
-    mesh->render(temp, (VectorF)position, velocity, age, naturalLight, world, scriptIOObject);
+    mesh()->render(temp, (VectorF)position, velocity, age, naturalLight, world, scriptIOObject);
     vector<Triangle> triangles;
     triangles.reserve(temp->size());
     const int arraySize = 2;

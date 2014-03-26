@@ -42,8 +42,6 @@ struct ClientState
     float dtheta, dphi;
     int renderDistance;
     int naturalLight = Lighting::MAX_INTENSITY;
-    PositionF pos;
-    VectorF velocity;
     bool needMeshes;
     Client client;
     recursive_mutex & lock;
@@ -58,18 +56,83 @@ struct ClientState
     ClientState()
         : lock(client.getLock()), needState(true)
     {
-        pos = PositionF(0.5, AverageGroundHeight + 7.5, 0.5, Dimension::Overworld);
-        velocity = VectorF(0);
         theta = phi = dtheta = dphi = 0;
         renderDistance = 30;
         needMeshes = true;
         done = false;
         paused = GameVersion::DEBUG;
     }
+    const VectorF velocity() const
+    {
+        if(!player)
+            return VectorF();
+        return player->velocity;
+    }
+    const PositionF pos() const
+    {
+        if(!player)
+            return PositionF();
+        return player->position;
+    }
+    void velocity(VectorF v)
+    {
+        cout << "Prev Velocity : <" << player->velocity.x << ", " << player->velocity.y << ", " << player->velocity.z << ">\n" << flush;
+        if(player)
+            player->velocity = v;
+        cout << "Wrote Velocity: <" << player->velocity.x << ", " << player->velocity.y << ", " << player->velocity.z << ">\n" << flush;
+    }
+    void pos(PositionF v)
+    {
+        if(player)
+            player->position = v;
+    }
 };
 
 namespace ClientImplementation
 {
+bool writeState(Writer &writer, ClientState *state)
+{
+    flag &needState = state->needState;
+    if(needState.exchange(false))
+    {
+        state->lock.lock();
+        if(!state->player)
+        {
+            needState = true;
+            state->lock.unlock();
+        }
+        else
+        {
+            PositionF pos = state->pos();
+            VectorF velocity = state->velocity();
+            float phi = state->phi;
+            float theta = state->theta;
+            float viewDistance = state->renderDistance;
+            if(state->paused)
+                velocity = VectorF(0);
+            bool flying = state->paused || state->flying;
+            float age = state->player ? state->player->age : 0;
+            state->lock.unlock();
+            NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdatePositionAndVelocity);
+            writer.writeF32(pos.x);
+            writer.writeF32(pos.y);
+            writer.writeF32(pos.z);
+            writer.writeDimension(pos.d);
+            writer.writeF32(velocity.x);
+            writer.writeF32(velocity.y);
+            writer.writeF32(velocity.z);
+            writer.writeF32(phi);
+            writer.writeF32(theta);
+            writer.writeF32(viewDistance);
+            writer.writeBool(flying);
+            writer.writeF32(age);
+            writer.flush();
+            return true;
+        }
+    }
+    return false;
+}
+
 void clientProcessWriter(Writer *pwriter, ClientState * state)
 {
     Writer &writer = *pwriter;
@@ -83,66 +146,15 @@ void clientProcessWriter(Writer *pwriter, ClientState * state)
         {
             UpdateList neededChunkList = state->neededChunkList;
             state->neededChunkList.clear();
-            flag &needState = state->needState;
             state->lock.unlock();
             bool didAnything = false;
-            if(needState.exchange(false))
-            {
-                state->lock.lock();
-                PositionF pos = state->pos;
-                VectorF velocity = state->velocity;
-                float phi = state->phi;
-                float theta = state->theta;
-                float viewDistance = state->renderDistance;
-                if(state->paused)
-                    velocity = VectorF(0);
-                bool flying = state->paused || state->flying;
-                state->lock.unlock();
-                NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdatePositionAndVelocity);
-                writer.writeF32(pos.x);
-                writer.writeF32(pos.y);
-                writer.writeF32(pos.z);
-                writer.writeDimension(pos.d);
-                writer.writeF32(velocity.x);
-                writer.writeF32(velocity.y);
-                writer.writeF32(velocity.z);
-                writer.writeF32(phi);
-                writer.writeF32(theta);
-                writer.writeF32(viewDistance);
-                writer.writeBool(flying);
-                writer.flush();
+            if(writeState(writer, state))
                 didAnything = true;
-            }
             for(PositionI p : neededChunkList.updatesList)
             {
                 if(!get<1>(chunksAlreadyRequsted.insert(p)))
                     continue;
-                if(needState.exchange(false))
-                {
-                    state->lock.lock();
-                    PositionF pos = state->pos;
-                    VectorF velocity = state->velocity;
-                    float phi = state->phi;
-                    float theta = state->theta;
-                    float viewDistance = state->renderDistance;
-                    if(state->paused)
-                        velocity = VectorF(0);
-                    bool flying = state->paused || state->flying;
-                    state->lock.unlock();
-                    NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::UpdatePositionAndVelocity);
-                    writer.writeF32(pos.x);
-                    writer.writeF32(pos.y);
-                    writer.writeF32(pos.z);
-                    writer.writeDimension(pos.d);
-                    writer.writeF32(velocity.x);
-                    writer.writeF32(velocity.y);
-                    writer.writeF32(velocity.z);
-                    writer.writeF32(phi);
-                    writer.writeF32(theta);
-                    writer.writeF32(viewDistance);
-                    writer.writeBool(flying);
-                    writer.flush();
-                }
+                writeState(writer, state);
                 NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::RequestChunk);
                 writer.writeS32(p.x);
                 writer.writeS32(p.y);
@@ -198,6 +210,8 @@ void clientProcessReader(Reader *preader, ClientState * state)
                         LockedClient lockIt(client);
                         shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
                         world->handleReadEntity(e);
+                        if(e == state->player && !e->good())
+                            throw IOException("sent destroyed player");
                     }
                 }
                 //cout << "Client : received " << readCount << " updated render objects\n";
@@ -346,7 +360,7 @@ void meshMakerThread(Mesh meshes[], ClientState * state)
         Client & client = state->client;
         int renderDistance = state->renderDistance;
         int naturalLight = state->naturalLight;
-        PositionI pos = (PositionI)state->pos;
+        PositionI pos = (PositionI)state->pos();
         state->lock.unlock();
         Mesh tempMeshes[(int)RenderLayer::Last];
         shared_ptr<unordered_set<PositionI>> neededChunks = make_shared<unordered_set<PositionI>>();
@@ -370,28 +384,26 @@ void meshMakerThread(Mesh meshes[], ClientState * state)
 void updateVelocity(ClientState * state)
 {
     lock_guard<recursive_mutex> lockIt(state->lock);
-    state->velocity = VectorF(0, state->velocity.y, 0);
+    state->velocity(VectorF(0, state->velocity().y, 0));
     const float speed = 5;
     VectorF forwardVector = Matrix::rotateY(state->theta).invert().apply(VectorF(0, 0, -1)) * speed;
     VectorF leftVector = Matrix::rotateY(state->theta).invert().apply(VectorF(-1, 0, 0)) * speed;
     if(state->backwardDown)
     {
-        state->velocity -= forwardVector;
+        state->velocity(state->velocity() - forwardVector);
     }
     if(state->forwardDown)
     {
-        state->velocity += forwardVector;
+        state->velocity(state->velocity() + forwardVector);
     }
     if(state->leftDown)
     {
-        state->velocity += leftVector;
+        state->velocity(state->velocity() + leftVector);
     }
     if(state->rightDown)
     {
-        state->velocity -= leftVector;
+        state->velocity(state->velocity() - leftVector);
     }
-    if(!state->paused)
-        state->pos += Display::frameDeltaTime() * state->velocity;
 }
 
 class ClientEventHandler final : public EventHandler
@@ -496,7 +508,7 @@ TransformedMesh makeSelectBoxMesh()
     return transform(Matrix::translate(VectorF(-0.5f)).concat(Matrix::scale(1.05)).concat(Matrix::translate(VectorF(0.5f))), retval);
 }
 
-void renderEntities(Mesh dest, Client &client, RenderLayer rl, unsigned naturalLight, float playerTheta, float playerPhi, PositionF & playerPosition, shared_ptr<RenderObjectEntity> player)
+void renderEntities(Mesh dest, Client &client, RenderLayer rl, unsigned naturalLight, float playerTheta, float playerPhi, shared_ptr<RenderObjectEntity> player)
 {
     vector<shared_ptr<RenderObjectEntity>> entities;
     {
@@ -508,6 +520,9 @@ void renderEntities(Mesh dest, Client &client, RenderLayer rl, unsigned naturalL
             entities.push_back(e);
         }
     }
+    Dimension d = Dimension::Overworld;
+    if(player)
+        d = player->position.d;
 
     for(shared_ptr<RenderObjectEntity> e : entities)
     {
@@ -517,18 +532,17 @@ void renderEntities(Mesh dest, Client &client, RenderLayer rl, unsigned naturalL
             e->scriptIOObject->value[L"theta"] = make_shared<Scripting::DataFloat>(playerTheta);
             e->scriptIOObject->value[L"phi"] = make_shared<Scripting::DataFloat>(playerPhi);
             e->scriptIOObject->value[L"isCurrentPlayer"] = make_shared<Scripting::DataBoolean>(true);
-            e->position = playerPosition;
         }
-        e->render(dest, rl, playerPosition.d, client, naturalLight);
+        e->render(dest, rl, d, client, naturalLight);
     }
 }
 
-void moveEntities(Client &client, float deltaTime)
+void moveEntities(ClientState &state, float deltaTime)
 {
     vector<shared_ptr<RenderObjectEntity>> entities;
     {
-        LockedClient lockIt(client);
-        shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
+        LockedClient lockIt(state.client);
+        shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(state.client);
         entities.reserve(world->entities.size());
         for(shared_ptr<RenderObjectEntity> e : world->entities)
         {
@@ -538,7 +552,11 @@ void moveEntities(Client &client, float deltaTime)
 
     for(shared_ptr<RenderObjectEntity> e : entities)
     {
-        LockedClient lockIt(client);
+        LockedClient lockIt(state.client);
+        if(e == state.player)
+        {
+            updateVelocity(&state);
+        }
         e->move(deltaTime);
     }
 }
@@ -576,9 +594,11 @@ void clientProcess(StreamRW & streamRW)
         Display::initFrame();
         glClearColor(0, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        moveEntities(clientState, Display::frameDeltaTime());
         clientState.lock.lock();
-        updateVelocity(&clientState);
-        Matrix tform = Matrix::translate(-(VectorF)clientState.pos)
+        PositionF pos = clientState.pos();
+        VectorF velocity = clientState.velocity();
+        Matrix tform = Matrix::translate(-(VectorF)clientState.pos())
                         .concat(Matrix::rotateY(clientState.theta))
                         .concat(Matrix::rotateX(-clientState.phi));
         Mesh tempMeshes[(int)RenderLayer::Last];
@@ -586,12 +606,10 @@ void clientProcess(StreamRW & streamRW)
         {
             tempMeshes[(int)rl] = meshes[(int)rl];
         }
-        shared_ptr<PositionI> rayHitPos = RenderObjectWorld::getWorld(clientState.client)->getFirstHitBlock(Ray(tform.invert().applyToNormal(VectorF(0, 0, -1)), clientState.pos), clientReachDistance);
-        PositionF pos = clientState.pos;
+        shared_ptr<PositionI> rayHitPos = RenderObjectWorld::getWorld(clientState.client)->getFirstHitBlock(Ray(tform.invert().applyToNormal(VectorF(0, 0, -1)), clientState.pos()), clientReachDistance);
         float phi = clientState.phi, theta = clientState.theta;
         int naturalLight = clientState.naturalLight;
         clientState.lock.unlock();
-        moveEntities(clientState.client, Display::frameDeltaTime());
         int polyCount = 0;
         for(RenderLayer rl = (RenderLayer)0; rl < RenderLayer::Last; rl = (RenderLayer)((int)rl + 1))
         {
@@ -605,7 +623,7 @@ void clientProcess(StreamRW & streamRW)
                 r << transform(Matrix::translate((VectorI)*rayHitPos).concat(tform), selectBoxMesh);
             }
             mesh = make_shared<Mesh_t>();
-            renderEntities(mesh, clientState.client, rl, naturalLight, theta, phi, clientState.pos, clientState.player);
+            renderEntities(mesh, clientState.client, rl, naturalLight, theta, phi, clientState.player);
             polyCount += mesh->size();
             r << transform(tform, mesh);
         }
@@ -621,6 +639,8 @@ void clientProcess(StreamRW & streamRW)
 
         s << L"\nFPS : " << Display::averageFPS() << endl;
         s << L"Triangle Count : " << polyCount << endl;
+        s << L"Position : <" << pos.x << L", " << pos.y << L", " << pos.z << L">     Dimension : " << (int)pos.d << endl;
+        s << L"Velocity : <" << velocity.x << L", " << velocity.y << L", " << velocity.z << L">\n";
         r << transform(Matrix::translate(-40 * Display::scaleX(), 40 * Display::scaleY() - Text::height(s.str()), -40 * Display::scaleX()), Text::mesh(s.str(), Color(1, 0, 1)));
         Display::flip();
         Display::handleEvents(shared_ptr<EventHandler>(new ClientEventHandler(&clientState)));

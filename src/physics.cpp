@@ -138,7 +138,7 @@ PhysicsCollision PhysicsBox::collide(shared_ptr<const PhysicsObject> pother, flo
                 fixedPosition.z += deltaFixedPosition.z;
             }
             VectorF newPosition = (center * properties().mass + fixedPosition * other.properties().mass) / (properties().mass + other.properties().mass);
-            return PhysicsCollision(PositionF(newPosition, dimension()), newVelocity, normalizeNoThrow(newPosition - center), 0);
+            return PhysicsCollision(PositionF(newPosition + answerOffset, dimension()), newVelocity, normalizeNoThrow(newPosition - center), 0);
 #else
             return PhysicsCollision();
 #endif
@@ -176,7 +176,7 @@ PhysicsCollision PhysicsBox::collide(shared_ptr<const PhysicsObject> pother, flo
         newVelocity -= collisionNormal * dot(newVelocity, collisionNormal);
         newVelocity += collisionNormal * reflectedDot;
         VectorF newPosition = cPosition;
-        return PhysicsCollision(PositionF(newPosition, dimension()), newVelocity, collisionNormal, collisionTime);
+        return PhysicsCollision(PositionF(newPosition + answerOffset, dimension()), newVelocity, collisionNormal, collisionTime);
     }
     }
     assert(false);

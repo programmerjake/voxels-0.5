@@ -65,7 +65,7 @@ void EntityBlock::onMove(EntityData & data, shared_ptr<World> world, float delta
     BlockIterator bi = world->get((PositionI)data.position);
     data.entity->acceleration = data.acceleration;
     data.entity->deltaAcceleration = data.deltaAcceleration;
-    auto pphysicsObject = make_shared<PhysicsBox>((VectorF)data.position, VectorF(0.125), data.velocity, data.entity->acceleration, data.entity->deltaAcceleration, data.position.d, PhysicsProperties(0.1, 0.5, 0.1));
+    auto pphysicsObject = make_shared<PhysicsBox>((VectorF)data.position, physicsExtents, data.velocity, data.entity->acceleration, data.entity->deltaAcceleration, data.position.d, physicsProperties);
     PhysicsBox & physicsObject = *pphysicsObject;
     for(int step = 0; step < count; step++)
     {
@@ -75,7 +75,7 @@ void EntityBlock::onMove(EntityData & data, shared_ptr<World> world, float delta
         {
             bool supported = false;
             PhysicsCollision firstCollision(data.position + deltaTime * data.velocity + deltaTime * deltaTime * 0.5f * data.entity->acceleration + deltaTime * deltaTime * deltaTime * (1 / 6.0f) * data.entity->deltaAcceleration, data.velocity + deltaTime * data.entity->acceleration + deltaTime * deltaTime * 0.5f * data.entity->deltaAcceleration, VectorF(0), deltaTime);
-            physicsObject.reInit((VectorF)data.position, VectorF(0.125), data.velocity, data.entity->acceleration, data.entity->deltaAcceleration);
+            physicsObject.reInit((VectorF)data.position, physicsExtents, data.velocity, data.entity->acceleration, data.entity->deltaAcceleration);
             for(int dx = -1; dx <= 1; dx++)
             {
                 for(int dy = -1; dy <= 1; dy++)

@@ -146,7 +146,13 @@ public:
         data.desc->storeInternal(data, gss);
     }
     virtual Mesh makeBlockEntityMesh() const = 0;
-    virtual shared_ptr<PhysicsObject> getPhysicsObject(PositionI pos) const = 0;
+    virtual shared_ptr<PhysicsObjectConstructor> getPhysicsObjectConstructor() const = 0;
+    shared_ptr<PhysicsObject> getPhysicsObject(PositionI pos) const
+    {
+        PositionF fPos = pos;
+        fPos += VectorF(0.5);
+        return getPhysicsObjectConstructor()->make(fPos);
+    }
 };
 
 struct BlockDescriptors_t final

@@ -93,7 +93,7 @@ struct EntityData
     void clear()
     {
         if(entity != nullptr)
-            entity->mesh = nullptr;
+            entity->clear();
         desc = nullptr;
     }
 };
@@ -180,6 +180,12 @@ public:
     {
         gss.writeEntityDescriptor(data.desc);
         data.desc->storeInternal(data, gss);
+    }
+    virtual shared_ptr<PhysicsObjectConstructor> getPhysicsObjectConstructor(EntityData & entity) const = 0;
+    shared_ptr<PhysicsObject> getPhysicsObject(EntityData & entity) const
+    {
+        auto c = getPhysicsObjectConstructor(entity);
+        return c->make(entity.position, entity.velocity, entity.acceleration, entity.deltaAcceleration);
     }
 };
 

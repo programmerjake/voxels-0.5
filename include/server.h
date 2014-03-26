@@ -19,9 +19,11 @@
 #define SERVER_H_INCLUDED
 
 #include "stream.h"
+#include "client.h"
 
 constexpr int GenerateThreadCount = 5;
 
-void runServer(StreamServer & server);
+void runServer(StreamServer &server);
+bool isClientValid(Client &client);
 
 #endif // SERVER_H_INCLUDED
