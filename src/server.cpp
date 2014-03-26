@@ -588,7 +588,7 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                         getClientNeedStateFlag(*pclient) = true;
                         getClientGotStateFlag(*pclient) = false;
                     }
-#if 0
+#if 1
                     if(frame % 10 == 0)
                     {
                         BlockDescriptorPtr block;

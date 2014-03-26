@@ -64,7 +64,8 @@ shared_ptr<RenderObjectBlockMesh> RenderObjectBlockMesh::read(Reader &reader, Cl
     hitBoxMax.x = reader.readLimitedF32(0, 1);
     hitBoxMax.y = reader.readLimitedF32(0, 1);
     hitBoxMax.z = reader.readLimitedF32(0, 1);
-    retval = shared_ptr<RenderObjectBlockMesh>(new RenderObjectBlockMesh(blockClass, hitBoxMin, hitBoxMax, lightProperties, center, nx, px, ny, py, nz, pz, nxBlocked, pxBlocked, nyBlocked, pyBlocked, nzBlocked, pzBlocked, rl));
+    shared_ptr<PhysicsObjectConstructor> physicsConstructor = PhysicsObjectConstructor::read(reader);
+    retval = shared_ptr<RenderObjectBlockMesh>(new RenderObjectBlockMesh(blockClass, hitBoxMin, hitBoxMax, lightProperties, center, nx, px, ny, py, nz, pz, nxBlocked, pxBlocked, nyBlocked, pyBlocked, nzBlocked, pzBlocked, rl, physicsConstructor));
     client.setPtr(retval, id, Client::DataType::RenderObjectBlockMesh);
     DUMP_V(RenderObjectBlockMesh::read, "read new block");
     return retval;
@@ -145,11 +146,12 @@ void RenderObjectBlockMesh::write(Writer &writer, Client &client)
     writer.writeF32(hitBoxMax.x);
     writer.writeF32(hitBoxMax.y);
     writer.writeF32(hitBoxMax.z);
+    physicsConstructor->write(writer);
 }
 
 shared_ptr<RenderObject> RenderObject::read(Reader &reader, Client &client)
 {
-    Type type = (Type)reader.readLimitedU8(0, (uint8_t)Type::Last);
+    Type type = (Type)reader.readLimitedU8(0, (uint8_t)Type::Last - 1);
 
     switch(type)
     {
@@ -164,3 +166,60 @@ shared_ptr<RenderObject> RenderObject::read(Reader &reader, Client &client)
     }
 }
 
+void RenderObjectEntity::move(float deltaTime, shared_ptr<RenderObjectWorld> world)
+{
+    const int searchDist = 2;
+    if(!good())
+        return;
+    updateAge += deltaTime;
+    int count = (iceil(deltaTime * abs(velocity) / 0.5 + 1), 1);
+    deltaTime /= count;
+    RenderObjectWorld::BlockIterator bi = world->get((PositionI)position - VectorI(searchDist));
+    for(int step = 0; step < count; step++)
+    {
+        age += deltaTime;
+        int zeroCount = 0;
+        while(deltaTime * deltaTime * absSquared(velocity) > eps * eps)
+        {
+            PhysicsCollision firstCollision(position + deltaTime * velocity + deltaTime * deltaTime * 0.5f * acceleration + deltaTime * deltaTime * deltaTime * (1 / 6.0f) * deltaAcceleration, velocity + deltaTime * acceleration + deltaTime * deltaTime * 0.5f * deltaAcceleration, VectorF(0), deltaTime);
+            shared_ptr<PhysicsObject> pphysicsObject = mesh()->constructPhysicsObject(position, velocity, acceleration, deltaAcceleration);
+            PhysicsObject & physicsObject = *pphysicsObject;
+            for(int dx = -2; dx <= 2; dx++, bi.movePX())
+            {
+                RenderObjectWorld::BlockIterator bi2 = bi;
+                for(int dy = -2; dy <= 2; dy++, bi2.movePY())
+                {
+                    RenderObjectWorld::BlockIterator curBI = bi2;
+                    for(int dz = -2; dz <= 2; dz++, curBI.movePZ())
+                    {
+                        shared_ptr<PhysicsObject> otherObject;
+                        if(curBI.getMesh() != nullptr)
+                            otherObject = curBI.getMesh()->constructPhysicsObject(curBI.getPosition());
+                        else
+                            otherObject = static_pointer_cast<PhysicsObject>(make_shared<PhysicsBox>((VectorI)curBI.getPosition() + VectorF(0.5), VectorF(0.5), VectorF(0), VectorF(0), VectorF(0), curBI.getPosition().d, PhysicsProperties(PhysicsProperties::INFINITE_MASS, 1, 0)));
+                        assert(otherObject);
+                        PhysicsCollision collision = physicsObject.collide(otherObject, deltaTime);
+                        if(collision.valid)
+                        {
+                            if(collision.time < eps)
+                            {
+                                if(zeroCount > 25)
+                                    collision.valid = false;
+                                else
+                                    zeroCount++;
+                            }
+                            else
+                                zeroCount = 0;
+                        }
+                        if(collision.valid && collision.time < firstCollision.time)
+                            firstCollision = collision;
+                    }
+                }
+            }
+            deltaTime -= firstCollision.time;
+            position = firstCollision.newPosition + eps * (2 + abs(firstCollision.newVelocity)) * firstCollision.collisionNormal;
+            velocity = firstCollision.newVelocity;
+            acceleration += deltaAcceleration * firstCollision.time;
+        }
+    }
+}

@@ -27,6 +27,7 @@
 #include "light.h"
 #include "ray_casting.h"
 #include "script.h"
+#include "physics.h"
 #include <atomic>
 #include <unordered_map>
 #include <unordered_set>
@@ -96,10 +97,11 @@ private:
     };
     vector<Part> parts;
     VectorF hitBoxMin, hitBoxMax;
+    shared_ptr<PhysicsObjectConstructor> physicsConstructor;
 public:
     const bool isPlayer;
-    RenderObjectEntityMesh(VectorF hitBoxMin, VectorF hitBoxMax, bool isPlayer = false)
-        : hitBoxMin(hitBoxMin), hitBoxMax(hitBoxMax), isPlayer(isPlayer)
+    RenderObjectEntityMesh(VectorF hitBoxMin, VectorF hitBoxMax, shared_ptr<PhysicsObjectConstructor> physicsConstructor, bool isPlayer = false)
+        : hitBoxMin(hitBoxMin), hitBoxMax(hitBoxMax), physicsConstructor(physicsConstructor), isPlayer(isPlayer)
     {
     }
     void addPart(Mesh mesh, shared_ptr<Script> script)
@@ -121,7 +123,8 @@ private:
         hitBoxMax.z = reader.readLimitedF32(-1, 1);
         uint32_t partCount = reader.readU32();
         bool isPlayer = reader.readBool();
-        auto retval = make_shared<RenderObjectEntityMesh>(hitBoxMin, hitBoxMax, isPlayer);
+        shared_ptr<PhysicsObjectConstructor> physicsConstructor = PhysicsObjectConstructor::read(reader);
+        auto retval = make_shared<RenderObjectEntityMesh>(hitBoxMin, hitBoxMax, physicsConstructor, isPlayer);
 
         for(uint32_t i = 0; i < partCount; i++)
         {
@@ -142,6 +145,7 @@ private:
         writer.writeF32(hitBoxMax.z);
         writer.writeU32(parts.size());
         writer.writeBool(isPlayer);
+        physicsConstructor->write(writer);
 
         for(auto part : parts)
         {
@@ -167,6 +171,10 @@ public:
         }
 
         return rayHitBox(hitBoxMin + (VectorF)pos, hitBoxMax + (VectorF)pos, ray);
+    }
+    shared_ptr<PhysicsObject> constructPhysicsObject(PositionF position, VectorF velocity, VectorF acceleration, VectorF deltaAcceleration)
+    {
+        return physicsConstructor->make(position, velocity, acceleration, deltaAcceleration);
     }
 };
 
@@ -234,11 +242,11 @@ protected:
         retval->position.y = reader.readFiniteF32();
         retval->position.z = reader.readFiniteF32();
         retval->position.d = reader.readDimension();
-        cout << "Prev velocity : <" << retval->velocity.x << ", " << retval->velocity.y << ", " << retval->velocity.z << ">\n" << flush;
+//        cout << "Prev velocity : <" << retval->velocity.x << ", " << retval->velocity.y << ", " << retval->velocity.z << ">\n" << flush;
         retval->velocity.x = reader.readFiniteF32();
         retval->velocity.y = reader.readFiniteF32();
         retval->velocity.z = reader.readFiniteF32();
-        cout << "Read velocity : <" << retval->velocity.x << ", " << retval->velocity.y << ", " << retval->velocity.z << ">\n" << flush;
+//        cout << "Read velocity : <" << retval->velocity.x << ", " << retval->velocity.y << ", " << retval->velocity.z << ">\n" << flush;
         retval->acceleration.x = reader.readFiniteF32();
         retval->acceleration.y = reader.readFiniteF32();
         retval->acceleration.z = reader.readFiniteF32();
@@ -296,15 +304,7 @@ protected:
     }
 public:
     virtual void render(Mesh dest, RenderLayer rl, Dimension d, Client & client, unsigned) override;
-    void move(float deltaTime)
-    {
-        position += velocity * deltaTime + acceleration * (deltaTime * deltaTime * 0.5f) + deltaAcceleration
-                    * (deltaTime * deltaTime * deltaTime * (1 / 6.0f));
-        velocity += acceleration * deltaTime + deltaAcceleration * (deltaTime * deltaTime * 0.5f);
-        acceleration += deltaAcceleration * deltaTime;
-        age += deltaTime;
-        updateAge += deltaTime;
-    }
+    void move(float deltaTime, shared_ptr<RenderObjectWorld> world);
     virtual bool operator ==(const RenderObject &rt) const override
     {
         return this == &rt;
@@ -323,6 +323,12 @@ public:
         if(!good())
             return false;
         return mesh()->isPlayer;
+    }
+    shared_ptr<PhysicsObject> constructPhysicsObject()
+    {
+        if(!good())
+            return shared_ptr<PhysicsObject>(new PhysicsEmpty());
+        return mesh()->constructPhysicsObject(position, velocity, acceleration, deltaAcceleration);
     }
 };
 
@@ -705,6 +711,10 @@ struct RenderObjectWorld final : public enable_shared_from_this<RenderObjectWorl
             return retval;
         }
     };
+    BlockIterator get(PositionI pos)
+    {
+        return BlockIterator(shared_from_this(), pos);
+    }
     static shared_ptr<RenderObjectWorld> getWorld(Client &client)
     {
         static Client::IdType worldId = Client::NullId;
@@ -759,6 +769,7 @@ private:
     Mesh center, nx, px, ny, py, nz, pz;
     shared_ptr<RenderObjectWorld> world;
     VectorF hitBoxMin, hitBoxMax;
+    shared_ptr<PhysicsObjectConstructor> physicsConstructor;
 public:
     const bool nxBlocked, pxBlocked, nyBlocked, pyBlocked, nzBlocked, pzBlocked;
     const LightProperties lightProperties;
@@ -779,9 +790,9 @@ public:
     RenderObjectBlockMesh(RenderObjectBlockClass blockClass, VectorF hitBoxMin, VectorF hitBoxMax,
                           LightProperties lightProperties, Mesh center, Mesh nx, Mesh px, Mesh ny, Mesh py, Mesh nz, Mesh pz,
                           bool nxBlocked, bool pxBlocked, bool nyBlocked, bool pyBlocked, bool nzBlocked, bool pzBlocked,
-                          RenderLayer rl)
+                          RenderLayer rl, shared_ptr<PhysicsObjectConstructor> physicsConstructor)
         : blockClass(blockClass), center(center), nx(nx), px(px), ny(ny), py(py), nz(nz), pz(pz),
-          hitBoxMin(hitBoxMin), hitBoxMax(hitBoxMax), nxBlocked(nxBlocked), pxBlocked(pxBlocked),
+          hitBoxMin(hitBoxMin), hitBoxMax(hitBoxMax), physicsConstructor(physicsConstructor), nxBlocked(nxBlocked), pxBlocked(pxBlocked),
           nyBlocked(nyBlocked), pyBlocked(pyBlocked), nzBlocked(nzBlocked), pzBlocked(pzBlocked),
           lightProperties(lightProperties), rl(rl)
     {
@@ -797,6 +808,10 @@ public:
         }
 
         return rayHitBox(hitBoxMin + (VectorI)pos, hitBoxMax + (VectorI)pos, ray);
+    }
+    shared_ptr<PhysicsObject> constructPhysicsObject(PositionI position)
+    {
+        return physicsConstructor->make((PositionF)position);
     }
 };
 
@@ -870,6 +885,10 @@ public:
         }
 
         return block->rayHits(ray, pos);
+    }
+    shared_ptr<PhysicsObject> constructPhysicsObject()
+    {
+        return block->constructPhysicsObject(pos);
     }
 };
 

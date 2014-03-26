@@ -49,7 +49,7 @@ shared_ptr<RenderObjectBlockMesh> StoneLikeBlock::internalMakeBlockMesh() const
                 Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), getFaceTexture(BlockFace::PY), TextureDescriptor(), TextureDescriptor()),
                 Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), getFaceTexture(BlockFace::NZ), TextureDescriptor()),
                 Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), getFaceTexture(BlockFace::PZ)),
-                true, true, true, true, true, true, RenderLayer::Opaque
+                true, true, true, true, true, true, RenderLayer::Opaque, getPhysicsObjectConstructor()
                                                  );
 }
 

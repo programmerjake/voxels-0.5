@@ -44,11 +44,11 @@ struct ClientState
     int naturalLight = Lighting::MAX_INTENSITY;
     bool needMeshes;
     Client client;
-    recursive_mutex & lock;
+    recursive_mutex &lock;
     condition_variable_any cond;
     bool done;
     bool paused, flying = true;
-    #warning finish implementing flying
+#warning finish implementing flying
     flag needState;
     UpdateList neededChunkList;
     bool forwardDown = false, backwardDown = false, leftDown = false, rightDown = false, jumpDown = false, sneakDown = false;
@@ -64,27 +64,34 @@ struct ClientState
     }
     const VectorF velocity() const
     {
-        if(!player)
+        if(!player) {
             return VectorF();
+        }
+
         return player->velocity;
     }
     const PositionF pos() const
     {
-        if(!player)
+        if(!player) {
             return PositionF();
+        }
+
         return player->position;
     }
     void velocity(VectorF v)
     {
-        cout << "Prev Velocity : <" << player->velocity.x << ", " << player->velocity.y << ", " << player->velocity.z << ">\n" << flush;
-        if(player)
+        //        cout << "Prev Velocity : <" << player->velocity.x << ", " << player->velocity.y << ", " << player->velocity.z << ">\n" << flush;
+        if(player) {
             player->velocity = v;
-        cout << "Wrote Velocity: <" << player->velocity.x << ", " << player->velocity.y << ", " << player->velocity.z << ">\n" << flush;
+        }
+
+        //        cout << "Wrote Velocity: <" << player->velocity.x << ", " << player->velocity.y << ", " << player->velocity.z << ">\n" << flush;
     }
     void pos(PositionF v)
     {
-        if(player)
+        if(player) {
             player->position = v;
+        }
     }
 };
 
@@ -93,9 +100,11 @@ namespace ClientImplementation
 bool writeState(Writer &writer, ClientState *state)
 {
     flag &needState = state->needState;
+
     if(needState.exchange(false))
     {
         state->lock.lock();
+
         if(!state->player)
         {
             needState = true;
@@ -108,8 +117,11 @@ bool writeState(Writer &writer, ClientState *state)
             float phi = state->phi;
             float theta = state->theta;
             float viewDistance = state->renderDistance;
-            if(state->paused)
+
+            if(state->paused) {
                 velocity = VectorF(0);
+            }
+
             bool flying = state->paused || state->flying;
             float age = state->player ? state->player->age : 0;
             state->lock.unlock();
@@ -130,10 +142,11 @@ bool writeState(Writer &writer, ClientState *state)
             return true;
         }
     }
+
     return false;
 }
 
-void clientProcessWriter(Writer *pwriter, ClientState * state)
+void clientProcessWriter(Writer *pwriter, ClientState *state)
 {
     Writer &writer = *pwriter;
     //Client &client = state->client;
@@ -142,18 +155,24 @@ void clientProcessWriter(Writer *pwriter, ClientState * state)
     try
     {
         state->lock.lock();
+
         while(!state->done)
         {
             UpdateList neededChunkList = state->neededChunkList;
             state->neededChunkList.clear();
             state->lock.unlock();
             bool didAnything = false;
-            if(writeState(writer, state))
+
+            if(writeState(writer, state)) {
                 didAnything = true;
+            }
+
             for(PositionI p : neededChunkList.updatesList)
             {
-                if(!get<1>(chunksAlreadyRequsted.insert(p)))
+                if(!get<1>(chunksAlreadyRequsted.insert(p))) {
                     continue;
+                }
+
                 writeState(writer, state);
                 NetworkProtocol::writeNetworkEvent(writer, NetworkProtocol::NetworkEvent::RequestChunk);
                 writer.writeS32(p.x);
@@ -165,10 +184,14 @@ void clientProcessWriter(Writer *pwriter, ClientState * state)
                 didAnything = true;
                 //cout << "Client : send chunk request\n";
             }
-            if(!didAnything)
+
+            if(!didAnything) {
                 this_thread::sleep_for(chrono::milliseconds(1));
+            }
+
             state->lock.lock();
         }
+
         state->lock.unlock();
     }
     catch(exception &e)
@@ -181,7 +204,7 @@ void clientProcessWriter(Writer *pwriter, ClientState * state)
     state->lock.unlock();
 }
 
-void clientProcessReader(Reader *preader, ClientState * state)
+void clientProcessReader(Reader *preader, ClientState *state)
 {
     Reader &reader = *preader;
     Client &client = state->client;
@@ -190,6 +213,7 @@ void clientProcessReader(Reader *preader, ClientState * state)
     try
     {
         state->lock.lock();
+
         while(!state->done)
         {
             state->lock.unlock();
@@ -199,39 +223,65 @@ void clientProcessReader(Reader *preader, ClientState * state)
             {
             case NetworkProtocol::NetworkEvent::UpdateRenderObjects:
             {
+                PositionF playerPosition;
+                VectorF playerVelocity, playerAcceleration, playerDeltaAcceleration;
+                {
+                    LockedClient lockIt(client);
+                    playerPosition = state->player->position;
+                    playerVelocity = state->player->velocity;
+                    playerAcceleration = state->player->acceleration;
+                    playerDeltaAcceleration = state->player->deltaAcceleration;
+                }
                 uint64_t readCount = reader.readU64();
 
                 for(uint64_t i = 0; i < readCount; i++)
                 {
                     shared_ptr<RenderObject> ro = RenderObject::read(reader, client);
+
                     if(ro && ro->type() == RenderObject::Type::Entity)
                     {
                         shared_ptr<RenderObjectEntity> e = dynamic_pointer_cast<RenderObjectEntity>(ro);
                         LockedClient lockIt(client);
                         shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
                         world->handleReadEntity(e);
-                        if(e == state->player && !e->good())
+
+                        if(e == state->player && !e->good()) {
                             throw IOException("sent destroyed player");
+                        }
                     }
                 }
+
+                {
+                    LockedClient lockIt(client);
+                    state->player->position = playerPosition;
+                    state->player->velocity = playerVelocity;
+                    state->player->acceleration = playerAcceleration;
+                    state->player->deltaAcceleration = playerDeltaAcceleration;
+                }
+
                 //cout << "Client : received " << readCount << " updated render objects\n";
                 state->lock.lock();
                 continue;
             }
+
             case NetworkProtocol::NetworkEvent::RequestState:
             {
                 state->lock.lock();
                 state->needState = true;
                 continue;
             }
+
             case NetworkProtocol::NetworkEvent::SendPlayer:
             {
                 shared_ptr<RenderObject> ro = RenderObject::read(reader, client);
+
                 if(!ro || ro->type() != RenderObject::Type::Entity)
                 {
                     throw InvalidDataValueException("in receive SendPlayer : didn't read entity");
                 }
+
                 shared_ptr<RenderObjectEntity> player = dynamic_pointer_cast<RenderObjectEntity>(ro);
+
                 if(!player)
                 {
                     throw InvalidDataValueException("in receive SendPlayer : didn't read entity (can't cast)");
@@ -242,6 +292,7 @@ void clientProcessReader(Reader *preader, ClientState * state)
                     shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
                     world->handleReadEntity(player);
                 }
+
                 state->lock.lock();
                 state->player = player;
                 continue;
@@ -250,8 +301,10 @@ void clientProcessReader(Reader *preader, ClientState * state)
             case NetworkProtocol::NetworkEvent::Last:
                 assert(false);
             }
+
             assert(false);
         }
+
         state->lock.unlock();
     }
     catch(exception &e)
@@ -264,7 +317,7 @@ void clientProcessReader(Reader *preader, ClientState * state)
     state->lock.unlock();
 }
 
-void lightingThread(ClientState * state)
+void lightingThread(ClientState *state)
 {
     try
     {
@@ -286,8 +339,10 @@ void makeChunkRenderMesh(Mesh dest, Client &client, shared_ptr<unordered_set<Pos
     shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
     RenderObjectWorld::BlockIterator biX(world, chunkPos);
     shared_ptr<RenderObjectWorld::Chunk> chunk = biX.getChunk();
-    if(chunk->retrieved < RenderObjectWorld::Chunk::size * RenderObjectWorld::Chunk::size * RenderObjectWorld::Chunk::size)
+
+    if(chunk->retrieved < RenderObjectWorld::Chunk::size * RenderObjectWorld::Chunk::size * RenderObjectWorld::Chunk::size) {
         neededChunks->insert(chunk->pos);
+    }
 
     if(chunk->cachedMesh[(int)rl] != nullptr)
     {
@@ -333,11 +388,11 @@ Mesh makeRenderMesh(Client &client, shared_ptr<unordered_set<PositionI>> neededC
     int maxY = (pos.y + renderDistance) & RenderObjectWorld::Chunk::floor_size_mask;
     int maxZ = (pos.z + renderDistance) & RenderObjectWorld::Chunk::floor_size_mask;
 
-    for(int x = minX; x <= maxX; x+=RenderObjectWorld::Chunk::size)
+    for(int x = minX; x <= maxX; x += RenderObjectWorld::Chunk::size)
     {
-        for(int y = minY; y <= maxY; y+=RenderObjectWorld::Chunk::size)
+        for(int y = minY; y <= maxY; y += RenderObjectWorld::Chunk::size)
         {
-            for(int z = minZ; z <= maxZ; z+=RenderObjectWorld::Chunk::size)
+            for(int z = minZ; z <= maxZ; z += RenderObjectWorld::Chunk::size)
             {
                 makeChunkRenderMesh(retval, client, neededChunks, PositionI(x, y, z, pos.d), rl, naturalLight);
             }
@@ -347,59 +402,73 @@ Mesh makeRenderMesh(Client &client, shared_ptr<unordered_set<PositionI>> neededC
     return retval;
 }
 
-void meshMakerThread(Mesh meshes[], ClientState * state)
+void meshMakerThread(Mesh meshes[], ClientState *state)
 {
     state->lock.lock();
+
     while(!state->done)
     {
-        while(!state->done && !state->needMeshes)
+        while(!state->done && !state->needMeshes) {
             state->cond.wait(state->lock);
-        if(state->done)
+        }
+
+        if(state->done) {
             break;
+        }
+
         state->needMeshes = false;
-        Client & client = state->client;
+        Client &client = state->client;
         int renderDistance = state->renderDistance;
         int naturalLight = state->naturalLight;
         PositionI pos = (PositionI)state->pos();
         state->lock.unlock();
         Mesh tempMeshes[(int)RenderLayer::Last];
         shared_ptr<unordered_set<PositionI>> neededChunks = make_shared<unordered_set<PositionI>>();
+
         for(RenderLayer rl = (RenderLayer)0; rl < RenderLayer::Last; rl = (RenderLayer)((int)rl + 1))
         {
             tempMeshes[(int)rl] = makeRenderMesh(client, neededChunks, rl, pos, renderDistance, naturalLight);
         }
+
         state->lock.lock();
+
         for(PositionI p : *neededChunks)
         {
             state->neededChunkList.add(p);
         }
+
         for(RenderLayer rl = (RenderLayer)0; rl < RenderLayer::Last; rl = (RenderLayer)((int)rl + 1))
         {
             meshes[(int)rl] = tempMeshes[(int)rl];
         }
     }
+
     state->lock.unlock();
 }
 
-void updateVelocity(ClientState * state)
+void updateVelocity(ClientState *state)
 {
     lock_guard<recursive_mutex> lockIt(state->lock);
     state->velocity(VectorF(0, state->velocity().y, 0));
     const float speed = 5;
     VectorF forwardVector = Matrix::rotateY(state->theta).invert().apply(VectorF(0, 0, -1)) * speed;
     VectorF leftVector = Matrix::rotateY(state->theta).invert().apply(VectorF(-1, 0, 0)) * speed;
+
     if(state->backwardDown)
     {
         state->velocity(state->velocity() - forwardVector);
     }
+
     if(state->forwardDown)
     {
         state->velocity(state->velocity() + forwardVector);
     }
+
     if(state->leftDown)
     {
         state->velocity(state->velocity() + leftVector);
     }
+
     if(state->rightDown)
     {
         state->velocity(state->velocity() - leftVector);
@@ -408,9 +477,9 @@ void updateVelocity(ClientState * state)
 
 class ClientEventHandler final : public EventHandler
 {
-    ClientState * clientState;
+    ClientState *clientState;
 public:
-    ClientEventHandler(ClientState * clientState)
+    ClientEventHandler(ClientState *clientState)
         : clientState(clientState)
     {
     }
@@ -425,70 +494,94 @@ public:
     virtual bool handleMouseMove(MouseMoveEvent &event) override
     {
         lock_guard<recursive_mutex> lockIt(clientState->lock);
-        if(clientState->paused)
+
+        if(clientState->paused) {
             return true;
-        if(event.deltaX > 0)
+        }
+
+        if(event.deltaX > 0) {
             clientState->dtheta += limit(event.deltaX, 0.0f, 10.0f) * event.deltaX / 1000.0 * M_PI;
-        else
+        }
+        else {
             clientState->dtheta -= limit(event.deltaX, -10.0f, 0.0f) * event.deltaX / 1000.0 * M_PI;
-        if(event.deltaY > 0)
+        }
+
+        if(event.deltaY > 0) {
             clientState->dphi -= limit(event.deltaY, 0.0f, 10.0f) * event.deltaY / 1000.0 * M_PI;
-        else
+        }
+        else {
             clientState->dphi += limit(event.deltaY, -10.0f, 0.0f) * event.deltaY / 1000.0 * M_PI;
+        }
+
         return true;
     }
     virtual bool handleMouseScroll(MouseScrollEvent &) override
     {
         return true;
     }
-    virtual bool handleKeyUp(KeyUpEvent & event) override
+    virtual bool handleKeyUp(KeyUpEvent &event) override
     {
         lock_guard<recursive_mutex> lockIt(clientState->lock);
-        if(clientState->paused)
+
+        if(clientState->paused) {
             return false;
+        }
+
         if(event.key == KeyboardKey::KeyboardKey_W)
         {
             clientState->forwardDown = false;
         }
+
         if(event.key == KeyboardKey::KeyboardKey_A)
         {
             clientState->leftDown = false;
         }
+
         if(event.key == KeyboardKey::KeyboardKey_D)
         {
             clientState->rightDown = false;
         }
+
         if(event.key == KeyboardKey::KeyboardKey_S)
         {
             clientState->backwardDown = false;
         }
+
         return false;
     }
     virtual bool handleKeyDown(KeyDownEvent &event) override
     {
         lock_guard<recursive_mutex> lockIt(clientState->lock);
+
         if(event.key == KeyboardKey::KeyboardKey_P && !event.isRepetition)
         {
             clientState->paused = !clientState->paused;
         }
-        if(clientState->paused)
+
+        if(clientState->paused) {
             return false;
+        }
+
         if(event.key == KeyboardKey::KeyboardKey_W)
         {
             clientState->forwardDown = true;
         }
+
         if(event.key == KeyboardKey::KeyboardKey_A)
         {
             clientState->leftDown = true;
         }
+
         if(event.key == KeyboardKey::KeyboardKey_D)
         {
             clientState->rightDown = true;
         }
+
         if(event.key == KeyboardKey::KeyboardKey_S)
         {
             clientState->backwardDown = true;
         }
+
         return false;
     }
     virtual bool handleKeyPress(KeyPressEvent &) override
@@ -503,7 +596,8 @@ public:
 
 TransformedMesh makeSelectBoxMesh()
 {
-    Mesh retval = Generate::unitBox(TextureAtlas::Selection.td(), TextureAtlas::Selection.td(), TextureAtlas::Selection.td(), TextureAtlas::Selection.td(), TextureAtlas::Selection.td(), TextureAtlas::Selection.td());
+    Mesh retval = Generate::unitBox(TextureAtlas::Selection.td(), TextureAtlas::Selection.td(), TextureAtlas::Selection.td(), TextureAtlas::Selection.td(), TextureAtlas::Selection.td(),
+                                    TextureAtlas::Selection.td());
     retval->add(invert(retval));
     return transform(Matrix::translate(VectorF(-0.5f)).concat(Matrix::scale(1.05)).concat(Matrix::translate(VectorF(0.5f))), retval);
 }
@@ -515,24 +609,29 @@ void renderEntities(Mesh dest, Client &client, RenderLayer rl, unsigned naturalL
         LockedClient lockIt(client);
         shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
         entities.reserve(world->entities.size());
+
         for(shared_ptr<RenderObjectEntity> e : world->entities)
         {
             entities.push_back(e);
         }
     }
     Dimension d = Dimension::Overworld;
-    if(player)
+
+    if(player) {
         d = player->position.d;
+    }
 
     for(shared_ptr<RenderObjectEntity> e : entities)
     {
         LockedClient lockIt(client);
+
         if(e == player)
         {
             e->scriptIOObject->value[L"theta"] = make_shared<Scripting::DataFloat>(playerTheta);
             e->scriptIOObject->value[L"phi"] = make_shared<Scripting::DataFloat>(playerPhi);
             e->scriptIOObject->value[L"isCurrentPlayer"] = make_shared<Scripting::DataBoolean>(true);
         }
+
         e->render(dest, rl, d, client, naturalLight);
     }
 }
@@ -540,10 +639,12 @@ void renderEntities(Mesh dest, Client &client, RenderLayer rl, unsigned naturalL
 void moveEntities(ClientState &state, float deltaTime)
 {
     vector<shared_ptr<RenderObjectEntity>> entities;
+    shared_ptr<RenderObjectWorld> world;
     {
         LockedClient lockIt(state.client);
-        shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(state.client);
+        world = RenderObjectWorld::getWorld(state.client);
         entities.reserve(world->entities.size());
+
         for(shared_ptr<RenderObjectEntity> e : world->entities)
         {
             entities.push_back(e);
@@ -553,18 +654,20 @@ void moveEntities(ClientState &state, float deltaTime)
     for(shared_ptr<RenderObjectEntity> e : entities)
     {
         LockedClient lockIt(state.client);
+
         if(e == state.player)
         {
             updateVelocity(&state);
         }
-        e->move(deltaTime);
+
+        e->move(deltaTime, world);
     }
 }
 }
 
 using namespace ClientImplementation;
 
-void clientProcess(StreamRW & streamRW)
+void clientProcess(StreamRW &streamRW)
 {
     startGraphics();
     TransformedMesh selectBoxMesh = makeSelectBoxMesh();
@@ -579,13 +682,16 @@ void clientProcess(StreamRW & streamRW)
     thread networkWriterThread(clientProcessWriter, &writer, &clientState);
     Renderer r;
     Mesh meshes[(int)RenderLayer::Last];
-    for(Mesh & m : meshes)
+
+    for(Mesh &m : meshes)
     {
         m = Mesh(new Mesh_t);
     }
+
     thread renderThread(meshMakerThread, (Mesh *)meshes, &clientState);
 
     clientState.lock.lock();
+
     while(!clientState.done)
     {
         clientState.needMeshes = true;
@@ -599,18 +705,21 @@ void clientProcess(StreamRW & streamRW)
         PositionF pos = clientState.pos();
         VectorF velocity = clientState.velocity();
         Matrix tform = Matrix::translate(-(VectorF)clientState.pos())
-                        .concat(Matrix::rotateY(clientState.theta))
-                        .concat(Matrix::rotateX(-clientState.phi));
+                       .concat(Matrix::rotateY(clientState.theta))
+                       .concat(Matrix::rotateX(-clientState.phi));
         Mesh tempMeshes[(int)RenderLayer::Last];
+
         for(RenderLayer rl = (RenderLayer)0; rl < RenderLayer::Last; rl = (RenderLayer)((int)rl + 1))
         {
             tempMeshes[(int)rl] = meshes[(int)rl];
         }
+
         shared_ptr<PositionI> rayHitPos = RenderObjectWorld::getWorld(clientState.client)->getFirstHitBlock(Ray(tform.invert().applyToNormal(VectorF(0, 0, -1)), clientState.pos()), clientReachDistance);
         float phi = clientState.phi, theta = clientState.theta;
         int naturalLight = clientState.naturalLight;
         clientState.lock.unlock();
         int polyCount = 0;
+
         for(RenderLayer rl = (RenderLayer)0; rl < RenderLayer::Last; rl = (RenderLayer)((int)rl + 1))
         {
             Mesh mesh = tempMeshes[(int)rl];
@@ -618,15 +727,18 @@ void clientProcess(StreamRW & streamRW)
             polyCount += mesh->size();
             renderLayerSetup(rl);
             r << transform(tform, mesh);
+
             if(rl == RenderLayer::Opaque && rayHitPos != nullptr)
             {
                 r << transform(Matrix::translate((VectorI)*rayHitPos).concat(tform), selectBoxMesh);
             }
+
             mesh = make_shared<Mesh_t>();
             renderEntities(mesh, clientState.client, rl, naturalLight, theta, phi, clientState.player);
             polyCount += mesh->size();
             r << transform(tform, mesh);
         }
+
         renderLayerSetup(RenderLayer::Last);
         Display::initOverlay();
         wstringstream s;
@@ -651,11 +763,15 @@ void clientProcess(StreamRW & streamRW)
         clientState.dphi /= 2;
         bool paused = clientState.paused;
         clientState.lock.unlock();
-        if(paused == Display::grabMouse())
+
+        if(paused == Display::grabMouse()) {
             Display::grabMouse(!paused);
+        }
+
         clientState.lock.lock();
         clientState.cond.notify_all();
     }
+
     clientState.cond.notify_all();
     clientState.lock.unlock();
     networkReaderThread.join();

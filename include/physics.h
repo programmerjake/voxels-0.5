@@ -179,8 +179,6 @@ inline bool isBoxCollision(VectorF center1, VectorF extents1, VectorF center2, V
 struct PhysicsObjectConstructor final : public enable_shared_from_this<PhysicsObjectConstructor>
 {
 private:
-    PhysicsProperties properties;
-    VectorF extents, offset;
     enum class Type : uint8_t
     {
         Box,
@@ -188,8 +186,10 @@ private:
         Last
     };
     const Type type;
+    PhysicsProperties properties;
+    VectorF extents, offset;
     PhysicsObjectConstructor(Type type)
-        : type(type)
+        : type(type), properties(1, 1, 0)
     {
     }
 public:
@@ -248,7 +248,7 @@ public:
     }
     void write(Writer &writer)
     {
-        writer.writeU8(type);
+        writer.writeU8((uint8_t)type);
         if(type == Type::Empty)
             return;
         properties.write(writer);

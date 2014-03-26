@@ -51,7 +51,7 @@ shared_ptr<RenderObjectBlockMesh> AirBlock::makeBlockMesh() const
     return make_shared<RenderObjectBlockMesh>(airClass, VectorF(0), VectorF(0),
             lightProperties, Mesh(new Mesh_t), Mesh(new Mesh_t),
             Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), Mesh(new Mesh_t), false,
-            false, false, false, false, false, RenderLayer::Opaque);
+            false, false, false, false, false, RenderLayer::Opaque, getPhysicsObjectConstructor());
 }
 
 shared_ptr<RenderObjectBlockMesh> GlassBlock::makeBlockMesh() const
@@ -72,7 +72,7 @@ shared_ptr<RenderObjectBlockMesh> GlassBlock::makeBlockMesh() const
                               TextureDescriptor(), TextureAtlas::Glass.td(), TextureDescriptor()),
             Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(),
                               TextureDescriptor(), TextureDescriptor(), TextureAtlas::Glass.td()),
-            false, false, false, false, false, false, RenderLayer::Opaque
+            false, false, false, false, false, false, RenderLayer::Opaque, getPhysicsObjectConstructor()
                                              );
 }
 
@@ -93,7 +93,7 @@ shared_ptr<RenderObjectBlockMesh> SandBlock::makeBlockMesh() const
                               TextureDescriptor(), TextureAtlas::Sand.td(), TextureDescriptor()),
             Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(),
                               TextureDescriptor(), TextureDescriptor(), TextureAtlas::Sand.td()),
-            true, true, true, true, true, true, RenderLayer::Opaque
+            true, true, true, true, true, true, RenderLayer::Opaque, getPhysicsObjectConstructor()
                                              );
 }
 

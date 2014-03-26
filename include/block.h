@@ -149,9 +149,7 @@ public:
     virtual shared_ptr<PhysicsObjectConstructor> getPhysicsObjectConstructor() const = 0;
     shared_ptr<PhysicsObject> getPhysicsObject(PositionI pos) const
     {
-        PositionF fPos = pos;
-        fPos += VectorF(0.5);
-        return getPhysicsObjectConstructor()->make(fPos);
+        return getPhysicsObjectConstructor()->make((PositionF)pos);
     }
 };
 

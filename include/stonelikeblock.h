@@ -50,9 +50,9 @@ protected:
     virtual shared_ptr<RenderObjectBlockMesh> internalMakeBlockMesh() const;
     virtual TextureDescriptor getFaceTexture(BlockFace face) const = 0;
     virtual Mesh makeBlockEntityMesh() const override;
-    virtual shared_ptr<PhysicsObject> getPhysicsObject(PositionI pos) const override
+    virtual shared_ptr<PhysicsObjectConstructor> getPhysicsObjectConstructor() const override
     {
-        return static_pointer_cast<PhysicsObject>(make_shared<PhysicsBox>((VectorI)pos + VectorF(0.5), VectorF(0.5), VectorF(0), VectorF(0), VectorF(0), pos.d, PhysicsProperties(PhysicsProperties::INFINITE_MASS, 0.8, 0.1)));
+        return PhysicsObjectConstructor::box(PhysicsProperties(PhysicsProperties::INFINITE_MASS, 0.8, 0.1), VectorF(0.5), VectorF(0.5));
     }
 private:
     mutable shared_ptr<RenderObjectBlockMesh> blockMesh;

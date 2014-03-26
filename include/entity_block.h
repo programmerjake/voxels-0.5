@@ -24,8 +24,8 @@
 class EntityBlock final : public EntityDescriptor
 {
 private:
-    static constexpr VectorF physicsExtents = VectorF(0.125);
-    static constexpr PhysicsProperties physicsProperties(0.1, 0.5, 0.1);
+    static constexpr const VectorF physicsExtents() {return VectorF(0.125);}
+    static constexpr const PhysicsProperties physicsProperties() {return PhysicsProperties(0.1, 0.5, 0.1);}
     struct ExtraData final : public ExtraEntityData
     {
         BlockDescriptorPtr block;
@@ -44,6 +44,9 @@ public:
     {
         assert(block);
         return EntityData(EntityDescriptors.get(L"builtin.block"), position, velocity, gravityVector, shared_ptr<ExtraEntityData>(new ExtraData(block)));
+    }
+    virtual ~EntityBlock()
+    {
     }
 protected:
     virtual EntityData loadInternal(GameLoadStream & gls) const override
@@ -91,9 +94,9 @@ protected:
 public:
     virtual shared_ptr<RenderObjectEntity> getEntity(EntityData & entity, shared_ptr<World> world) const override;
     virtual void onMove(EntityData & entity, shared_ptr<World> world, float deltaTime) const override;
-    virtual shared_ptr<PhysicsObjectConstructor> getPhysicsObjectConstructor(EntityData & entity) const override
+    virtual shared_ptr<PhysicsObjectConstructor> getPhysicsObjectConstructor(EntityData &) const override
     {
-        return PhysicsObjectConstructor::box(physicsProperties, physicsExtents);
+        return PhysicsObjectConstructor::box(physicsProperties(), physicsExtents());
     }
 };
 
