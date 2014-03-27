@@ -589,7 +589,7 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                         getClientGotStateFlag(*pclient) = false;
                     }
 #if 1
-                    if(frame % 1 == 0)
+                    if(frame % 40 == 0)
                     {
                         BlockDescriptorPtr block;
                         if(rand() % 3 == 0)
@@ -599,7 +599,7 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                         else
                             block = BlockDescriptors.get(L"builtin.glass");
                         VectorF lookDir = Matrix::rotateX(getClientViewPhi(*pclient)).concat(Matrix::rotateY(-getClientViewTheta(*pclient))).apply(VectorF(0, 0, -1));
-                        for(int i = 10; i <= 30; i++)
+                        for(int i = 5; i <= 50; i++)
                             world->addEntity(EntityBlock::make(block, getClientPosition(*pclient) + lookDir, (i) * lookDir));
                     }
 #endif

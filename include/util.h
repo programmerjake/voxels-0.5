@@ -1845,4 +1845,34 @@ inline int solveCubic(float a/*constant*/, float b/*linear*/, float c/*quadratic
     return 1;
 }
 
+template <typename T, size_t allocChunkSize = min(8, 32768 / min(sizeof(T), sizeof(ptrdiff_t)))>
+class ArenaAllocator final
+{
+private:
+    struct Block
+    {
+        struct Element
+        {
+            union
+            {
+                char memory[sizeof(T)];
+                Element * next;
+            };
+            bool free = true;
+        };
+        Block * nextBlock;
+        Element elements[allocChunkSize];
+        Element * freeHead;
+        Block()
+        {
+            memset((void *)&elements[0], 0, allocChunkSize * sizeof(Element));
+            freeHead = &elements[0];
+            for(size_t i = 0; i < allocChunkSize - 1; i++)
+                elements[i].next = elements[i + 1];
+            elements[allocChunkSize - 1].next = nullptr;
+        }
+    };
+
+};
+
 #endif // UTIL_H

@@ -600,7 +600,7 @@ TransformedMesh makeSelectBoxMesh()
     return transform(Matrix::translate(VectorF(-0.5f)).concat(Matrix::scale(1.05)).concat(Matrix::translate(VectorF(0.5f))), retval);
 }
 
-void renderEntities(Mesh dest, Client &client, RenderLayer rl, unsigned naturalLight, float playerTheta, float playerPhi, shared_ptr<RenderObjectEntity> player)
+size_t renderEntities(Mesh dest, Client &client, RenderLayer rl, unsigned naturalLight, float playerTheta, float playerPhi, shared_ptr<RenderObjectEntity> player)
 {
     vector<shared_ptr<RenderObjectEntity>> entities;
     {
@@ -632,6 +632,7 @@ void renderEntities(Mesh dest, Client &client, RenderLayer rl, unsigned naturalL
 
         e->render(dest, rl, d, client, naturalLight);
     }
+    return entities.size();
 }
 
 void moveEntities(ClientState &state, float deltaTime)
@@ -716,7 +717,7 @@ void clientProcess(StreamRW &streamRW)
         float phi = clientState.phi, theta = clientState.theta;
         int naturalLight = clientState.naturalLight;
         clientState.lock.unlock();
-        int polyCount = 0;
+        int polyCount = 0, entityCount = 0;
 
         for(RenderLayer rl = (RenderLayer)0; rl < RenderLayer::Last; rl = (RenderLayer)((int)rl + 1))
         {
@@ -732,7 +733,7 @@ void clientProcess(StreamRW &streamRW)
             }
 
             mesh = make_shared<Mesh_t>();
-            renderEntities(mesh, clientState.client, rl, naturalLight, theta, phi, clientState.player);
+            entityCount = renderEntities(mesh, clientState.client, rl, naturalLight, theta, phi, clientState.player);
             polyCount += mesh->size();
             r << transform(tform, mesh);
         }
@@ -748,7 +749,7 @@ void clientProcess(StreamRW &streamRW)
         }
 
         s << L"\nFPS : " << Display::averageFPS() << endl;
-        s << L"Triangle Count : " << polyCount << endl;
+        s << L"Triangle Count : " << polyCount << L"   Entity Count : " << entityCount << endl;
         s << L"Position : <" << pos.x << L", " << pos.y << L", " << pos.z << L">     Dimension : " << (int)pos.d << endl;
         s << L"Velocity : <" << velocity.x << L", " << velocity.y << L", " << velocity.z << L">\n";
         r << transform(Matrix::translate(-40 * Display::scaleX(), 40 * Display::scaleY() - Text::height(s.str()), -40 * Display::scaleX()), Text::mesh(s.str(), Color(1, 0, 1)));

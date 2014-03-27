@@ -55,13 +55,12 @@ shared_ptr<RenderObjectEntity> EntityBlock::getEntity(EntityData & data, shared_
     return data.entity;
 }
 
-void EntityBlock::onMove(EntityData & data, shared_ptr<World> world, float deltaTime) const
+void EntityBlock::onMove(EntityData & data, shared_ptr<World> world, float deltaTimeIn) const
 {
     getEntity(data, world);
     data.deltaAcceleration = VectorF(0);
     data.acceleration = gravityVector;
-    int count = (iceil(deltaTime * abs(data.velocity) / 0.5 + 1),1);
-    deltaTime /= count;
+    int count = iceil(deltaTimeIn * abs(data.velocity) / 0.5 + 1);
     BlockIterator bi = world->get((PositionI)data.position);
     data.entity->acceleration = data.acceleration;
     data.entity->deltaAcceleration = data.deltaAcceleration;
@@ -69,6 +68,7 @@ void EntityBlock::onMove(EntityData & data, shared_ptr<World> world, float delta
     PhysicsBox & physicsObject = *pphysicsObject;
     for(int step = 0; step < count; step++)
     {
+        float deltaTime = deltaTimeIn / count;
         data.entity->age += deltaTime;
         int zeroCount = 0;
         while(deltaTime * deltaTime * absSquared(data.velocity) > eps * eps)
@@ -149,23 +149,6 @@ void EntityBlock::onMove(EntityData & data, shared_ptr<World> world, float delta
             data.setPosition(firstCollision.newPosition + eps * (2 + abs(firstCollision.newVelocity)) * firstCollision.collisionNormal);
             data.setVelocity(firstCollision.newVelocity);
             data.setAcceleration(data.entity->acceleration + data.entity->deltaAcceleration * firstCollision.time);
-//            if(absSquared(firstCollision.collisionNormal) > eps * eps)
-//            {
-//                firstCollision.collisionNormal = normalize(firstCollision.collisionNormal);
-//                if(dot(data.acceleration, firstCollision.collisionNormal) <= 0)
-//                {
-//                    data.entity->acceleration = data.acceleration - firstCollision.collisionNormal * dot(data.acceleration, firstCollision.collisionNormal);
-//                    data.entity->deltaAcceleration = data.deltaAcceleration - firstCollision.collisionNormal * dot(data.deltaAcceleration, firstCollision.collisionNormal);
-//                }
-//            }
-//            if(supported)
-//            {
-//                if(data.entity->velocity.y <= 0)
-//                {
-//                    data.entity->velocity.y = 0;
-//                    data.entity->acceleration.y = max(0.0f, data.entity->acceleration.y);
-//                }
-//            }
         }
     }
     if(data.entity->age > 15)

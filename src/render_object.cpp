@@ -168,125 +168,65 @@ shared_ptr<RenderObject> RenderObject::read(Reader &reader, Client &client)
     }
 }
 
-namespace
-{
-#error finish
-template <typename Function>
-float getNextCollision(float searchDuration, float simTime, shared_ptr<RenderObjectWorld> world, PositionF &position, VectorF &velocity, VectorF &acceleration, VectorF &deltaAcceleration, PositionF &simEndPosition, VectorF &simEndVelocity, VectorF &simEndAcceleration, VectorF &simEndDeltaAcceleration,
-                       Function constructPhysicsObject)
-{
-    const int searchDist = 2;
-    float retval = 0;
-    int count = iceil(searchDuration * abs(velocity) / 0.5 + 1);
-    RenderObjectWorld::BlockIterator bi = world->get((PositionI)position - VectorI(searchDist));
-    bool gotCollision = false;
-
-    for(int step = 0; step < count; step++)
-    {
-        float deltaTime = searchDuration / count;
-        int zeroCount = 0;
-
-        while(deltaTime * deltaTime * absSquared(velocity) > eps * eps)
-        {
-            PhysicsCollision firstCollision(position + deltaTime * velocity + deltaTime * deltaTime * 0.5f * acceleration + deltaTime * deltaTime * deltaTime * (1 / 6.0f) * deltaAcceleration,
-                                            velocity + deltaTime * acceleration + deltaTime * deltaTime * 0.5f * deltaAcceleration, VectorF(0), deltaTime);
-            shared_ptr<PhysicsObject> pphysicsObject = constructPhysicsObject(position, velocity, acceleration, deltaAcceleration);
-            PhysicsObject &physicsObject = *pphysicsObject;
-
-            for(int dx = -2; dx <= 2; dx++, bi.movePX())
-            {
-                RenderObjectWorld::BlockIterator bi2 = bi;
-
-                for(int dy = -2; dy <= 2; dy++, bi2.movePY())
-                {
-                    RenderObjectWorld::BlockIterator curBI = bi2;
-
-                    for(int dz = -2; dz <= 2; dz++, curBI.movePZ())
-                    {
-                        shared_ptr<PhysicsObject> otherObject;
-
-                        if(curBI.getMesh() != nullptr)
-                        {
-                            otherObject = curBI.getMesh()->constructPhysicsObject(curBI.getPosition());
-                        }
-                        else
-                        {
-                            otherObject = shared_ptr<PhysicsObject>(new PhysicsEmpty);
-                        }
-
-                        assert(otherObject);
-                        PhysicsCollision collision = physicsObject.collide(otherObject, deltaTime);
-
-                        if(collision.valid)
-                        {
-                            if(collision.time < eps)
-                            {
-                                if(zeroCount > 25)
-                                {
-                                    collision.valid = false;
-                                }
-                                else
-                                {
-                                    zeroCount++;
-                                }
-                            }
-                            else
-                            {
-                                zeroCount = 0;
-                            }
-                        }
-
-                        if(collision.valid && collision.time < firstCollision.time)
-                        {
-                            firstCollision = collision;
-                        }
-                    }
-                }
-            }
-
-            deltaTime -= firstCollision.time;
-            retval += firstCollision.time;
-            position = firstCollision.newPosition + eps * (2 + abs(firstCollision.newVelocity)) * firstCollision.collisionNormal;
-            velocity = firstCollision.newVelocity;
-            acceleration += deltaAcceleration * firstCollision.time;
-            if(retval >= simTime)
-                return firstCollision.collisionNormal != VectorF(0) ? retval : -retval;
-        }
-    }
-    return retval;
-}
-}
-
-void RenderObjectEntity::move(float deltaTime, shared_ptr<RenderObjectWorld> world)
+void RenderObjectEntity::move(float deltaTimeIn, shared_ptr<RenderObjectWorld> world)
 {
     if(!good())
     {
         return;
     }
 
-    updateAge += deltaTime;
+    updateAge += deltaTimeIn;
 
-    if(nextCollisionAge > age + deltaTime)
+    const VectorI searchSize = VectorI(1, 2, 1);
+
+    int count = iceil(deltaTimeIn * abs(velocity) / 0.5 + 1);
+    RenderObjectWorld::BlockIterator bi = world->get((PositionI)position - searchSize);
+    for(int step = 0; step < count; step++)
     {
-        position += deltaTime * velocity + deltaTime * deltaTime * 0.5f * acceleration + deltaTime * deltaTime * deltaTime * (1 / 6.0f) * deltaAcceleration;
-        velocity += deltaTime * acceleration + deltaTime * deltaTime * 0.5f * deltaAcceleration;
-        acceleration += deltaAcceleration * deltaTime;
+        float deltaTime = deltaTimeIn / count;
         age += deltaTime;
-        return;
+        int zeroCount = 0;
+        while(deltaTime * deltaTime * absSquared(velocity) > eps * eps)
+        {
+            PhysicsCollision firstCollision(position + deltaTime * velocity + deltaTime * deltaTime * 0.5f * acceleration + deltaTime * deltaTime * deltaTime * (1 / 6.0f) * deltaAcceleration, velocity + deltaTime * acceleration + deltaTime * deltaTime * 0.5f * deltaAcceleration, VectorF(0), deltaTime);
+            auto pphysicsObject = mesh()->constructPhysicsObject(position, velocity, acceleration, deltaAcceleration);
+            PhysicsObject & physicsObject = *pphysicsObject;
+            for(int dx = -searchSize.x; dx <= searchSize.x; dx++, bi.movePX())
+            {
+                RenderObjectWorld::BlockIterator bi2 = bi;
+                for(int dy = -searchSize.y; dy <= searchSize.y; dy++, bi2.movePY())
+                {
+                    RenderObjectWorld::BlockIterator curBI = bi2;
+                    for(int dz = -searchSize.z; dz <= searchSize.z; dz++, curBI.movePZ())
+                    {
+                        shared_ptr<PhysicsObject> otherObject;
+                        if(curBI.getMesh())
+                            otherObject = curBI.getMesh()->constructPhysicsObject(curBI.getPosition());
+                        else
+                            otherObject = static_pointer_cast<PhysicsObject>(make_shared<PhysicsEmpty>());
+                        assert(otherObject);
+                        PhysicsCollision collision = physicsObject.collide(otherObject, deltaTime);
+                        if(collision.valid)
+                        {
+                            if(collision.time < eps)
+                            {
+                                if(zeroCount > 25)
+                                    collision.valid = false;
+                                else
+                                    zeroCount++;
+                            }
+                            else
+                                zeroCount = 0;
+                        }
+                        if(collision.valid && collision.time < firstCollision.time)
+                            firstCollision = collision;
+                    }
+                }
+            }
+            deltaTime -= firstCollision.time;
+            position = firstCollision.newPosition + eps * (2 + abs(firstCollision.newVelocity)) * firstCollision.collisionNormal;
+            velocity = firstCollision.newVelocity;
+            acceleration = acceleration + deltaAcceleration * firstCollision.time;
+        }
     }
-
-    if(!needNextCollision)
-    {
-        position = nextPosition;
-        acceleration += deltaAcceleration * (nextCollisionAge - age);
-        age = nextCollisionAge;
-        velocity = nextVelocity;
-        needNextCollision = true;
-    }
-
-    auto theMesh = mesh();
-    auto constructPhysicsObject = [theMesh](PositionF position, VectorF velocity, VectorF acceleration, VectorF deltaAcceleration)
-    {
-        return theMesh->constructPhysicsObject(position, velocity, acceleration, deltaAcceleration);
-    };
 }

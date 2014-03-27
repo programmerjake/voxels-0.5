@@ -59,7 +59,7 @@ shared_ptr<RenderObjectEntity> EntityPlayer::getEntity(EntityData & data, shared
     return data.entity;
 }
 
-void EntityPlayer::onMove(EntityData & data, shared_ptr<World> world, float deltaTime) const
+void EntityPlayer::onMove(EntityData & data, shared_ptr<World> world, float deltaTimeIn) const
 {
     getEntity(data, world);
     assert(data.extraData);
@@ -69,8 +69,7 @@ void EntityPlayer::onMove(EntityData & data, shared_ptr<World> world, float delt
     data.acceleration = gravityVector;
     if(eData->flying)
         data.acceleration = VectorF(0);
-    int count = (iceil(deltaTime * abs(data.velocity) / 0.5 + 1),1);
-    deltaTime /= count;
+    int count = iceil(deltaTimeIn * abs(data.velocity) / 0.5 + 1);
     BlockIterator bi = world->get((PositionI)data.position);
     data.entity->acceleration = data.acceleration;
     data.entity->deltaAcceleration = data.deltaAcceleration;
@@ -78,6 +77,7 @@ void EntityPlayer::onMove(EntityData & data, shared_ptr<World> world, float delt
     PhysicsBox & physicsObject = *pphysicsObject;
     for(int step = 0; step < count; step++)
     {
+        float deltaTime = deltaTimeIn / count;
         data.entity->age += deltaTime;
         int zeroCount = 0;
         while(deltaTime * deltaTime * absSquared(data.velocity) > eps * eps)
