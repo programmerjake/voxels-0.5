@@ -1845,6 +1845,9 @@ inline int solveCubic(float a/*constant*/, float b/*linear*/, float c/*quadratic
     return 1;
 }
 
+#if 1
+#warning finish ArenaAllocator
+#else
 template <typename T, size_t allocChunkSize = min(8, 32768 / min(sizeof(T), sizeof(ptrdiff_t)))>
 class ArenaAllocator final
 {
@@ -1874,5 +1877,6 @@ private:
     };
 
 };
+#endif
 
 #endif // UTIL_H
