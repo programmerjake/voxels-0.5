@@ -47,7 +47,7 @@ struct ClientState
     recursive_mutex &lock;
     condition_variable_any cond;
     bool done;
-    bool paused, flying = true;
+    bool paused, flying = false;
 #warning finish implementing flying
     flag needState;
     UpdateList neededChunkList;
@@ -225,17 +225,17 @@ void clientProcessReader(Reader *preader, ClientState *state)
             {
                 PositionF playerPosition;
                 VectorF playerVelocity, playerAcceleration, playerDeltaAcceleration;
-                {
-                    LockedClient lockIt(client);
-                    playerPosition = state->player->position;
-                    playerVelocity = state->player->velocity;
-                    playerAcceleration = state->player->acceleration;
-                    playerDeltaAcceleration = state->player->deltaAcceleration;
-                }
                 uint64_t readCount = reader.readU64();
 
                 for(uint64_t i = 0; i < readCount; i++)
                 {
+                    {
+                        LockedClient lockIt(client);
+                        playerPosition = state->player->position;
+                        playerVelocity = state->player->velocity;
+                        playerAcceleration = state->player->acceleration;
+                        playerDeltaAcceleration = state->player->deltaAcceleration;
+                    }
                     shared_ptr<RenderObject> ro = RenderObject::read(reader, client);
 
                     if(ro && ro->type() == RenderObject::Type::Entity)
@@ -245,18 +245,16 @@ void clientProcessReader(Reader *preader, ClientState *state)
                         shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
                         world->handleReadEntity(e);
 
-                        if(e == state->player && !e->good()) {
-                            throw IOException("sent destroyed player");
+                        if(e == state->player)
+                        {
+                            if(!e->good())
+                                throw IOException("sent destroyed player");
+                            state->player->position = playerPosition;
+                            state->player->velocity = playerVelocity;
+                            state->player->acceleration = playerAcceleration;
+                            state->player->deltaAcceleration = playerDeltaAcceleration;
                         }
                     }
-                }
-
-                {
-                    LockedClient lockIt(client);
-                    state->player->position = playerPosition;
-                    state->player->velocity = playerVelocity;
-                    state->player->acceleration = playerAcceleration;
-                    state->player->deltaAcceleration = playerDeltaAcceleration;
                 }
 
                 //cout << "Client : received " << readCount << " updated render objects\n";

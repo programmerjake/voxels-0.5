@@ -149,23 +149,23 @@ void EntityBlock::onMove(EntityData & data, shared_ptr<World> world, float delta
             data.setPosition(firstCollision.newPosition + eps * (2 + abs(firstCollision.newVelocity)) * firstCollision.collisionNormal);
             data.setVelocity(firstCollision.newVelocity);
             data.setAcceleration(data.entity->acceleration + data.entity->deltaAcceleration * firstCollision.time);
-            if(absSquared(firstCollision.collisionNormal) > eps * eps)
-            {
-                firstCollision.collisionNormal = normalize(firstCollision.collisionNormal);
-                if(dot(data.acceleration, firstCollision.collisionNormal) <= 0)
-                {
-                    data.entity->acceleration = data.acceleration - firstCollision.collisionNormal * dot(data.acceleration, firstCollision.collisionNormal);
-                    data.entity->deltaAcceleration = data.deltaAcceleration - firstCollision.collisionNormal * dot(data.deltaAcceleration, firstCollision.collisionNormal);
-                }
-            }
-            if(supported)
-            {
-                if(data.entity->velocity.y <= 0)
-                {
-                    data.entity->velocity.y = 0;
-                    data.entity->acceleration.y = max(0.0f, data.entity->acceleration.y);
-                }
-            }
+//            if(absSquared(firstCollision.collisionNormal) > eps * eps)
+//            {
+//                firstCollision.collisionNormal = normalize(firstCollision.collisionNormal);
+//                if(dot(data.acceleration, firstCollision.collisionNormal) <= 0)
+//                {
+//                    data.entity->acceleration = data.acceleration - firstCollision.collisionNormal * dot(data.acceleration, firstCollision.collisionNormal);
+//                    data.entity->deltaAcceleration = data.deltaAcceleration - firstCollision.collisionNormal * dot(data.deltaAcceleration, firstCollision.collisionNormal);
+//                }
+//            }
+//            if(supported)
+//            {
+//                if(data.entity->velocity.y <= 0)
+//                {
+//                    data.entity->velocity.y = 0;
+//                    data.entity->acceleration.y = max(0.0f, data.entity->acceleration.y);
+//                }
+//            }
         }
     }
     if(data.entity->age > 15)

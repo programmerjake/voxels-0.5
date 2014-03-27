@@ -204,6 +204,15 @@ public:
     VectorF acceleration;
     VectorF deltaAcceleration;
     float age, updateAge;
+    bool needNextCollision = true;
+    float nextCollisionAge = -1;
+    PositionF nextPosition;
+    VectorF nextVelocity;
+    void clearCachedCollisions()
+    {
+        needNextCollision = true;
+        nextCollisionAge = -1;
+    }
     RenderObjectEntity()
         : meshInternal(nullptr), scriptIOObject(make_shared<Scripting::DataObject>())
     {
@@ -236,6 +245,7 @@ protected:
             return retval;
         }
 
+        retval->clearCachedCollisions();
         retval->age = reader.readLimitedF32(0, 1e10);
         retval->updateAge = 0;
         retval->position.x = reader.readFiniteF32();
