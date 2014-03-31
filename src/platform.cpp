@@ -31,6 +31,10 @@
 #include <thread>
 #include <mutex>
 
+#ifndef SDL_HINT_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK
+#define SDL_HINT_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK "SDL_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK"
+#endif // SDL_HINT_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK
+
 using namespace std;
 
 double Display::realtimeTimer()
@@ -152,7 +156,20 @@ static void startSDL()
         cerr << "error : can't start SDL : " << SDL_GetError() << endl;
         exit(1);
     }
-    atexit(SDL_Quit);
+    atexit(endGraphics);
+}
+
+void endGraphics()
+{
+    if(runningGraphics.exchange(false))
+    {
+        SDL_GL_DeleteContext(glcontext);
+        glcontext = nullptr;
+        SDL_DestroyWindow(window);
+        window = nullptr;
+    }
+    if(runningSDL.exchange(false))
+        SDL_Quit();
 }
 
 void startGraphics()
@@ -891,6 +908,7 @@ void Display::grabMouse(bool g)
 {
     grabMouse_ = g;
     SDL_SetRelativeMouseMode(g ? SDL_TRUE : SDL_FALSE);
+    SDL_SetWindowGrab(window, g ? SDL_TRUE : SDL_FALSE);
 }
 
 VectorF Display::transformMouseTo3D(float x, float y, float depth)

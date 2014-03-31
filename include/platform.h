@@ -241,6 +241,7 @@ namespace Display
 }
 
 void startGraphics();
+void endGraphics();
 
 #endif // PLATFORM_H_INCLUDED
 #include "event.h"

@@ -105,6 +105,7 @@ int myMain(vector<wstring> args)
         else
             return error(L"unrecognized argument : " + arg);
     }
+    thread serverThread;
     try
     {
         if(isServer)
@@ -122,13 +123,24 @@ int myMain(vector<wstring> args)
             return 0;
         }
         StreamBidirectionalPipe pipe;
-        thread serverThread(serverThreadFn, shared_ptr<StreamServer>(new StreamServerWrapper(list<shared_ptr<StreamRW>>{pipe.pport1()})));
+        shared_ptr<NetworkServer> server = nullptr;
+        try
+        {
+            server = make_shared<NetworkServer>(GameVersion::port);
+            cout << "Connected to port " << GameVersion::port << endl;
+        }
+        catch(IOException & e)
+        {
+            cout << e.what() << endl;
+        }
+        serverThread = thread(serverThreadFn, shared_ptr<StreamServer>(new StreamServerWrapper(list<shared_ptr<StreamRW>>{pipe.pport1()}, server)));
         clientProcess(pipe.port2());
     }
     catch(exception & e)
     {
         return error(mbsrtowcs(e.what()));
     }
+    serverThread.join();
     return 0;
 }
 

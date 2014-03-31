@@ -588,7 +588,9 @@ public:
     }
     virtual bool handleQuit(QuitEvent &) override
     {
-        return false; // so that the program will actually quit
+        lock_guard<recursive_mutex> lockIt(clientState->lock);
+        clientState->done = true;
+        return true;
     }
 };
 
@@ -776,5 +778,6 @@ void clientProcess(StreamRW &streamRW)
     networkReaderThread.join();
     networkWriterThread.join();
     renderThread.join();
+    endGraphics();
 }
 

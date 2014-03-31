@@ -548,6 +548,8 @@ void generateInitialWorld(shared_ptr<World> world)
     cout << "Server : world Generated\n";
 }
 
+atomic_int serverClientCount(0);
+
 void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared_ptr<World> world)
 {
     array<shared_ptr<ChunkGenerator>, GenerateThreadCount> generators;
@@ -572,7 +574,12 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                     Client & client = **i;
                     LockedClient lockClient(client);
                     if(getClientTerminatedFlag(client))
+                    {
                         i = clients->erase(i);
+                        serverClientCount--;
+                        if(serverClientCount <= 0)
+                            exit(0);
+                    }
                     else
                     {
                         playerEntities.push_back(EntityPlayer::get(client));
@@ -698,6 +705,7 @@ void runServer(StreamServer &server)
         while(true)
         {
             shared_ptr<StreamRW> stream = server.accept();
+            serverClientCount++;
             //stream = shared_ptr<StreamRW>(new StreamRWWrapper(shared_ptr<Reader>(new ExpandReader(stream->preader())), shared_ptr<Writer>(new CompressWriter(stream->pwriter()))));
             lock_guard<recursive_mutex> lockIt(world->lock);
             shared_ptr<Client> pclient = make_shared<Client>();

@@ -663,15 +663,20 @@ class StreamServerWrapper final : public StreamServer
 {
 private:
     list<shared_ptr<StreamRW>> streams;
+    shared_ptr<StreamServer> nextServer;
 public:
-    StreamServerWrapper(list<shared_ptr<StreamRW>> streams)
-        : streams(streams)
+    StreamServerWrapper(list<shared_ptr<StreamRW>> streams, shared_ptr<StreamServer> nextServer = nullptr)
+        : streams(streams), nextServer(nextServer)
     {
     }
     virtual shared_ptr<StreamRW> accept() override
     {
         if(streams.empty())
-            throw NoStreamsLeftException();
+        {
+            if(nextServer == nullptr)
+                throw NoStreamsLeftException();
+            return nextServer->accept();
+        }
         shared_ptr<StreamRW> retval = streams.front();
         streams.pop_front();
         return retval;
