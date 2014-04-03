@@ -96,3 +96,13 @@ initializer init2([]()
 });
 }
 #endif // testing solveCubic
+
+void * operator new(size_t sz) // for profiling
+{
+    return malloc(sz);
+}
+
+void operator delete(void * ptr) // for profiling
+{
+    free(ptr);
+}

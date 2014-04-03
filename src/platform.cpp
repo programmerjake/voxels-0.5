@@ -16,8 +16,7 @@
  *
  */
 #include "platform.h"
-#include <SDL.h>
-//#include <SDL_image.h>
+#include <SDL2/SDL.h>
 #include <GL/gl.h>
 #include "matrix.h"
 #include "vector.h"

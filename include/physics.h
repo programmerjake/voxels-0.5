@@ -102,7 +102,19 @@ public:
 
 class PhysicsEmpty final : public PhysicsObject
 {
+private:
+    static thread_local ArenaAllocator<PhysicsEmpty> myAllocator;
 public:
+    static void * operator new(size_t sz)
+    {
+        assert(sz == sizeof(PhysicsEmpty));
+        return myAllocator.alloc();
+    }
+    static void operator delete(void * mem, size_t sz)
+    {
+        assert(sz == sizeof(PhysicsEmpty));
+        myAllocator.free(mem);
+    }
     PhysicsEmpty()
         : PhysicsObject(Dimension::Overworld, PhysicsProperties(1, 0, 0))
     {
@@ -119,6 +131,19 @@ public:
 
 class PhysicsBox final : public PhysicsObject
 {
+private:
+    static thread_local ArenaAllocator<PhysicsBox> myAllocator;
+public:
+    static void * operator new(size_t sz)
+    {
+        assert(sz == sizeof(PhysicsBox));
+        return myAllocator.alloc();
+    }
+    static void operator delete(void * mem, size_t sz)
+    {
+        assert(sz == sizeof(PhysicsBox));
+        myAllocator.free(mem);
+    }
 public:
     VectorF center, extents;
     VectorF velocity, acceleration, deltaAcceleration, answerOffset;
@@ -178,6 +203,19 @@ inline bool isBoxCollision(VectorF center1, VectorF extents1, VectorF center2, V
 
 struct PhysicsObjectConstructor final : public enable_shared_from_this<PhysicsObjectConstructor>
 {
+private:
+    static thread_local ArenaAllocator<PhysicsObjectConstructor> myAllocator;
+public:
+    static void * operator new(size_t sz)
+    {
+        assert(sz == sizeof(PhysicsObjectConstructor));
+        return myAllocator.alloc();
+    }
+    static void operator delete(void * mem, size_t sz)
+    {
+        assert(sz == sizeof(PhysicsObjectConstructor));
+        myAllocator.free(mem);
+    }
 private:
     enum class Type : uint8_t
     {

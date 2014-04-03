@@ -21,6 +21,9 @@ PhysicsObject::~PhysicsObject()
 {
 }
 
+thread_local ArenaAllocator<PhysicsEmpty> PhysicsEmpty::myAllocator;
+thread_local ArenaAllocator<PhysicsBox> PhysicsBox::myAllocator;
+
 namespace
 {
 inline int getCollisions(float times[3], float position1, float velocity1, float acceleration1, float deltaAcceleration1, float position2, float velocity2, float acceleration2, float deltaAcceleration2)
@@ -183,3 +186,4 @@ PhysicsCollision PhysicsBox::collide(shared_ptr<const PhysicsObject> pother, flo
     return PhysicsCollision();
 }
 
+thread_local ArenaAllocator<PhysicsObjectConstructor> PhysicsObjectConstructor::myAllocator;
