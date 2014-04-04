@@ -93,7 +93,6 @@ PhysicsCollision PhysicsBox::collide(shared_ptr<const PhysicsObject> pother, flo
         if(min.x < otherMax.x && min.y < otherMax.y && min.z < otherMax.z && max.x > otherMin.x && max.y > otherMin.y && max.z > otherMin.z) // intersects now
         {
 #if 1
-            VectorF newVelocity = (velocity * properties().mass + other.velocity * other.properties().mass) / (properties().mass + other.properties().mass);
             VectorF deltaCenter = center - other.center;
             VectorF deltaFixedPosition;
             if(deltaCenter.x > 0)
@@ -141,7 +140,19 @@ PhysicsCollision PhysicsBox::collide(shared_ptr<const PhysicsObject> pother, flo
                 fixedPosition.z += deltaFixedPosition.z;
             }
             VectorF newPosition = (center * properties().mass + fixedPosition * other.properties().mass) / (properties().mass + other.properties().mass);
-            return PhysicsCollision(PositionF(newPosition + answerOffset, dimension()), newVelocity, normalizeNoThrow(newPosition - center), 0);
+            VectorF collisionNormal = normalizeNoThrow(newPosition - center);
+            VectorF cVelocity = velocity;
+            VectorF oCVelocity = other.velocity;
+            VectorF nonReflectedVelocity = (cVelocity * properties().mass + oCVelocity * other.properties().mass) / (properties().mass + other.properties().mass);
+            VectorF reflectedVelocity = (cVelocity * (properties().mass - other.properties().mass) + (other.properties().mass + other.properties().mass) * oCVelocity) / (properties().mass + other.properties().mass);
+            VectorF partiallyReflectedVelocity = nonReflectedVelocity + properties().bounciness * other.properties().bounciness * (reflectedVelocity - nonReflectedVelocity);
+            float reflectedDot = dot(partiallyReflectedVelocity, collisionNormal);
+            VectorF frictionlessVelocity = cVelocity;
+            VectorF stuckVelocity = nonReflectedVelocity;
+            VectorF newVelocity = frictionlessVelocity + properties().friction * other.properties().friction * (stuckVelocity - frictionlessVelocity);
+            newVelocity -= collisionNormal * dot(newVelocity, collisionNormal);
+            newVelocity += collisionNormal * reflectedDot;
+            return PhysicsCollision(PositionF(newPosition + answerOffset, dimension()), newVelocity, collisionNormal, 0);
 #else
             return PhysicsCollision();
 #endif

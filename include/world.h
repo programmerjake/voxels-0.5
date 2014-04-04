@@ -29,7 +29,6 @@ using namespace std;
 
 const int WorldHeight = ChunkHeight;
 const int AverageGroundHeight = 64;
-constexpr VectorF gravityVector = VectorF(0, -9.8, 0);
 
 class BlockIterator;
 class World;

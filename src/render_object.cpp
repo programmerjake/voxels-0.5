@@ -180,6 +180,7 @@ void RenderObjectEntity::move(float deltaTimeIn, shared_ptr<RenderObjectWorld> w
     const VectorI searchSize = VectorI(1, 2, 1);
 
     int count = iceil(deltaTimeIn * abs(velocity) / 0.5 + 1);
+    count = 1;
     RenderObjectWorld::BlockIterator bi = world->get((PositionI)position - searchSize);
     for(int step = 0; step < count; step++)
     {
@@ -223,10 +224,78 @@ void RenderObjectEntity::move(float deltaTimeIn, shared_ptr<RenderObjectWorld> w
                     }
                 }
             }
+            PhysicsCollision collision = physicsObject.collide(make_shared<PhysicsBox>(VectorF(position.x, -1, position.z) - VectorF(1024), VectorF(1024), VectorF(0), VectorF(0), VectorF(0), position.d, PhysicsProperties(PhysicsProperties::INFINITE_MASS, 1, 0)), deltaTime);
+            if(collision.valid)
+            {
+                if(collision.time < eps)
+                {
+                    if(zeroCount > 25)
+                        collision.valid = false;
+                    else
+                        zeroCount++;
+                }
+                else
+                    zeroCount = 0;
+            }
+            if(collision.valid && collision.time < firstCollision.time)
+                firstCollision = collision;
             deltaTime -= firstCollision.time;
             position = firstCollision.newPosition + eps * (2 + abs(firstCollision.newVelocity)) * firstCollision.collisionNormal;
             velocity = firstCollision.newVelocity;
             acceleration = acceleration + deltaAcceleration * firstCollision.time;
         }
     }
+}
+
+bool RenderObjectEntity::isOnGround(shared_ptr<RenderObjectWorld> world)
+{
+    if(!good())
+    {
+        return false;
+    }
+
+    const VectorI searchSize = VectorI(1, 2, 1);
+
+    RenderObjectWorld::BlockIterator bi = world->get((PositionI)position - searchSize);
+    auto pphysicsObject = mesh()->constructPhysicsObject(position - VectorF(0, 5 * eps, 0), velocity, acceleration, deltaAcceleration);
+    PhysicsObject & physicsObject = *pphysicsObject;
+    switch(physicsObject.type())
+    {
+    case PhysicsObject::Type::None:
+        break;
+    case PhysicsObject::Type::Box:
+    {
+        PhysicsBox & box = dynamic_cast<PhysicsBox &>(physicsObject);
+        box.extents -= VectorF(eps * 5, 0, eps * 5);
+        break;
+    }
+    }
+    for(int dx = -searchSize.x; dx <= searchSize.x; dx++, bi.movePX())
+    {
+        RenderObjectWorld::BlockIterator bi2 = bi;
+        for(int dy = -searchSize.y; dy <= searchSize.y; dy++, bi2.movePY())
+        {
+            RenderObjectWorld::BlockIterator curBI = bi2;
+            for(int dz = -searchSize.z; dz <= searchSize.z; dz++, curBI.movePZ())
+            {
+                shared_ptr<PhysicsObject> otherObject;
+                if(curBI.getMesh())
+                    otherObject = curBI.getMesh()->constructPhysicsObject(curBI.getPosition());
+                else
+                    otherObject = static_pointer_cast<PhysicsObject>(make_shared<PhysicsEmpty>());
+                assert(otherObject);
+                PhysicsCollision collision = physicsObject.collide(otherObject, eps * 2);
+                if(collision.valid)
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    PhysicsCollision collision = physicsObject.collide(make_shared<PhysicsBox>(VectorF(position.x, -1, position.z) - VectorF(1024), VectorF(1024), VectorF(0), VectorF(0), VectorF(0), position.d, PhysicsProperties(PhysicsProperties::INFINITE_MASS, 1, 0)), eps * 2);
+    if(collision.valid)
+    {
+        return true;
+    }
+    return false;
 }

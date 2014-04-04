@@ -279,6 +279,7 @@ void clientProcessReader(Reader *preader, ClientState *state)
                 }
 
                 shared_ptr<RenderObjectEntity> player = dynamic_pointer_cast<RenderObjectEntity>(ro);
+                player->acceleration = gravityVector;
 
                 if(!player)
                 {
@@ -444,6 +445,27 @@ void meshMakerThread(Mesh meshes[], ClientState *state)
     state->lock.unlock();
 }
 
+bool isPlayerOnGround(ClientState &state)
+{
+    if(state.player == nullptr || !state.player->good())
+        return false;
+    shared_ptr<RenderObjectWorld> world;
+    LockedClient lockIt(state.client);
+    world = RenderObjectWorld::getWorld(state.client);
+    return state.player->isOnGround(world);
+}
+
+void handleJump(ClientState *state)
+{
+    if(state->jumpDown)
+    {
+        if(isPlayerOnGround(*state))
+        {
+            state->velocity(VectorF(state->velocity().x, 0, state->velocity().z) - gravityVector * 0.5);
+        }
+    }
+}
+
 void updateVelocity(ClientState *state)
 {
     lock_guard<recursive_mutex> lockIt(state->lock);
@@ -471,6 +493,7 @@ void updateVelocity(ClientState *state)
     {
         state->velocity(state->velocity() - leftVector);
     }
+    handleJump(state);
 }
 
 class ClientEventHandler final : public EventHandler
@@ -545,6 +568,11 @@ public:
             clientState->backwardDown = false;
         }
 
+        if(event.key == KeyboardKey::KeyboardKey_Space)
+        {
+            clientState->jumpDown = false;
+        }
+
         return false;
     }
     virtual bool handleKeyDown(KeyDownEvent &event) override
@@ -578,6 +606,12 @@ public:
         if(event.key == KeyboardKey::KeyboardKey_S)
         {
             clientState->backwardDown = true;
+        }
+
+        if(event.key == KeyboardKey::KeyboardKey_Space)
+        {
+            clientState->jumpDown = true;
+            handleJump(clientState);
         }
 
         return false;

@@ -311,7 +311,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                 LockedClient lockClient(client);
                 lock_guard<recursive_mutex> lockWorld(world->lock);
                 shared_ptr<EntityData> eplayer = EntityPlayer::get(client);
-                EntityPlayer::update(eplayer, PositionF(0.5, 0.5 + AverageGroundHeight + 10, 0.5, Dimension::Overworld), VectorF(0), 0, 0, false);
+                EntityPlayer::update(eplayer, PositionF(0.5, 0.5 + AverageGroundHeight + 100, 0.5, Dimension::Overworld), VectorF(0), 0, 0, false);
                 world->addEntity(eplayer);
                 roplayer = eplayer->desc->getEntity(*eplayer, world);
             }
@@ -359,7 +359,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                     PositionI pos = *i;
                     bi = pos;
 
-                    if(count >= max<ssize_t>(50, 100 - (ssize_t)objects.size() / 2))
+                    if(count >= max<ssize_t>(100, 400 - (ssize_t)objects.size() / 2))
                     {
                         if(locked)
                         {
@@ -596,7 +596,7 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                         getClientGotStateFlag(*pclient) = false;
                     }
 #if 1
-                    if(frame % 40 == 0)
+                    if(frame % 80 == 0)
                     {
                         BlockDescriptorPtr block;
                         if(rand() % 3 == 0)
@@ -605,9 +605,14 @@ void serverSimulateThreadFn(shared_ptr<list<shared_ptr<Client>>> clients, shared
                             block = BlockDescriptors.get(L"builtin.stone");
                         else
                             block = BlockDescriptors.get(L"builtin.glass");
-                        VectorF lookDir = Matrix::rotateX(getClientViewPhi(*pclient)).concat(Matrix::rotateY(-getClientViewTheta(*pclient))).apply(VectorF(0, 0, -1));
-                        for(int i = 5; i <= 50; i++)
-                            world->addEntity(EntityBlock::make(block, getClientPosition(*pclient) + lookDir, (i) * lookDir));
+                        default_random_engine r;
+                        r.seed(frame);
+                        for(int i = 10; i <= 20; i++)
+                        {
+                            VectorF lookDir = Matrix::rotateX(getClientViewPhi(*pclient)).concat(Matrix::rotateY(-getClientViewTheta(*pclient))).apply(VectorF(0, 0, -1));
+                            lookDir = normalize(lookDir + VectorF::random(r) * 0.1f);
+                            world->addEntity(EntityBlock::make(block, getClientPosition(*pclient) + lookDir * 0.25, (i / 10.0 + 10.0) * lookDir));
+                        }
                     }
 #endif
                     UpdateList &cul = getClientUpdateList(*pclient);

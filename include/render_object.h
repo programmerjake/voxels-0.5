@@ -315,6 +315,7 @@ protected:
 public:
     virtual void render(Mesh dest, RenderLayer rl, Dimension d, Client & client, unsigned) override;
     void move(float deltaTime, shared_ptr<RenderObjectWorld> world);
+    bool isOnGround(shared_ptr<RenderObjectWorld> world);
     virtual bool operator ==(const RenderObject &rt) const override
     {
         return this == &rt;

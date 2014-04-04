@@ -26,7 +26,7 @@ class EntityPlayer final : public EntityDescriptor
 {
 private:
     static constexpr VectorF physicsExtents() {return VectorF(0.3, 0.9, 0.3);}
-    static constexpr PhysicsProperties physicsProperties() {return PhysicsProperties(0.1, 0.5, 0.1);}
+    static constexpr PhysicsProperties physicsProperties() {return PhysicsProperties(1, 0, 0);}
     static constexpr VectorF physicsOffset() {return VectorF(0, physicsExtents().y - 1.62, 0);}
     struct ExtraData final : public ExtraEntityData
     {

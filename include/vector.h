@@ -429,5 +429,6 @@ inline VectorF normalizeNoThrow(const VectorI & v)
     return normalizeNoThrow((VectorF)v);
 }
 
+constexpr VectorF gravityVector = VectorF(0, -9.8, 0);
 
 #endif // VECTOR_H
