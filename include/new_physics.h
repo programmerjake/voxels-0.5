@@ -18,8 +18,6 @@
 #ifndef NEW_PHYSICS_H_INCLUDED
 #define NEW_PHYSICS_H_INCLUDED
 
-#error finish new_physics
-
 #include "position.h"
 #include "util.h"
 #include "stream.h"
@@ -33,10 +31,10 @@ const constexpr float ContactEPS = 1e-3;
 struct Properties final
 {
     float mass, friction, bounciness;
-    uint_fast32_t contactMask;
+    uint_fast32_t contactMask1, contactMask2;
     static constexpr float INFINITE_MASS = 1e20;
-    constexpr Properties(float mass, float friction, float bounciness, uint32_t contactMask = 1)
-        : mass(mass), friction(friction), bounciness(bounciness), contactMask(contactMask)
+    constexpr Properties(float mass, float friction, float bounciness, uint32_t contactMask1 = 1, uint32_t contactMask2 = 1)
+        : mass(mass), friction(friction), bounciness(bounciness), contactMask1(contactMask1), contactMask2(contactMask2)
     {
     }
     static Properties read(Reader &reader)
@@ -45,15 +43,17 @@ struct Properties final
         mass = reader.readLimitedF32(eps, INFINITE_MASS);
         friction = reader.readLimitedF32(0, 1);
         bounciness = reader.readLimitedF32(0, 1);
-        uint32_t contactMask = reader.readU32();
-        return Properties(mass, friction, bounciness, contactMask);
+        uint32_t contactMask1 = reader.readU32();
+        uint32_t contactMask2 = reader.readU32();
+        return Properties(mass, friction, bounciness, contactMask1, contactMask2);
     }
     void write(Writer &writer)
     {
         writer.writeF32(mass);
         writer.writeF32(friction);
         writer.writeF32(bounciness);
-        writer.writeU32(contactMask);
+        writer.writeU32(contactMask1);
+        writer.writeU32(contactMask2);
     }
 };
 
@@ -77,21 +77,22 @@ struct Contact
 struct Collision final : public Contact
 {
     VectorF velocity;
-    float time;
+    double time;
     Collision()
         : Contact(), time(-1)
     {
     }
-    Collision(PositionF position, VectorF otherNormal, VectorF velocity, float time)
+    Collision(PositionF position, VectorF otherNormal, VectorF velocity, double time)
         : Contact(position, otherNormal), velocity(velocity), time(time)
     {
     }
 };
 
-struct Object final
+struct Object
 {
 public:
-    Object()
+    Object(Properties properties)
+        : properties(properties)
     {
     }
     enum class Type
@@ -104,8 +105,10 @@ public:
     Properties properties;
     VectorF gravity;
     virtual void calcPos(double currentTime) = 0;
-    virtual Contact getContact(Object & other) = 0;
-    virtual Collision getFirstCollision(Object & other) = 0;
+    virtual bool processContact(const Object & other) = 0; /// returns true if it did anything
+    virtual Collision getFirstCollision(const Object & other) const = 0;
+    virtual void resetAcceleration() = 0;
+    virtual void handleFirstCollision(Collision c, const Object & other) = 0;
 };
 
 struct Empty final : public Object
@@ -119,13 +122,23 @@ private:
     {
         lastCalcTime = currentTime;
     }
-    virtual Contact getContact(Object & other) override
+    virtual bool processContact(const Object &) override
     {
-        return Contact();
+        return false;
     }
-    virtual Collision getFirstCollision(Object & other) override
+    virtual Collision getFirstCollision(const Object &) const override
     {
         return Collision();
+    }
+    virtual void resetAcceleration() override
+    {
+    }
+    virtual void handleFirstCollision(Collision, const Object &) override
+    {
+    }
+    Empty()
+        : Object(Properties(0, 0, 0, 0, 0))
+    {
     }
 };
 
@@ -134,7 +147,9 @@ struct AABox final : public Object
     PositionF position;
     VectorF size;
     VectorF velocity;
-    AABox(PositionF position, VectorF size, VectorF velocity)
+    VectorF acceleration;
+    AABox(PositionF position, VectorF size, VectorF velocity, Properties properties)
+        : Object(properties)
     {
     }
     virtual Type type() const override
@@ -145,11 +160,16 @@ struct AABox final : public Object
     {
         float deltaTime = currentTime - lastCalcTime;
         lastCalcTime = currentTime;
-        position += velocity * deltaTime + 0.5f * deltaTime * deltaTime * gravity;
-        velocity += gravity * deltaTime;
+        position += velocity * deltaTime + 0.5f * deltaTime * deltaTime * acceleration;
+        velocity += acceleration * deltaTime;
     }
-    virtual Contact getContact(Object & other) override;
-    virtual Collision getFirstCollision(Object & other) override;
+    virtual bool processContact(const Object & other) override;
+    virtual Collision getFirstCollision(const Object & other) const override;
+    virtual void resetAcceleration() override
+    {
+        acceleration = gravity;
+    }
+    virtual void handleFirstCollision(Collision c, const Object & other) override;
 };
 
 struct World final
@@ -162,9 +182,7 @@ struct World final
         o->lastCalcTime = currentTime;
         objects.push_back(o);
     }
-    void move(double runToTime)
-    {
-    }
+    void move(double runToTime);
 };
 }
 
