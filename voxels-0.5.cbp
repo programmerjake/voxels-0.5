@@ -62,7 +62,7 @@
 			<Add option="`sdl2-config --libs`" />
 			<Add library="GL" />
 			<Add library="png" />
-			<Add library="SDL2" />
+			<Add library="/usr/local/lib/libSDL2.a" />
 		</Linker>
 		<Unit filename="include/biome_server.h" />
 		<Unit filename="include/biomes.h" />

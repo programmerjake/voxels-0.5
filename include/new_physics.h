@@ -28,12 +28,15 @@
 
 namespace Physics
 {
+const constexpr float ContactEPS = 1e-3;
+
 struct Properties final
 {
     float mass, friction, bounciness;
+    uint_fast32_t contactMask;
     static constexpr float INFINITE_MASS = 1e20;
-    constexpr Properties(float mass, float friction, float bounciness)
-        : mass(mass), friction(friction), bounciness(bounciness)
+    constexpr Properties(float mass, float friction, float bounciness, uint32_t contactMask = 1)
+        : mass(mass), friction(friction), bounciness(bounciness), contactMask(contactMask)
     {
     }
     static Properties read(Reader &reader)
@@ -42,13 +45,15 @@ struct Properties final
         mass = reader.readLimitedF32(eps, INFINITE_MASS);
         friction = reader.readLimitedF32(0, 1);
         bounciness = reader.readLimitedF32(0, 1);
-        return Properties(mass, friction, bounciness);
+        uint32_t contactMask = reader.readU32();
+        return Properties(mass, friction, bounciness, contactMask);
     }
     void write(Writer &writer)
     {
         writer.writeF32(mass);
         writer.writeF32(friction);
         writer.writeF32(bounciness);
+        writer.writeU32(contactMask);
     }
 };
 
@@ -73,6 +78,14 @@ struct Collision final : public Contact
 {
     VectorF velocity;
     float time;
+    Collision()
+        : Contact(), time(-1)
+    {
+    }
+    Collision(PositionF position, VectorF otherNormal, VectorF velocity, float time)
+        : Contact(position, otherNormal), velocity(velocity), time(time)
+    {
+    }
 };
 
 struct Object final
@@ -86,12 +99,13 @@ public:
         Empty,
         AABox,
     };
-
+    virtual Type type() const = 0;
     double lastCalcTime = 0;
     Properties properties;
     VectorF gravity;
     virtual void calcPos(double currentTime) = 0;
-    virtual Contact getContact(const Object & other) const
+    virtual Contact getContact(Object & other) = 0;
+    virtual Collision getFirstCollision(Object & other) = 0;
 };
 
 struct Empty final : public Object
@@ -105,20 +119,37 @@ private:
     {
         lastCalcTime = currentTime;
     }
+    virtual Contact getContact(Object & other) override
+    {
+        return Contact();
+    }
+    virtual Collision getFirstCollision(Object & other) override
+    {
+        return Collision();
+    }
 };
 
 struct AABox final : public Object
 {
     PositionF position;
+    VectorF size;
     VectorF velocity;
+    AABox(PositionF position, VectorF size, VectorF velocity)
+    {
+    }
     virtual Type type() const override
     {
         return Type::Empty;
     }
     virtual void calcPos(double currentTime)
     {
+        float deltaTime = currentTime - lastCalcTime;
         lastCalcTime = currentTime;
+        position += velocity * deltaTime + 0.5f * deltaTime * deltaTime * gravity;
+        velocity += gravity * deltaTime;
     }
+    virtual Contact getContact(Object & other) override;
+    virtual Collision getFirstCollision(Object & other) override;
 };
 
 struct World final

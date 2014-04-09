@@ -15,8 +15,41 @@
  * MA 02110-1301, USA.
  *
  */
-#if 1
+#if 0
 #warning finish new_physics
 #else
 #include "new_physics.h"
+
+namespace Physics
+{
+namespace
+{
+inline bool boxesIntersect(PositionF)
+}
+Contact AABox::getContact(const Object & other_in) const
+{
+    assert(lastCalcTime == other_in.lastCalcTime);
+    if((other_in.properties.contactMask & properties.contactMask) == 0)
+        return Contact();
+
+    switch(other_in.type())
+    {
+    case Type::Empty:
+        return Contact();
+    case Type::AABox:
+    {
+        const AABox & other = (const AABox &)other_in;
+        if(position.d != other.position.d)
+            return Contact();
+    }
+    }
+    assert(false);
+    return Contact();
+}
+
+Collision AABox::getFirstCollision(const Object & other) const
+{
+
+}
+}
 #endif
