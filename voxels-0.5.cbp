@@ -64,6 +64,7 @@
 			<Add library="png" />
 			<Add library="/usr/local/lib/libSDL2.a" />
 		</Linker>
+		<Unit filename="include/audio.h" />
 		<Unit filename="include/biome_server.h" />
 		<Unit filename="include/biomes.h" />
 		<Unit filename="include/block.h" />
@@ -89,6 +90,7 @@
 		<Unit filename="include/network.h" />
 		<Unit filename="include/network_protocol.h" />
 		<Unit filename="include/new_physics.h" />
+		<Unit filename="include/ogg_vorbis_decoder.h" />
 		<Unit filename="include/physics.h" />
 		<Unit filename="include/platform.h" />
 		<Unit filename="include/player.h" />
@@ -109,6 +111,7 @@
 		<Unit filename="include/vector.h" />
 		<Unit filename="include/world.h" />
 		<Unit filename="include/world_generator.h" />
+		<Unit filename="src/audio.cpp" />
 		<Unit filename="src/biomes.cpp" />
 		<Unit filename="src/block.cpp" />
 		<Unit filename="src/builtin_blocks.cpp" />
@@ -123,7 +126,9 @@
 		<Unit filename="src/matrix.cpp" />
 		<Unit filename="src/mesh.cpp" />
 		<Unit filename="src/network.cpp" />
-		<Unit filename="src/new_physics.cpp" />
+		<Unit filename="src/new_physics.cpp">
+			<Option target="&lt;{~None~}&gt;" />
+		</Unit>
 		<Unit filename="src/physics.cpp" />
 		<Unit filename="src/platform.cpp">
 			<Option compiler="gcc" use="1" buildCommand="$compiler $options $includes `sdl-config --cflags` -c $file -o $object" />

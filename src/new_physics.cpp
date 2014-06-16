@@ -44,13 +44,13 @@ inline bool boxCollides(VectorF & position, VectorF other_position, VectorF size
     {
         if(displacement.x < 0)
         {
-            position.x = other.position.x - minDisplacement.x - ContactEPS * 0.5;
+            position.x = other_position.x - minDisplacement.x - ContactEPS * 0.5;
             normal = VectorF(-1, 0, 0);
             return true;
         }
         else
         {
-            position.x = other.position.x + minDisplacement.x + ContactEPS * 0.5;
+            position.x = other_position.x + minDisplacement.x + ContactEPS * 0.5;
             normal = VectorF(1, 0, 0);
             return true;
         }
@@ -59,13 +59,13 @@ inline bool boxCollides(VectorF & position, VectorF other_position, VectorF size
     {
         if(displacement.y < 0)
         {
-            position.y = other.position.y - minDisplacement.y - ContactEPS * 0.5;
+            position.y = other_position.y - minDisplacement.y - ContactEPS * 0.5;
             normal = VectorF(0, -1, 0);
             return true;
         }
         else
         {
-            position.y = other.position.y + minDisplacement.y + ContactEPS * 0.5;
+            position.y = other_position.y + minDisplacement.y + ContactEPS * 0.5;
             normal = VectorF(0, 1, 0);
             return true;
         }
@@ -74,13 +74,13 @@ inline bool boxCollides(VectorF & position, VectorF other_position, VectorF size
     {
         if(displacement.z < 0)
         {
-            position.z = other.position.z - minDisplacement.z - ContactEPS * 0.5;
+            position.z = other_position.z - minDisplacement.z - ContactEPS * 0.5;
             normal = VectorF(0, 0, -1);
             return true;
         }
         else
         {
-            position.z = other.position.z + minDisplacement.z + ContactEPS * 0.5;
+            position.z = other_position.z + minDisplacement.z + ContactEPS * 0.5;
             normal = VectorF(0, 0, 1);
             return true;
         }
@@ -123,7 +123,7 @@ bool AABox::processContact(const Object & other_in)
     return false;
 }
 
-Collision AABox::getFirstCollision(const Object & other) const
+Collision AABox::getFirstCollision(const Object & other_in) const
 {
     if((other_in.properties.contactMask & properties.contactMask) == 0)
         return Collision();
