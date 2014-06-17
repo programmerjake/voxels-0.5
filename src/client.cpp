@@ -735,7 +735,7 @@ void clientProcess(StreamRW &streamRW)
         clientState.cond.notify_all();
         clientState.lock.unlock();
         Display::initFrame();
-        glClearColor(0, 0, 0, 0);
+        glClearColor(0, 0, 0.5, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         moveEntities(clientState, Display::frameDeltaTime());
         clientState.lock.lock();

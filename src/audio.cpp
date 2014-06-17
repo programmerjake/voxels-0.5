@@ -273,7 +273,7 @@ shared_ptr<PlayingAudio> Audio::play(float volume, bool looped)
     return shared_ptr<PlayingAudio>(new PlayingAudio(playingAudioData));
 }
 
-#if 1
+#if 0
 namespace
 {
 initializer init1([]()

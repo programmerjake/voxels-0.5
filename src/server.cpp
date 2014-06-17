@@ -311,7 +311,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                 LockedClient lockClient(client);
                 lock_guard<recursive_mutex> lockWorld(world->lock);
                 shared_ptr<EntityData> eplayer = EntityPlayer::get(client);
-                EntityPlayer::update(eplayer, PositionF(0.5, 0.5 + AverageGroundHeight + 100, 0.5, Dimension::Overworld), VectorF(0), 0, 0, false);
+                EntityPlayer::update(eplayer, PositionF(0.5, 0.5 + AverageGroundHeight + 10, 0.5, Dimension::Overworld), VectorF(0), 0, 0, false);
                 world->addEntity(eplayer);
                 roplayer = eplayer->desc->getEntity(*eplayer, world);
             }

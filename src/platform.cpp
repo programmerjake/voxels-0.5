@@ -956,7 +956,7 @@ float Display::scaleY()
 
 void Display::initFrame()
 {
-    if(width > height)
+    if(width() > height())
     {
         scaleXInternal = static_cast<float>(width()) / height();
         scaleYInternal = 1.0;
@@ -966,6 +966,7 @@ void Display::initFrame()
         scaleXInternal = 1.0;
         scaleYInternal = static_cast<float>(height()) / width();
     }
+    //glDisable(GL_DEPTH_TEST);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_TEXTURE_2D);
     glEnable(GL_ALPHA_TEST);
