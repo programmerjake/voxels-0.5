@@ -62,7 +62,6 @@
 			<Add option="`sdl2-config --libs`" />
 			<Add library="GL" />
 			<Add library="png" />
-			<Add library="/usr/local/lib/libSDL2.a" />
 			<Add library="ogg" />
 			<Add library="vorbis" />
 			<Add library="vorbisfile" />

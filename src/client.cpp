@@ -790,7 +790,7 @@ void clientProcess(StreamRW &streamRW)
         s << L"Triangle Count : " << polyCount << L"   Entity Count : " << entityCount << endl;
         s << L"Position : <" << pos.x << L", " << pos.y << L", " << pos.z << L">     Dimension : " << (int)pos.d << endl;
         s << L"Velocity : <" << velocity.x << L", " << velocity.y << L", " << velocity.z << L">\n";
-        r << transform(Matrix::translate(-40 * Display::scaleX(), 40 * Display::scaleY() - Text::height(s.str()), -40 * Display::scaleX()), Text::mesh(s.str(), Color(1, 0, 1)));
+        r << transform(Matrix::translate(-40 * Display::scaleX(), 40 * Display::scaleY() - Text::height(s.str()), -40), Text::mesh(s.str(), Color(1, 0, 1)));
         Display::flip();
         Display::handleEvents(shared_ptr<EventHandler>(new ClientEventHandler(&clientState)));
         clientState.lock.lock();
