@@ -29,6 +29,7 @@
 #include <atomic>
 #include <thread>
 #include <mutex>
+#include "audio.h"
 
 #ifndef SDL_HINT_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK
 #define SDL_HINT_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK "SDL_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK"
@@ -144,18 +145,96 @@ static int xResInternal, yResInternal;
 
 static SDL_Window *window = nullptr;
 static SDL_GLContext glcontext = nullptr;
-static atomic_bool runningGraphics(false), runningSDL(false);
+static atomic_bool runningGraphics(false), runningSDL(false), runningAudio(false);
+static atomic_int SDLUseCount(0);
+static atomic_bool addedAtExits(false);
 
 static void startSDL()
 {
     if(runningSDL.exchange(true))
         return;
-    if(0 != SDL_Init(SDL_INIT_TIMER | SDL_INIT_VIDEO | SDL_INIT_AUDIO))
+    if(0 != SDL_Init(SDL_INIT_TIMER | SDL_INIT_VIDEO))
     {
         cerr << "error : can't start SDL : " << SDL_GetError() << endl;
         exit(1);
     }
-    atexit(endGraphics);
+    if(!addedAtExits.exchange(true))
+    {
+        atexit(endGraphics);
+        atexit(endAudio);
+    }
+}
+
+static SDL_AudioSpec globalAudioSpec;
+static SDL_AudioDeviceID globalAudioDeviceID = 0;
+static atomic_bool validAudio(false);
+
+unsigned getGlobalAudioSampleRate()
+{
+    if(!validAudio)
+        return 0;
+    return globalAudioSpec.freq;
+}
+
+unsigned getGlobalAudioChannelCount()
+{
+    if(!validAudio)
+        return 0;
+    return globalAudioSpec.channels;
+}
+
+void startAudio()
+{
+    if(!runningAudio.exchange(true))
+    {
+        SDLUseCount++;
+        startSDL();
+        if(0 != SDL_InitSubSystem(SDL_INIT_AUDIO))
+        {
+            cerr << "error : can't start SDL audio subsystem : " << SDL_GetError() << endl;
+            exit(1);
+        }
+        validAudio = true;
+        SDL_AudioSpec desired;
+        desired.callback = PlayingAudio::audioCallback;
+        desired.channels = 6;
+        desired.format = AUDIO_S16SYS;
+        desired.freq = 96000;
+        desired.samples = 512;
+        desired.userdata = nullptr;
+        globalAudioDeviceID = SDL_OpenAudioDevice(nullptr, 0, &desired, &globalAudioSpec, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE | SDL_AUDIO_ALLOW_CHANNELS_CHANGE);
+        if(globalAudioDeviceID == 0)
+        {
+            cerr << "error : can't open audio device : " << SDL_GetError() << endl;
+            SDL_QuitSubSystem(SDL_INIT_AUDIO);
+            SDLUseCount--;
+            runningAudio = false;
+            exit(1);
+        }
+        SDL_PauseAudioDevice(globalAudioDeviceID, SDL_FALSE);
+    }
+}
+
+void endAudio()
+{
+    if(runningAudio.exchange(false))
+    {
+        SDL_PauseAudioDevice(globalAudioDeviceID, SDL_TRUE);
+        validAudio = false;
+        SDL_CloseAudioDevice(globalAudioDeviceID);
+        globalAudioDeviceID = 0;
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+        if(--SDLUseCount <= 0)
+        {
+            if(runningSDL.exchange(false))
+                SDL_Quit();
+        }
+    }
+}
+
+bool audioRunning()
+{
+    return validAudio;
 }
 
 void endGraphics()
@@ -167,15 +246,19 @@ void endGraphics()
         SDL_DestroyWindow(window);
         window = nullptr;
     }
-    if(runningSDL.exchange(false))
-        SDL_Quit();
+    if(--SDLUseCount <= 0)
+    {
+        if(runningSDL.exchange(false))
+            SDL_Quit();
+    }
 }
 
 void startGraphics()
 {
-    startSDL();
     if(runningGraphics.exchange(true))
         return;
+    SDLUseCount++;
+    startSDL();
 #if 0
     const SDL_VideoInfo * vidInfo = SDL_GetVideoInfo();
     if(vidInfo == nullptr)
@@ -914,4 +997,3 @@ VectorF Display::transformMouseTo3D(float x, float y, float depth)
 {
     return VectorF(depth * scaleX() * (2 * x / width() - 1), depth * scaleY() * (1 - 2 * y / height()), -depth);
 }
-

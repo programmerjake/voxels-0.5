@@ -63,6 +63,9 @@
 			<Add library="GL" />
 			<Add library="png" />
 			<Add library="/usr/local/lib/libSDL2.a" />
+			<Add library="ogg" />
+			<Add library="vorbis" />
+			<Add library="vorbisfile" />
 		</Linker>
 		<Unit filename="include/audio.h" />
 		<Unit filename="include/biome_server.h" />

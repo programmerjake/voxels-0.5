@@ -22,6 +22,7 @@
 #include <cmath>
 #include <random>
 #include <cstdint>
+#include <limits>
 #include <list>
 #include <set>
 #include <functional>
@@ -247,7 +248,7 @@ public:
     typedef const T *const_pointer;
     static constexpr size_type capacity()
     {
-        return arraySize;
+        return arraySize - 1;
     }
 private:
     size_type frontIndex, backIndex;

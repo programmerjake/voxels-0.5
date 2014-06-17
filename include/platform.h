@@ -242,6 +242,11 @@ namespace Display
 
 void startGraphics();
 void endGraphics();
+void startAudio();
+void endAudio();
+unsigned getGlobalAudioSampleRate();
+unsigned getGlobalAudioChannelCount();
+bool audioRunning();
 
 #endif // PLATFORM_H_INCLUDED
 #include "event.h"
