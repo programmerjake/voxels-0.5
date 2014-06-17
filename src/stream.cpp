@@ -22,19 +22,20 @@
 #include <mutex>
 #include <condition_variable>
 #include <queue>
+#include "util.h"
 
 using namespace std;
 
 namespace
 {
-const size_t bufferSize = 8192;
+const size_t bufferSize = 32768;
 
 struct Pipe
 {
     mutex lock;
     condition_variable_any cond;
     bool closed = false;
-    queue<uint8_t> buffer;
+    queue<uint8_t, circularDeque<uint8_t, bufferSize + 1>> buffer;
 };
 
 class PipeReader final : public Reader

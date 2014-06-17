@@ -31,10 +31,10 @@ const constexpr float ContactEPS = 1e-3;
 struct Properties final
 {
     float mass, friction, bounciness;
-    uint_fast32_t contactMask1, contactMask2;
+    uint_fast32_t contactMask;
     static constexpr float INFINITE_MASS = 1e20;
-    constexpr Properties(float mass, float friction, float bounciness, uint32_t contactMask1 = 1, uint32_t contactMask2 = 1)
-        : mass(mass), friction(friction), bounciness(bounciness), contactMask1(contactMask1), contactMask2(contactMask2)
+    constexpr Properties(float mass, float friction, float bounciness, uint32_t contactMask = 1)
+        : mass(mass), friction(friction), bounciness(bounciness), contactMask(contactMask)
     {
     }
     static Properties read(Reader &reader)
@@ -43,17 +43,15 @@ struct Properties final
         mass = reader.readLimitedF32(eps, INFINITE_MASS);
         friction = reader.readLimitedF32(0, 1);
         bounciness = reader.readLimitedF32(0, 1);
-        uint32_t contactMask1 = reader.readU32();
-        uint32_t contactMask2 = reader.readU32();
-        return Properties(mass, friction, bounciness, contactMask1, contactMask2);
+        uint32_t contactMask = reader.readU32();
+        return Properties(mass, friction, bounciness, contactMask);
     }
     void write(Writer &writer)
     {
         writer.writeF32(mass);
         writer.writeF32(friction);
         writer.writeF32(bounciness);
-        writer.writeU32(contactMask1);
-        writer.writeU32(contactMask2);
+        writer.writeU32(contactMask);
     }
 };
 

@@ -359,7 +359,7 @@ void runServerWriterThread(shared_ptr<StreamRW> connection, shared_ptr<Client> p
                     PositionI pos = *i;
                     bi = pos;
 
-                    if(count >= max<ssize_t>(100, 400 - (ssize_t)objects.size() / 2))
+                    if(count >= max<ssize_t>(1000, 4000 - (ssize_t)objects.size() / 2))
                     {
                         if(locked)
                         {
