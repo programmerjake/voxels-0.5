@@ -96,12 +96,15 @@ static void startSDL();
 #include <cerrno>
 #include <cstring>
 #include <cwchar>
-static wstring ResourcePrefix;
+static atomic_bool setResourcePrefix(false);
+static wstring * pResourcePrefix = nullptr;
 static wstring getExecutablePath();
+static void calcResourcePrefix();
 
 static wstring getResourceFileName(wstring resource)
 {
-    return ResourcePrefix + resource;
+    calcResourcePrefix();
+    return *pResourcePrefix + resource;
 }
 
 static wstring getExecutablePath()
@@ -116,16 +119,18 @@ static wstring getExecutablePath()
     return mbsrtowcs(&buf[0]);
 }
 
-initializer initializer1([]()
+static void calcResourcePrefix()
 {
+    if(setResourcePrefix.exchange(true))
+        return;
     wstring p = getExecutablePath();
     size_t pos = p.find_last_of(L"/\\");
     if(pos == wstring::npos)
         p = L"";
     else
         p = p.substr(0, pos + 1);
-    ResourcePrefix = p + L"res/";
-});
+    pResourcePrefix = new wstring(p + L"res/");
+}
 
 shared_ptr<Reader> getResourceReader(wstring resource)
 {
@@ -153,7 +158,7 @@ static void startSDL()
 {
     if(runningSDL.exchange(true))
         return;
-    if(0 != SDL_Init(SDL_INIT_TIMER | SDL_INIT_VIDEO))
+    if(0 != SDL_Init(SDL_INIT_TIMER))
     {
         cerr << "error : can't start SDL : " << SDL_GetError() << endl;
         exit(1);
@@ -192,6 +197,8 @@ void startAudio()
         if(0 != SDL_InitSubSystem(SDL_INIT_AUDIO))
         {
             cerr << "error : can't start SDL audio subsystem : " << SDL_GetError() << endl;
+            SDLUseCount--;
+            runningAudio = false;
             exit(1);
         }
         validAudio = true;
@@ -200,7 +207,7 @@ void startAudio()
         desired.channels = 6;
         desired.format = AUDIO_S16SYS;
         desired.freq = 96000;
-        desired.samples = 512;
+        desired.samples = 4096;
         desired.userdata = nullptr;
         globalAudioDeviceID = SDL_OpenAudioDevice(nullptr, 0, &desired, &globalAudioSpec, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE | SDL_AUDIO_ALLOW_CHANNELS_CHANGE);
         if(globalAudioDeviceID == 0)
@@ -245,6 +252,7 @@ void endGraphics()
         glcontext = nullptr;
         SDL_DestroyWindow(window);
         window = nullptr;
+        SDL_QuitSubSystem(SDL_INIT_VIDEO);
     }
     if(--SDLUseCount <= 0)
     {
@@ -259,6 +267,13 @@ void startGraphics()
         return;
     SDLUseCount++;
     startSDL();
+    if(0 != SDL_InitSubSystem(SDL_INIT_VIDEO))
+    {
+        cerr << "error : can't start SDL video subsystem : " << SDL_GetError() << endl;
+        SDLUseCount--;
+        runningGraphics = false;
+        exit(1);
+    }
 #if 0
     const SDL_VideoInfo * vidInfo = SDL_GetVideoInfo();
     if(vidInfo == nullptr)

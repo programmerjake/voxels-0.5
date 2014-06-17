@@ -2,9 +2,13 @@
 #include "platform.h"
 #include <mutex>
 #include <thread>
+#include <chrono>
 #include <functional>
 #include <unordered_set>
 #include <SDL2/SDL.h>
+#include <iostream>
+#include <cstdlib>
+#include <sstream>
 #include "util.h"
 #include "ogg_vorbis_decoder.h"
 
@@ -92,8 +96,7 @@ struct PlayingAudioData
         {
             for(size_t i = 0; i < channels; i++)
             {
-                int v = *data;
-                *data++ = (int)floor(v * volume + 0.5f) + bufferQueue.front();
+                *data++ += (int)floor(bufferQueue.front() * volume + 0.5f);
                 bufferQueue.pop_front();
             }
             playedSamples++;
@@ -167,7 +170,7 @@ void PlayingAudio::audioCallback(void *, uint8_t * buffer_in, int length)
     memset((void *)buffer16, 0, length);
     assert(length % (getGlobalAudioChannelCount() * sizeof(int16_t)) == 0);
     size_t sampleCount = length / (getGlobalAudioChannelCount() * sizeof(int16_t));
-    buffer.resize(sampleCount * getGlobalAudioChannelCount());
+    buffer.assign(sampleCount * getGlobalAudioChannelCount(), 0);
     for(auto i = playingAudioSet.begin(); i != playingAudioSet.end(); )
     {
         if(!(*i)->addInAudio(buffer.data(), sampleCount))
@@ -235,10 +238,11 @@ Audio::Audio(wstring resourceName, bool isStreaming)
             shared_ptr<Reader> preader = getResourceReader(resourceName);
             shared_ptr<AudioDecoder> decoder = make_shared<OggVorbisDecoder>(preader);
             vector<int16_t> buffer;
-            buffer.resize(decoder->channelCount() * decoder->numSamples());
+            buffer.resize(decoder->channelCount() * 8192);
             uint64_t finalSize = 0;
-            for(;finalSize < decoder->numSamples();)
+            for(;;)
             {
+                buffer.resize(finalSize + decoder->channelCount() * 8192);
                 uint64_t currentSize = decoder->channelCount() * decoder->decodeAudioBlock(&buffer[finalSize], (buffer.size() - finalSize) / decoder->channelCount());
                 if(currentSize == 0)
                     break;
@@ -263,7 +267,41 @@ Audio::Audio(const vector<int16_t> &data, unsigned sampleRate, unsigned channelC
 
 shared_ptr<PlayingAudio> Audio::play(float volume, bool looped)
 {
+    ::startAudio();
     auto playingAudioData = make_shared<PlayingAudioData>(data, volume, looped);
     startAudio(playingAudioData);
     return shared_ptr<PlayingAudio>(new PlayingAudio(playingAudioData));
 }
+
+#if 1
+namespace
+{
+initializer init1([]()
+{
+    cout << "press enter to exit.\n";
+    vector<Audio> backgroundSongs;
+    for(size_t i = 1; i <= 17; i++)
+    {
+        wostringstream os;
+        os << L"background";
+        if(i != 1)
+            os << i;
+        os << L".ogg";
+        backgroundSongs.push_back(Audio(os.str(), true));
+    }
+    auto playingAudio = backgroundSongs[rand() % backgroundSongs.size()].play();
+    atomic_bool done(false);
+    thread([&done](){cin.ignore(10000, '\n'); done = true;}).detach();
+    while(!done)
+    {
+        cout << playingAudio->currentTime() << "\x1b[K\r" << flush;
+        this_thread::sleep_for(chrono::milliseconds(100));
+        if(!playingAudio->isPlaying())
+            playingAudio = backgroundSongs[rand() % backgroundSongs.size()].play();
+        if(playingAudio->currentTime() >= 10)
+            playingAudio->stop();
+    }
+    exit(0);
+});
+}
+#endif // 1

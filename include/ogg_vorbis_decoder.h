@@ -5,6 +5,7 @@
 #include "audio.h"
 #include <vorbis/vorbisfile.h>
 #include <cerrno>
+#include <iostream>
 #include <endian.h>
 
 class OggVorbisDecoder final : public AudioDecoder
@@ -16,6 +17,8 @@ private:
     unsigned channels;
     unsigned sampleRate;
     uint64_t curPos = 0;
+    vector<int16_t> buffer;
+    size_t currentBufferPos = 0;
     static size_t read_fn(void * dataPtr_in, size_t blockSize, size_t numBlocks, void * dataSource)
     {
         OggVorbisDecoder & decoder = *(OggVorbisDecoder *)dataSource;
@@ -40,6 +43,20 @@ private:
         }
         return readCount;
     }
+    inline void readBuffer()
+    {
+        buffer.resize(buffer.capacity());
+        int currentSection;
+        currentBufferPos = 0;
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+        buffer.resize(ov_read(&ovf, (char *)buffer.data(), buffer.size() * sizeof(int16_t), 0, sizeof(int16_t), 1, &currentSection) / sizeof(int16_t));
+#elif __BYTE_ORDER == __BIG_ENDIAN
+        buffer.resize(ov_read(&ovf, (char *)buffer.data(), buffer.size() * sizeof(int16_t), 1, sizeof(int16_t), 1, &currentSection) / sizeof(int16_t));
+#else
+#error invalid endian value
+#endif
+        assert(buffer.size() % channels == 0);
+    }
 public:
     OggVorbisDecoder(shared_ptr<Reader> reader)
         : reader(reader)
@@ -59,8 +76,13 @@ public:
         }
         vorbis_info *info = ov_info(&ovf, -1);
         channels = info->channels;
+        buffer.reserve(channels * 8192);
         sampleRate = info->rate;
-        samples = ov_pcm_total(&ovf, -1);
+        auto samples = ov_pcm_total(&ovf, -1);
+        if(samples == OV_EINVAL)
+            this->samples = Unknown;
+        else
+            this->samples = samples;
         if(samples == 0 || channels == 0 || sampleRate == 0)
         {
             ov_clear(&ovf);
@@ -79,29 +101,27 @@ public:
     {
         return samples;
     }
-    virtual bool eof() override
-    {
-        return curPos >= samples;
-    }
     virtual unsigned channelCount() override
     {
         return channels;
     }
-    virtual uint64_t currentPosition() override
-    {
-        return curPos;
-    }
     virtual uint64_t decodeAudioBlock(int16_t * data, uint64_t readCount) override // returns number of samples decoded
     {
-        int currentSection;
-        uint64_t retval;
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-        retval = ov_read(&ovf, (char *)data, channels * readCount * sizeof(int16_t), 0, sizeof(int16_t), 1, &currentSection) / channels / sizeof(int16_t);
-#elif __BYTE_ORDER == __BIG_ENDIAN
-        retval = ov_read(&ovf, (char *)data, channels * readCount * sizeof(int16_t), 1, sizeof(int16_t), 1, &currentSection) / channels / sizeof(int16_t);
-#else
-#error invalid endian value
-#endif
+        uint64_t retval = 0;
+        size_t dataIndex = 0;
+        for(uint64_t i = 0; i < readCount; i++, retval++)
+        {
+            if(currentBufferPos >= buffer.size())
+            {
+                readBuffer();
+                if(buffer.size() == 0)
+                    break;
+            }
+            for(unsigned j = 0; j < channels; j++)
+            {
+                data[dataIndex++] = buffer[currentBufferPos++];
+            }
+        }
         curPos += retval;
         return retval;
     }

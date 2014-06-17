@@ -29,6 +29,7 @@
 #include <sstream>
 #include <mutex>
 #include <condition_variable>
+#include "audio.h"
 
 using namespace std;
 
@@ -704,6 +705,7 @@ using namespace ClientImplementation;
 
 void clientProcess(StreamRW &streamRW)
 {
+    Audio(L"background.ogg", true).play(true);
     startGraphics();
     TransformedMesh selectBoxMesh = makeSelectBoxMesh();
     shared_ptr<Reader> preader = streamRW.preader();

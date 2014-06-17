@@ -27,6 +27,7 @@ class AudioDecoder
     AudioDecoder(const AudioDecoder &) = delete;
     const AudioDecoder & operator =(const AudioDecoder &) = delete;
 public:
+    static constexpr uint64_t Unknown = ~(uint64_t)0;
     AudioDecoder()
     {
     }
@@ -35,12 +36,13 @@ public:
     }
     virtual unsigned samplesPerSecond() = 0;
     virtual uint64_t numSamples() = 0;
-    virtual uint64_t currentPosition() = 0;
-    virtual bool eof() = 0;
     virtual unsigned channelCount() = 0;
     double lengthInSeconds()
     {
-        return (double)numSamples() / samplesPerSecond();
+        uint64_t count = numSamples();
+        if(count == Unknown)
+            return -1;
+        return (double)count / samplesPerSecond();
     }
     virtual uint64_t decodeAudioBlock(int16_t * data, uint64_t samplesCount) = 0; // returns number of samples decoded
 };
@@ -67,16 +69,6 @@ public:
     {
         return samples.size() / channels;
     }
-    virtual uint64_t currentPosition() override
-    {
-        return currentLocation / channels;
-    }
-    virtual bool eof() override
-    {
-        if(currentLocation >= samples.size())
-            return true;
-        return false;
-    }
     virtual unsigned channelCount() override
     {
         return channels;
@@ -84,7 +76,7 @@ public:
     virtual uint64_t decodeAudioBlock(int16_t * data, uint64_t samplesCount) override // returns number of samples decoded
     {
         uint64_t retval = 0;
-        for(uint64_t i = 0; i < samplesCount && !eof(); i++)
+        for(uint64_t i = 0; i < samplesCount && currentLocation < samples.size(); i++)
         {
             for(unsigned j = 0; j < channels; j++)
                 *data++ = samples[currentLocation++];
@@ -109,10 +101,9 @@ public:
     ResampleAudioDecoder(shared_ptr<AudioDecoder> decoder, unsigned sampleRate)
         : decoder(decoder), sampleRate(sampleRate), channels(decoder->channelCount())
     {
-        buffer.reserve(channels * 1024);
-        buffer.resize(channels);
-        if(decodeAudioBlock(buffer.data(), 1) < 1)
-            buffer.resize(0);
+        constexpr size_t size = 1024;
+        buffer.resize(channels * size);
+        buffer.resize(channels * decoder->decodeAudioBlock(buffer.data(), size));
     }
     virtual unsigned samplesPerSecond() override
     {
@@ -120,15 +111,10 @@ public:
     }
     virtual uint64_t numSamples() override
     {
-        return (decoder->numSamples() * sampleRate) / decoder->samplesPerSecond();
-    }
-    virtual uint64_t currentPosition() override
-    {
-        return position;
-    }
-    virtual bool eof() override
-    {
-        return currentPosition() >= numSamples();
+        uint64_t count = decoder->numSamples();
+        if(count == Unknown)
+            return Unknown;
+        return (count * sampleRate) / decoder->samplesPerSecond();
     }
     virtual unsigned channelCount() override
     {
@@ -136,14 +122,15 @@ public:
     }
     virtual uint64_t decodeAudioBlock(int16_t * data, uint64_t sampleCount) override
     {
-        sampleCount = min(numSamples() - currentPosition(), sampleCount);
+        if(numSamples() != Unknown)
+            sampleCount = min(numSamples() - position, sampleCount);
         if(sampleCount == 0 || buffer.size() == 0)
             return sampleCount;
-        double rateConversionFactor = decoder->samplesPerSecond() / sampleRate;
+        double rateConversionFactor = (double)decoder->samplesPerSecond() / sampleRate;
         uint64_t retval = 0;
         for(uint64_t i = 0; i < sampleCount; i++, position++, retval++)
         {
-            double finalPosition = (double)position * rateConversionFactor;
+            double finalPosition = position * rateConversionFactor;
             uint64_t startIndex = (uint64_t)floor(finalPosition);
             float t = (float)(finalPosition - startIndex);
             startIndex *= channels;
@@ -159,7 +146,7 @@ public:
                 do
                 {
                     lastDecodeCount = decodeCount;
-                    decodeCount += decoder->decodeAudioBlock(buffer.data(), buffer.capacity() / channels - decodeCount);
+                    decodeCount += decoder->decodeAudioBlock(&buffer[decodeCount * channels], buffer.capacity() / channels - decodeCount);
                 }
                 while(decodeCount != lastDecodeCount && buffer.capacity() / channels < decodeCount);
                 buffer.resize(decodeCount * channels);
@@ -202,14 +189,6 @@ public:
     virtual uint64_t numSamples() override
     {
         return decoder->numSamples();
-    }
-    virtual uint64_t currentPosition() override
-    {
-        return decoder->currentPosition();
-    }
-    virtual bool eof() override
-    {
-        return decoder->eof();
     }
     virtual unsigned channelCount() override
     {
@@ -740,7 +719,7 @@ public:
     explicit Audio(wstring resourceName, bool isStreaming = false);
     explicit Audio(const vector<int16_t> &data, unsigned sampleRate, unsigned channelCount);
     shared_ptr<PlayingAudio> play(float volume = 1, bool looped = false);
-    inline shared_ptr<PlayingAudio> play(bool looped = false)
+    inline shared_ptr<PlayingAudio> play(bool looped)
     {
         return play(1, looped);
     }
