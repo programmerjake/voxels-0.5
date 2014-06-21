@@ -18,6 +18,8 @@
 #ifndef ENTITY_H_INCLUDED
 #define ENTITY_H_INCLUDED
 
+#error finish changing to new physics engine
+
 #include "render_object.h"
 #include <memory>
 #include <cstdint>
@@ -47,54 +49,22 @@ struct EntityData
 {
     shared_ptr<const EntityDescriptor> desc;
     shared_ptr<RenderObjectEntity> entity;
-    PositionF position;
-    VectorF velocity;
-    VectorF acceleration;
-    VectorF deltaAcceleration;
+    shared_ptr<PhysicsObject> physicsObject;
     shared_ptr<ExtraEntityData> extraData;
-    explicit EntityData(shared_ptr<const EntityDescriptor> desc = shared_ptr<EntityDescriptor>(), PositionF position = PositionF(), VectorF velocity = VectorF(0), VectorF acceleration = VectorF(0), shared_ptr<ExtraEntityData> extraData = nullptr, VectorF deltaAcceleration = VectorF(0))
-        : desc(desc), position(position), velocity(velocity), acceleration(acceleration), deltaAcceleration(deltaAcceleration), extraData(extraData)
+    explicit EntityData(shared_ptr<const EntityDescriptor> desc = shared_ptr<EntityDescriptor>(), shared_ptr<PhysicsObject> physicsObject, shared_ptr<ExtraEntityData> extraData = nullptr)
+        : desc(desc), physicsObject(physicsObject), extraData(extraData)
     {
     }
     bool good() const
     {
         return desc != nullptr;
     }
-    void setPosition(PositionF position)
-    {
-        if(entity != nullptr)
-            entity->position = position;
-        this->position = position;
-    }
-    void setVelocity(VectorF velocity)
-    {
-        if(entity != nullptr)
-            entity->velocity = velocity;
-        this->velocity = velocity;
-    }
-    void setAcceleration(VectorF acceleration)
-    {
-        if(entity != nullptr)
-            entity->acceleration = acceleration;
-        this->acceleration = acceleration;
-    }
-    void setDeltaAcceleration(VectorF deltaAcceleration)
-    {
-        if(entity != nullptr)
-            entity->deltaAcceleration = deltaAcceleration;
-        this->deltaAcceleration = deltaAcceleration;
-    }
-    void simTime(float deltaT)
-    {
-        setPosition(position + deltaT * velocity + deltaT * deltaT * 0.5f * acceleration + deltaT * deltaT * deltaT * (1 / 6.0f) * deltaAcceleration);
-        setVelocity(velocity + deltaT * acceleration + deltaT * deltaT * 0.5f * deltaAcceleration);
-        setAcceleration(acceleration + deltaT * deltaAcceleration);
-    }
     void clear()
     {
         if(entity != nullptr)
             entity->clear();
         desc = nullptr;
+        physicsObject = nullptr;
     }
 };
 
@@ -182,10 +152,10 @@ public:
         data.desc->storeInternal(data, gss);
     }
     virtual shared_ptr<PhysicsObjectConstructor> getPhysicsObjectConstructor(EntityData & entity) const = 0;
-    shared_ptr<PhysicsObject> getPhysicsObject(EntityData & entity) const
+    shared_ptr<PhysicsObject> getPhysicsObject(EntityData & entity, shared_ptr<PhysicsWorld> physicsWorld) const
     {
         auto c = getPhysicsObjectConstructor(entity);
-        return c->make(entity.position, entity.velocity, entity.acceleration, entity.deltaAcceleration);
+        return c->make(entity.position, entity.velocity, physicsWorld);
     }
 };
 

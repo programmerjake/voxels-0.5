@@ -21,6 +21,8 @@
 #include "builtin_blocks.h"
 #include <memory>
 
+#error finish changing to new physics engine
+
 using namespace std;
 
 void renderLayerSetup(RenderLayer rl)

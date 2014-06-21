@@ -19,6 +19,8 @@
 #include "generate.h"
 #include "server.h"
 
+#error finish changing to new physics engine
+
 void initEntityPlayer()
 {
     EntityPlayer::init();

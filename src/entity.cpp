@@ -17,6 +17,8 @@
  */
 #include "entity.h"
 
+#error finish changing to new physics engine
+
 map<wstring, EntityDescriptorPtr> *EntityDescriptor::entities;
 vector<EntityDescriptorPtr> *EntityDescriptor::entitiesList;
 

@@ -155,6 +155,7 @@ public:
     }
     void setNewState(PositionF newPosition, VectorF newVelocity);
     void setupNewState();
+    void setCurrentState(PositionF newPosition, VectorF newVelocity);
     bool collides(const PhysicsObject & rt) const;
     void adjustPosition(const PhysicsObject & rt);
     bool isSupportedBy(const PhysicsObject & rt) const;
@@ -258,7 +259,8 @@ private:
     }
     static constexpr uint8_t BoxShape = 0;
     static constexpr uint8_t CylinderShape = BoxShape + 1;
-    static constexpr uint8_t LastShape = CylinderShape + 1;
+    static constexpr uint8_t EmptyShape = CylinderShape + 1;
+    static constexpr uint8_t LastShape = EmptyShape + 1;
 public:
     static shared_ptr<PhysicsObjectConstructor> cylinderMaker(float radius, float yExtent, bool affectedByGravity, bool isStatic, PhysicsProperties properties, vector<PhysicsConstraint> constraints)
     {
@@ -311,6 +313,18 @@ public:
         };
         return shared_ptr<PhysicsObjectConstructor>(new PhysicsObjectConstructor(make, write));
     }
+    static shared_ptr<PhysicsObjectConstructor> empty()
+    {
+        auto write = [](Writer & writer)
+        {
+            writer.writeU8(EmptyShape);
+        };
+        auto make = [](PositionF, VectorF, shared_ptr<PhysicsWorld>)->shared_ptr<PhysicsObject>
+        {
+            return nullptr;
+        };
+        return shared_ptr<PhysicsObjectConstructor>(new PhysicsObjectConstructor(make, write));
+    }
     static shared_ptr<PhysicsObjectConstructor> read(Reader & reader)
     {
         uint8_t shape = reader.readLimitedU8(0, LastShape - 1);
@@ -350,6 +364,8 @@ public:
             }
             return cylinderMaker(radius, yExtent, affectedByGravity, isStatic, properties, constraints);
         }
+        case EmptyShape:
+            return empty();
         }
         assert(false);
     }
@@ -946,6 +962,14 @@ inline bool PhysicsObject::isSupportedBy(const PhysicsObject & rt) const
         }
     }
     return false;
+}
+
+inline void PhysicsObject::setCurrentState(PositionF newPosition, VectorF newVelocity)
+{
+    auto i = world->getOldVariableSetIndex();
+    position[i] = newPosition;
+    velocity[i] = newVelocity;
+    objectTime[i] = world->getCurrentTime();
 }
 
 #endif // PHYSICS_OBJECT_H_INCLUDED

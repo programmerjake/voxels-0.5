@@ -18,6 +18,8 @@
 #include "entity_block.h"
 #include "block.h"
 
+#error finish changing to new physics engine
+
 void initEntityBlock()
 {
     EntityDescriptor::initEntity(shared_ptr<EntityDescriptor>(new EntityBlock()));

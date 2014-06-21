@@ -21,6 +21,8 @@
 #include "block.h"
 #include "entity.h"
 
+#error finish changing to new physics engine
+
 class GravityAffectedBlock : public BlockDescriptor
 {
 protected:

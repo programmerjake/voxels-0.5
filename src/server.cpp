@@ -29,6 +29,8 @@
 #include <thread>
 #include <list>
 
+#error finish changing to new physics engine
+
 using namespace std;
 
 namespace

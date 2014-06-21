@@ -35,6 +35,8 @@
 #include <tuple>
 #include <utility>
 
+#error finish changing to new physics engine
+
 using namespace std;
 
 class RenderObject : public enable_shared_from_this<RenderObject>
@@ -199,34 +201,21 @@ public:
     {
         meshInternal = nullptr;
     }
-    PositionF position;
-    VectorF velocity;
-    VectorF acceleration;
-    VectorF deltaAcceleration;
+    shared_ptr<PhysicsObject> physicsObject;
     float age, updateAge;
-    bool needNextCollision = true;
-    float nextCollisionAge = -1;
-    PositionF nextPosition;
-    VectorF nextVelocity;
-    void clearCachedCollisions()
-    {
-        needNextCollision = true;
-        nextCollisionAge = -1;
-    }
     RenderObjectEntity()
         : meshInternal(nullptr), scriptIOObject(make_shared<Scripting::DataObject>())
     {
     }
-    RenderObjectEntity(shared_ptr<RenderObjectEntityMesh> mesh, PositionF position, VectorF velocity,
-                       VectorF acceleration, VectorF deltaAcceleration, float age, shared_ptr<Scripting::DataObject> scriptIOObject = make_shared<Scripting::DataObject>())
-        : meshInternal(mesh), position(position), velocity(velocity), acceleration(acceleration),
-          deltaAcceleration(deltaAcceleration), age(age), scriptIOObject(scriptIOObject)
+    RenderObjectEntity(shared_ptr<RenderObjectEntityMesh> mesh, PositionF position, VectorF velocity, shared_ptr<PhysicsWorld> physicsWorld,
+                       float age, shared_ptr<Scripting::DataObject> scriptIOObject = make_shared<Scripting::DataObject>())
+        : meshInternal(mesh), physicsObject(mesh->constructPhysicsObject(position, velocity, physicsWorld)), age(age), scriptIOObject(scriptIOObject)
     {
     }
     const shared_ptr<Scripting::DataObject> scriptIOObject;
     friend class RenderObject;
 protected:
-    static shared_ptr<RenderObjectEntity> read(Reader &reader, Client &client)
+    static shared_ptr<RenderObjectEntity> read(Reader &reader, Client &client, shared_ptr<PhysicsWorld> physicsWorld)
     {
         Client::IdType id = Client::readIdNonNull(reader);
         shared_ptr<RenderObjectEntity> retval = client.getPtr<RenderObjectEntity>(id, Client::DataType::RenderObjectEntity);
@@ -245,24 +234,19 @@ protected:
             return retval;
         }
 
-        retval->clearCachedCollisions();
         retval->age = reader.readLimitedF32(0, 1e10);
         retval->updateAge = 0;
-        retval->position.x = reader.readFiniteF32();
-        retval->position.y = reader.readFiniteF32();
-        retval->position.z = reader.readFiniteF32();
-        retval->position.d = reader.readDimension();
+        PositionF position;
+        position.x = reader.readFiniteF32();
+        position.y = reader.readFiniteF32();
+        position.z = reader.readFiniteF32();
+        position.d = reader.readDimension();
 //        cout << "Prev velocity : <" << retval->velocity.x << ", " << retval->velocity.y << ", " << retval->velocity.z << ">\n" << flush;
-        retval->velocity.x = reader.readFiniteF32();
-        retval->velocity.y = reader.readFiniteF32();
-        retval->velocity.z = reader.readFiniteF32();
+        VectorF velocity;
+        velocity.x = reader.readFiniteF32();
+        velocity.y = reader.readFiniteF32();
+        velocity.z = reader.readFiniteF32();
 //        cout << "Read velocity : <" << retval->velocity.x << ", " << retval->velocity.y << ", " << retval->velocity.z << ">\n" << flush;
-        retval->acceleration.x = reader.readFiniteF32();
-        retval->acceleration.y = reader.readFiniteF32();
-        retval->acceleration.z = reader.readFiniteF32();
-        retval->deltaAcceleration.x = reader.readFiniteF32();
-        retval->deltaAcceleration.y = reader.readFiniteF32();
-        retval->deltaAcceleration.z = reader.readFiniteF32();
         shared_ptr<Scripting::Data> newData = Scripting::Data::read(reader);
         if(newData->type() != Scripting::Data::Type::Object)
             throw IOException("RenderObjectEntity : script variables object is not an object");
@@ -335,11 +319,11 @@ public:
             return false;
         return mesh()->isPlayer;
     }
-    shared_ptr<PhysicsObject> constructPhysicsObject()
+    shared_ptr<PhysicsObject> constructPhysicsObject(shared_ptr<PhysicsWorld> physicsWorld)
     {
         if(!good())
-            return shared_ptr<PhysicsObject>(new PhysicsEmpty());
-        return mesh()->constructPhysicsObject(position, velocity, acceleration, deltaAcceleration);
+            return nullptr;
+        return mesh()->constructPhysicsObject(position, velocity, physicsWorld);
     }
 };
 
@@ -820,9 +804,9 @@ public:
 
         return rayHitBox(hitBoxMin + (VectorI)pos, hitBoxMax + (VectorI)pos, ray);
     }
-    shared_ptr<PhysicsObject> constructPhysicsObject(PositionI position)
+    shared_ptr<PhysicsObject> constructPhysicsObject(PositionI position, shared_ptr<PhysicsWorld> physicsWorld)
     {
-        return physicsConstructor->make((PositionF)position);
+        return physicsConstructor->make((PositionF)position, VectorF(0), physicsWorld);
     }
 };
 
@@ -897,9 +881,9 @@ public:
 
         return block->rayHits(ray, pos);
     }
-    shared_ptr<PhysicsObject> constructPhysicsObject()
+    shared_ptr<PhysicsObject> constructPhysicsObject(shared_ptr<PhysicsWorld> physicsWorld)
     {
-        return block->constructPhysicsObject(pos);
+        return block->constructPhysicsObject(pos, VectorF(0), physicsWorld);
     }
 };
 

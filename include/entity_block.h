@@ -21,11 +21,13 @@
 #include "entity.h"
 #include "block.h"
 
+#error finish changing to new physics engine
+
 class EntityBlock final : public EntityDescriptor
 {
 private:
     static constexpr const VectorF physicsExtents() {return VectorF(0.125);}
-    static constexpr const PhysicsProperties physicsProperties() {return PhysicsProperties(0.1, 0.5, 0.1);}
+    static constexpr const PhysicsProperties physicsProperties() {return PhysicsProperties();}
     struct ExtraData final : public ExtraEntityData
     {
         BlockDescriptorPtr block;
@@ -96,7 +98,7 @@ public:
     virtual void onMove(EntityData & entity, shared_ptr<World> world, float deltaTime) const override;
     virtual shared_ptr<PhysicsObjectConstructor> getPhysicsObjectConstructor(EntityData &) const override
     {
-        return PhysicsObjectConstructor::box(physicsProperties(), physicsExtents());
+        return PhysicsObjectConstructor::boxMaker(physicsExtents(), true, false, physicsProperties(), vector<PhysicsConstraint>());
     }
 };
 

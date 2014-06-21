@@ -20,6 +20,8 @@
 #include "generate.h"
 #include "util.h"
 
+#error finish changing to new physics engine
+
 void initBuiltinBlocks()
 {
     BlockDescriptor::initBlock(StoneBlock::ptr = shared_ptr<BlockDescriptor>(new StoneBlock));

@@ -19,6 +19,8 @@
 #ifndef WORLD_GENERATOR_H_INCLUDED
 #define WORLD_GENERATOR_H_INCLUDED
 
+#error finish changing to new physics engine
+
 #include <memory>
 #include <vector>
 #include <unordered_map>

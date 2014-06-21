@@ -18,6 +18,8 @@
 #ifndef CLIENT_H_INCLUDED
 #define CLIENT_H_INCLUDED
 
+#error finish changing to new physics engine
+
 #include <unordered_map>
 #include <cstdint>
 #include <atomic>

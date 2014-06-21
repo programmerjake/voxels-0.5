@@ -31,6 +31,8 @@
 #include <condition_variable>
 #include "audio.h"
 
+#error finish changing to new physics engine
+
 using namespace std;
 
 atomic_uint_fast64_t Client::nextId(1);

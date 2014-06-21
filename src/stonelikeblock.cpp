@@ -18,6 +18,8 @@
 #include "stonelikeblock.h"
 #include "generate.h"
 
+#error finish changing to new physics engine
+
 StoneLikeBlock::StoneLikeBlock(wstring name, LightProperties lightProperties)
     : BlockDescriptor(name, lightProperties)
 {

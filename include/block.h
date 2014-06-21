@@ -18,6 +18,8 @@
 #ifndef BLOCK_H_INCLUDED
 #define BLOCK_H_INCLUDED
 
+#error finish changing to new physics engine
+
 #include <memory>
 #include <cstdint>
 #include <cwchar>

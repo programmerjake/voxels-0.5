@@ -18,6 +18,8 @@
 #include "world_generator.h"
 #include "builtin_entities.h"
 
+#error finish changing to new physics engine
+
 atomic_uint WorldRandom::nextRandomClass(WorldRandom::RandomClassUserStart);
 const WorldGeneratorParts_t WorldGeneratorParts;
 vector<WorldGeneratorPartConstPtr> *WorldGeneratorPart::partsList = nullptr;

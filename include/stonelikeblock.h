@@ -22,6 +22,8 @@
 #include "block_face.h"
 #include <iostream>
 
+#error finish changing to new physics engine
+
 using namespace std;
 
 class StoneLikeBlock : public BlockDescriptor
@@ -52,7 +54,7 @@ protected:
     virtual Mesh makeBlockEntityMesh() const override;
     virtual shared_ptr<PhysicsObjectConstructor> getPhysicsObjectConstructor() const override
     {
-        return PhysicsObjectConstructor::box(PhysicsProperties(PhysicsProperties::INFINITE_MASS, 0.8, 0.1), VectorF(0.5), VectorF(0.5));
+        return PhysicsObjectConstructor::boxMaker(VectorF(0.5f), false, true, PhysicsProperties(), vector<PhysicsConstraint>());
     }
 private:
     mutable shared_ptr<RenderObjectBlockMesh> blockMesh;

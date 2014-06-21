@@ -21,6 +21,8 @@
 #ifndef WORLD_H_INCLUDED
 #define WORLD_H_INCLUDED
 
+#error finish changing to new physics engine
+
 #include "chunk.h"
 #include <unordered_map>
 #include <mutex>

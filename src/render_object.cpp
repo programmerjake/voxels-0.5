@@ -18,6 +18,8 @@
 #include "render_object.h"
 #include <iostream>
 
+#error finish changing to new physics engine
+
 using namespace std;
 
 void RenderObject::write(Writer &writer, Client &client)

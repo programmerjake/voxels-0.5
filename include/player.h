@@ -22,11 +22,13 @@
 #include "client.h"
 #include "render_object.h"
 
+#error finish changing to new physics engine
+
 class EntityPlayer final : public EntityDescriptor
 {
 private:
     static constexpr VectorF physicsExtents() {return VectorF(0.3, 0.9, 0.3);}
-    static constexpr PhysicsProperties physicsProperties() {return PhysicsProperties(1, 0, 0);}
+    static constexpr PhysicsProperties physicsProperties() {return PhysicsProperties();}
     static constexpr VectorF physicsOffset() {return VectorF(0, physicsExtents().y - 1.62, 0);}
     struct ExtraData final : public ExtraEntityData
     {
@@ -129,7 +131,7 @@ public:
     virtual void onMove(EntityData & entity, shared_ptr<World> world, float deltaTime) const override;
     virtual shared_ptr<PhysicsObjectConstructor> getPhysicsObjectConstructor(EntityData &) const override
     {
-        return PhysicsObjectConstructor::box(physicsProperties(), physicsExtents(), physicsOffset());
+        return PhysicsObjectConstructor::boxMaker(physicsExtents(), false, true, physicsProperties(), vector<PhysicsConstraint>());
     }
 };
 
