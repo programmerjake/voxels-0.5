@@ -18,8 +18,6 @@
 #ifndef ENTITY_H_INCLUDED
 #define ENTITY_H_INCLUDED
 
-#error finish changing to new physics engine
-
 #include "render_object.h"
 #include <memory>
 #include <cstdint>
@@ -64,7 +62,21 @@ struct EntityData
         if(entity != nullptr)
             entity->clear();
         desc = nullptr;
+        if(physicsObject)
+            physicsObject->destroy();
         physicsObject = nullptr;
+    }
+    PositionF position() const
+    {
+        if(physicsObject)
+            return physicsObject->getPosition();
+        return PositionF();
+    }
+    VectorF velocity() const
+    {
+        if(physicsObject)
+            return physicsObject->getVelocity();
+        return VectorF();
     }
 };
 
@@ -152,11 +164,6 @@ public:
         data.desc->storeInternal(data, gss);
     }
     virtual shared_ptr<PhysicsObjectConstructor> getPhysicsObjectConstructor(EntityData & entity) const = 0;
-    shared_ptr<PhysicsObject> getPhysicsObject(EntityData & entity, shared_ptr<PhysicsWorld> physicsWorld) const
-    {
-        auto c = getPhysicsObjectConstructor(entity);
-        return c->make(entity.position, entity.velocity, physicsWorld);
-    }
 };
 
 struct EntityDescriptors_t final

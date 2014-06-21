@@ -18,8 +18,6 @@
 #ifndef BUILTIN_BLOCKS_H_INCLUDED
 #define BUILTIN_BLOCKS_H_INCLUDED
 
-#error finish changing to new physics engine
-
 #include "block.h"
 #include "stonelikeblock.h"
 #include "gravity_affected_block.h"

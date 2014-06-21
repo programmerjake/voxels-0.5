@@ -18,14 +18,16 @@
 #ifndef CLIENT_H_INCLUDED
 #define CLIENT_H_INCLUDED
 
-#error finish changing to new physics engine
-
 #include <unordered_map>
 #include <cstdint>
 #include <atomic>
 #include <memory>
 #include <mutex>
 #include "stream.h"
+
+#ifndef PHYSICS_OBJECT_H_INCLUDED
+struct PhysicsWorld;
+#endif // PHYSICS_OBJECT_H_INCLUDED
 
 using namespace std;
 
@@ -309,6 +311,7 @@ public:
         }
         return retval;
     }
+    shared_ptr<PhysicsWorld> physicsWorld;
 };
 
 class LockedClient
@@ -330,5 +333,7 @@ public:
 };
 
 void clientProcess(StreamRW &streamRW);
+
+#include "physics.h"
 
 #endif // CLIENT_H_INCLUDED

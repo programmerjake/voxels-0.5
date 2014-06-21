@@ -87,7 +87,13 @@ private:
     bool isStatic_;
     bool supported = false;
     bool destroyed = false;
-    bool isCylinder_;
+    enum Type
+    {
+        Box,
+        Cylinder,
+        Empty,
+    };
+    Type type;
     VectorF extents;
     weak_ptr<PhysicsWorld> world;
     uint64_t latestUpdateTag = 0;
@@ -96,10 +102,11 @@ private:
     shared_ptr<const vector<PhysicsConstraint>> constraints;
     PhysicsObject(const PhysicsObject &) = delete;
     const PhysicsObject & operator =(const PhysicsObject &) = delete;
-    PhysicsObject(PositionF position, VectorF velocity, bool affectedByGravity, bool isStatic, VectorF extents, shared_ptr<PhysicsWorld> world, PhysicsProperties properties, bool isCylinder);
+    PhysicsObject(PositionF position, VectorF velocity, bool affectedByGravity, bool isStatic, VectorF extents, shared_ptr<PhysicsWorld> world, PhysicsProperties properties, Type type);
 public:
     static shared_ptr<PhysicsObject> makeBox(PositionF position, VectorF velocity, bool affectedByGravity, bool isStatic, VectorF extents, PhysicsProperties properties, shared_ptr<PhysicsWorld> world);
     static shared_ptr<PhysicsObject> makeCylinder(PositionF position, VectorF velocity, bool affectedByGravity, bool isStatic, float radius, float yExtents, PhysicsProperties properties, shared_ptr<PhysicsWorld> world);
+    static shared_ptr<PhysicsObject> makeEmpty(PositionF position, VectorF velocity, shared_ptr<PhysicsWorld> world);
     ~PhysicsObject();
     PositionF getPosition() const;
     VectorF getVelocity() const;
@@ -139,11 +146,15 @@ public:
     }
     bool isCylinder() const
     {
-        return isCylinder_;
+        return type == Type::Cylinder;
     }
     bool isBox() const
     {
-        return !isCylinder_;
+        return type == Type::Box;
+    }
+    bool isEmpty() const
+    {
+        return type == Type::Empty;
     }
     shared_ptr<PhysicsWorld> getWorld() const
     {
@@ -319,9 +330,9 @@ public:
         {
             writer.writeU8(EmptyShape);
         };
-        auto make = [](PositionF, VectorF, shared_ptr<PhysicsWorld>)->shared_ptr<PhysicsObject>
+        auto make = [](PositionF position, VectorF velocity, shared_ptr<PhysicsWorld> world)->shared_ptr<PhysicsObject>
         {
-            return nullptr;
+            return PhysicsObject::makeEmpty(position, velocity, world);
         };
         return shared_ptr<PhysicsObjectConstructor>(new PhysicsObjectConstructor(make, write));
     }
@@ -371,13 +382,13 @@ public:
     }
 };
 
-inline PhysicsObject::PhysicsObject(PositionF position, VectorF velocity, bool affectedByGravity, bool isStatic, VectorF extents, shared_ptr<PhysicsWorld> world, PhysicsProperties properties, bool isCylinder)
+inline PhysicsObject::PhysicsObject(PositionF position, VectorF velocity, bool affectedByGravity, bool isStatic, VectorF extents, shared_ptr<PhysicsWorld> world, PhysicsProperties properties, Type type)
     : position{position, position},
     velocity{velocity, velocity},
     objectTime{world->getCurrentTime(), world->getCurrentTime()},
     affectedByGravity(affectedByGravity),
     isStatic_(isStatic),
-    isCylinder_(isCylinder),
+    type(type),
     extents(extents),
     world(world),
     properties(properties)
@@ -386,7 +397,7 @@ inline PhysicsObject::PhysicsObject(PositionF position, VectorF velocity, bool a
 
 inline shared_ptr<PhysicsObject> PhysicsObject::makeBox(PositionF position, VectorF velocity, bool affectedByGravity, bool isStatic, VectorF extents, PhysicsProperties properties, shared_ptr<PhysicsWorld> world)
 {
-    shared_ptr<PhysicsObject> retval = shared_ptr<PhysicsObject>(new PhysicsObject(position, velocity, affectedByGravity, isStatic, extents, world, properties, false));
+    shared_ptr<PhysicsObject> retval = shared_ptr<PhysicsObject>(new PhysicsObject(position, velocity, affectedByGravity, isStatic, extents, world, properties, Type::Box));
     world->objects.insert(retval);
     world->changedObjects[(intptr_t)retval.get()] = retval;
     return retval;
@@ -394,9 +405,16 @@ inline shared_ptr<PhysicsObject> PhysicsObject::makeBox(PositionF position, Vect
 
 inline shared_ptr<PhysicsObject> PhysicsObject::makeCylinder(PositionF position, VectorF velocity, bool affectedByGravity, bool isStatic, float radius, float yExtents, PhysicsProperties properties, shared_ptr<PhysicsWorld> world)
 {
-    shared_ptr<PhysicsObject> retval = shared_ptr<PhysicsObject>(new PhysicsObject(position, velocity, affectedByGravity, isStatic, VectorF(radius, yExtents, radius), world, properties, true));
+    shared_ptr<PhysicsObject> retval = shared_ptr<PhysicsObject>(new PhysicsObject(position, velocity, affectedByGravity, isStatic, VectorF(radius, yExtents, radius), world, properties, Type::Cylinder));
     world->objects.insert(retval);
     world->changedObjects[(intptr_t)retval.get()] = retval;
+    return retval;
+}
+
+inline shared_ptr<PhysicsObject> PhysicsObject::makeEmpty(PositionF position, VectorF velocity, shared_ptr<PhysicsWorld> world)
+{
+    shared_ptr<PhysicsObject> retval = shared_ptr<PhysicsObject>(new PhysicsObject(position, velocity, false, true, VectorF(), world, PhysicsProperties(), Type::Empty));
+    world->objects.insert(retval);
     return retval;
 }
 
@@ -454,6 +472,8 @@ inline void PhysicsObject::setupNewState()
 
 inline bool PhysicsObject::collides(const PhysicsObject & rt) const
 {
+    if(isEmpty() || rt.isEmpty())
+        return false;
     auto world = getWorld();
     assert(world == rt.getWorld());
     PositionF lPosition = getPosition();
@@ -546,6 +566,10 @@ inline void PhysicsWorld::runToTime(double stopTime)
                 objectA->velocity[getOldVariableSetIndex()] = objectA->getVelocity();
                 objectA->objectTime[getOldVariableSetIndex()] = currentTime;
                 objectA->supported = false;
+                if(objectA->isEmpty())
+                {
+                    continue;
+                }
                 if(objectA->isStatic())
                 {
                     objectA->supported = true;
@@ -585,6 +609,11 @@ inline void PhysicsWorld::runToTime(double stopTime)
                     continue;
                 }
                 o->setupNewState();
+                if(o->isEmpty())
+                {
+                    i++;
+                    continue;
+                }
                 PositionF position = o->getPosition();
                 VectorF extents = o->getExtents();
                 float fMinX = position.x - extents.x;

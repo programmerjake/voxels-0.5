@@ -22,8 +22,6 @@
 #include "block_face.h"
 #include <iostream>
 
-#error finish changing to new physics engine
-
 using namespace std;
 
 class StoneLikeBlock : public BlockDescriptor

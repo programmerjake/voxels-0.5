@@ -42,16 +42,16 @@ private:
     {
     }
 public:
-    static EntityData make(BlockDescriptorPtr block, PositionF position, VectorF velocity = VectorF(0))
+    static EntityData make(BlockDescriptorPtr block, PositionF position, VectorF velocity, shared_ptr<PhysicsWorld> physicsWorld)
     {
         assert(block);
-        return EntityData(EntityDescriptors.get(L"builtin.block"), position, velocity, gravityVector, shared_ptr<ExtraEntityData>(new ExtraData(block)));
+        return EntityData(EntityDescriptors.get(L"builtin.block"), getPhysicsObjectConstructor().make(position, velocity, physicsWorld), shared_ptr<ExtraEntityData>(new ExtraData(block)));
     }
     virtual ~EntityBlock()
     {
     }
 protected:
-    virtual EntityData loadInternal(GameLoadStream & gls) const override
+    virtual EntityData loadInternal(GameLoadStream & gls, shared_ptr<PhysicsWorld> physicsWorld) const override
     {
         BlockDescriptorPtr block = gls.readBlockDescriptor();
         PositionF position;
@@ -63,15 +63,7 @@ protected:
         velocity.x = gls.readFiniteF32();
         velocity.y = gls.readFiniteF32();
         velocity.z = gls.readFiniteF32();
-        VectorF acceleration;
-        acceleration.x = gls.readFiniteF32();
-        acceleration.y = gls.readFiniteF32();
-        acceleration.z = gls.readFiniteF32();
-        VectorF deltaAcceleration;
-        deltaAcceleration.x = gls.readFiniteF32();
-        deltaAcceleration.y = gls.readFiniteF32();
-        deltaAcceleration.z = gls.readFiniteF32();
-        return EntityData(shared_from_this(), position, velocity, acceleration, shared_ptr<ExtraEntityData>(new ExtraData(block)), deltaAcceleration);
+        return make(block, position, velocity, physicsWorld);
     }
     virtual void storeInternal(EntityData data, GameStoreStream & gss) const override
     {
@@ -96,9 +88,16 @@ protected:
 public:
     virtual shared_ptr<RenderObjectEntity> getEntity(EntityData & entity, shared_ptr<World> world) const override;
     virtual void onMove(EntityData & entity, shared_ptr<World> world, float deltaTime) const override;
+    shared_ptr<PhysicsObjectConstructor> getPhysicsObjectConstructor() const
+    {
+        static shared_ptr<PhysicsObjectConstructor> retval;
+        if(!retval)
+            retval = PhysicsObjectConstructor::boxMaker(physicsExtents(), true, false, physicsProperties(), vector<PhysicsConstraint>());
+        return retval;
+    }
     virtual shared_ptr<PhysicsObjectConstructor> getPhysicsObjectConstructor(EntityData &) const override
     {
-        return PhysicsObjectConstructor::boxMaker(physicsExtents(), true, false, physicsProperties(), vector<PhysicsConstraint>());
+        return getPhysicsObjectConstructor();
     }
 };
 

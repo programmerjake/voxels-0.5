@@ -19,8 +19,6 @@
 #ifndef CHUNK_H_INCLUDED
 #define CHUNK_H_INCLUDED
 
-#error finish changing to new physics engine
-
 #include "position.h"
 #include <memory>
 #include <array>

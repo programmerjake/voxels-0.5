@@ -18,8 +18,6 @@
 #ifndef BLOCK_H_INCLUDED
 #define BLOCK_H_INCLUDED
 
-#error finish changing to new physics engine
-
 #include <memory>
 #include <cstdint>
 #include <cwchar>
@@ -56,6 +54,7 @@ struct BlockData
     int32_t idata;
     Lighting light;
     shared_ptr<ExtraBlockData> extraData;
+    shared_ptr<PhysicsObject> physicsObject;
     explicit BlockData(shared_ptr<const BlockDescriptor> desc = shared_ptr<BlockDescriptor>(), int32_t idata = 0, shared_ptr<ExtraBlockData> extraData = nullptr)
         : desc(desc), idata(idata), light(), extraData(extraData)
     {
