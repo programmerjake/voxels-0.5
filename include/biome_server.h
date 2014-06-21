@@ -18,7 +18,6 @@
 #include "world_generator.h"
 #ifndef BIOME_SERVER_H_INCLUDED
 #define BIOME_SERVER_H_INCLUDED
-#error finish changing to new physics engine
 
 #include <array>
 

@@ -149,9 +149,9 @@ public:
     }
     virtual Mesh makeBlockEntityMesh() const = 0;
     virtual shared_ptr<PhysicsObjectConstructor> getPhysicsObjectConstructor() const = 0;
-    shared_ptr<PhysicsObject> getPhysicsObject(PositionI pos) const
+    shared_ptr<PhysicsObject> getPhysicsObject(PositionI pos, shared_ptr<PhysicsWorld> physicsWorld) const
     {
-        return getPhysicsObjectConstructor()->make((PositionF)pos);
+        return getPhysicsObjectConstructor()->make((PositionF)pos, VectorF(0), physicsWorld);
     }
 };
 

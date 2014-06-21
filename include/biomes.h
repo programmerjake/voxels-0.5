@@ -18,8 +18,6 @@
 #ifndef BIOMES_H_INCLUDED
 #define BIOMES_H_INCLUDED
 
-#error finish changing to new physics engine
-
 #include "biome_server.h"
 
 class BiomeDesert final : public BiomeDescriptor

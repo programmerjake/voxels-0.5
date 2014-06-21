@@ -35,8 +35,6 @@
 #include <tuple>
 #include <utility>
 
-#error finish changing to new physics engine
-
 using namespace std;
 
 class RenderObject : public enable_shared_from_this<RenderObject>
@@ -241,12 +239,18 @@ protected:
         position.y = reader.readFiniteF32();
         position.z = reader.readFiniteF32();
         position.d = reader.readDimension();
-//        cout << "Prev velocity : <" << retval->velocity.x << ", " << retval->velocity.y << ", " << retval->velocity.z << ">\n" << flush;
         VectorF velocity;
         velocity.x = reader.readFiniteF32();
         velocity.y = reader.readFiniteF32();
         velocity.z = reader.readFiniteF32();
-//        cout << "Read velocity : <" << retval->velocity.x << ", " << retval->velocity.y << ", " << retval->velocity.z << ">\n" << flush;
+        if(retval->physicsObject == nullptr)
+        {
+            retval->physicsObject = retval->mesh()->constructPhysicsObject(position, velocity, physicsWorld);
+        }
+        else
+        {
+            retval->physicsObject->setCurrentState(position, velocity);
+        }
         shared_ptr<Scripting::Data> newData = Scripting::Data::read(reader);
         if(newData->type() != Scripting::Data::Type::Object)
             throw IOException("RenderObjectEntity : script variables object is not an object");
@@ -281,19 +285,15 @@ protected:
         }
 
         writer.writeF32(age);
+        PositionF position = physicsObject->getPosition();
         writer.writeF32(position.x);
         writer.writeF32(position.y);
         writer.writeF32(position.z);
         writer.writeDimension(position.d);
+        VectorF velocity = physicsObject->getVelocity();
         writer.writeF32(velocity.x);
         writer.writeF32(velocity.y);
         writer.writeF32(velocity.z);
-        writer.writeF32(acceleration.x);
-        writer.writeF32(acceleration.y);
-        writer.writeF32(acceleration.z);
-        writer.writeF32(deltaAcceleration.x);
-        writer.writeF32(deltaAcceleration.y);
-        writer.writeF32(deltaAcceleration.z);
         scriptIOObject->write(writer);
     }
 public:
@@ -311,19 +311,13 @@ public:
             return BoxRayCollision();
         }
 
-        return mesh()->rayHits(ray, position);
+        return mesh()->rayHits(ray, physicsObject->getPosition());
     }
     virtual bool isPlayer() const override
     {
         if(!good())
             return false;
         return mesh()->isPlayer;
-    }
-    shared_ptr<PhysicsObject> constructPhysicsObject(shared_ptr<PhysicsWorld> physicsWorld)
-    {
-        if(!good())
-            return nullptr;
-        return mesh()->constructPhysicsObject(position, velocity, physicsWorld);
     }
 };
 
@@ -1258,7 +1252,12 @@ inline void RenderObjectWorld::calcLight(float & lNXNYNZ, float & lNXNYPZ, float
 
 inline void RenderObjectEntity::render(Mesh dest, RenderLayer rl, Dimension d, Client & client, unsigned naturalLight)
 {
-    if(!good() || rl != RenderLayer::Opaque || d != position.d)
+    if(!good() || rl != RenderLayer::Opaque)
+    {
+        return;
+    }
+    PositionF position = physicsObject->getPosition());
+    if(d != position.d)
     {
         return;
     }
@@ -1266,6 +1265,7 @@ inline void RenderObjectEntity::render(Mesh dest, RenderLayer rl, Dimension d, C
     shared_ptr<RenderObjectWorld> world = RenderObjectWorld::getWorld(client);
 
     Mesh temp(new Mesh_t);
+    VectorF velocity = physicsObject->getVelocity();
 
     mesh()->render(temp, (VectorF)position, velocity, age, naturalLight, world, scriptIOObject);
     vector<Triangle> triangles;
