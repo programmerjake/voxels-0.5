@@ -91,7 +91,6 @@
 		<Unit filename="include/mesh.h" />
 		<Unit filename="include/network.h" />
 		<Unit filename="include/network_protocol.h" />
-		<Unit filename="include/new_physics.h" />
 		<Unit filename="include/ogg_vorbis_decoder.h" />
 		<Unit filename="include/physics.h" />
 		<Unit filename="include/platform.h" />
@@ -128,9 +127,6 @@
 		<Unit filename="src/matrix.cpp" />
 		<Unit filename="src/mesh.cpp" />
 		<Unit filename="src/network.cpp" />
-		<Unit filename="src/new_physics.cpp">
-			<Option target="&lt;{~None~}&gt;" />
-		</Unit>
 		<Unit filename="src/physics.cpp" />
 		<Unit filename="src/platform.cpp">
 			<Option compiler="gcc" use="1" buildCommand="$compiler $options $includes `sdl-config --cflags` -c $file -o $object" />

@@ -172,9 +172,9 @@ public:
 
         return rayHitBox(hitBoxMin + (VectorF)pos, hitBoxMax + (VectorF)pos, ray);
     }
-    shared_ptr<PhysicsObject> constructPhysicsObject(PositionF position, VectorF velocity, VectorF acceleration, VectorF deltaAcceleration)
+    shared_ptr<PhysicsObject> constructPhysicsObject(PositionF position, VectorF velocity, shared_ptr<PhysicsWorld> physicsWorld)
     {
-        return physicsConstructor->make(position, velocity, acceleration, deltaAcceleration);
+        return physicsConstructor->make(position, velocity, physicsWorld);
     }
 };
 

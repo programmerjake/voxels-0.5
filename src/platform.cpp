@@ -52,6 +52,8 @@ public:
     RWOpsReader(SDL_RWops * rw)
         : rw(rw)
     {
+        if(rw == nullptr)
+            throw IOException("invalid RWOps");
     }
     virtual uint8_t readByte() override
     {
