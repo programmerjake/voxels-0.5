@@ -78,12 +78,6 @@ protected:
         gss.writeF32(data.velocity.x);
         gss.writeF32(data.velocity.y);
         gss.writeF32(data.velocity.z);
-        gss.writeF32(data.acceleration.x);
-        gss.writeF32(data.acceleration.y);
-        gss.writeF32(data.acceleration.z);
-        gss.writeF32(data.deltaAcceleration.x);
-        gss.writeF32(data.deltaAcceleration.y);
-        gss.writeF32(data.deltaAcceleration.z);
     }
 public:
     virtual shared_ptr<RenderObjectEntity> getEntity(EntityData & entity, shared_ptr<World> world) const override;
